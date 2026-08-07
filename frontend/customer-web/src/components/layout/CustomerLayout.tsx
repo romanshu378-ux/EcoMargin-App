@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
-  Zap, 
   MapPin, 
   Wallet, 
   History, 
@@ -9,7 +8,11 @@ import {
   User, 
   LifeBuoy, 
   LogOut,
-  Home
+  Home,
+  Zap,
+  Bell,
+  Heart,
+  Settings
 } from 'lucide-react';
 
 interface CustomerLayoutProps {
@@ -31,7 +34,8 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
     { label: 'Find Stations', path: '/map', icon: MapPin },
     { label: 'Wallet', path: '/wallet', icon: Wallet },
     { label: 'History', path: '/history', icon: History },
-    { label: 'Reservations', path: '/booking', icon: Calendar },
+    { label: 'Favorites', path: '/favorites', icon: Heart },
+    { label: 'Notifications', path: '/notifications', icon: Bell },
     { label: 'Support', path: '/support', icon: LifeBuoy },
     { label: 'Profile', path: '/profile', icon: User },
   ];
@@ -39,17 +43,19 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
       {/* Top Navbar */}
-      <header className="h-20 bg-white/90 backdrop-blur border-b border-slate-200 shadow-sm px-8 flex items-center justify-between sticky top-0 z-50">
+      <header className="h-20 bg-white/90 backdrop-blur border-b border-slate-200 shadow-sm px-4 sm:px-8 flex items-center justify-between sticky top-0 z-50">
         <Link to="/" className="flex items-center gap-3">
-          <img src="/logo-dark.png" alt="EcoMargin Logo" className="h-10 w-auto object-contain" />
-          <div className="hidden sm:block">
-            <h1 className="font-bold text-xl text-slate-900 tracking-tight leading-none">EcoMargin</h1>
+          <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-black text-xl shadow-md shadow-emerald-600/30">
+            <Zap className="w-6 h-6 fill-white" />
+          </div>
+          <div>
+            <h1 className="font-extrabold text-xl text-slate-900 tracking-tight leading-none">EcoMargin</h1>
             <p className="text-[11px] text-emerald-600 font-semibold tracking-wide uppercase mt-0.5">EV Driver Portal</p>
           </div>
         </Link>
 
         {/* Navigation Links */}
-        <nav className="hidden md:flex items-center gap-1 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+        <nav className="hidden lg:flex items-center gap-1 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -57,7 +63,7 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
                   isActive
                     ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white'
@@ -96,6 +102,26 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
           )}
         </div>
       </header>
+
+      {/* Mobile Sub-Navigation Bar */}
+      <div className="lg:hidden bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-around overflow-x-auto">
+        {navItems.slice(0, 5).map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.path;
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex flex-col items-center gap-1 p-1.5 rounded-lg text-[10px] font-semibold ${
+                isActive ? 'text-emerald-600 font-bold' : 'text-slate-500'
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
 
       {/* Main Content */}
       <main className="flex-1">
