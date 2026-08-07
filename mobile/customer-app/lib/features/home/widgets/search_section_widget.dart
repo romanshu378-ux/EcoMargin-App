@@ -14,96 +14,89 @@ class SearchSectionWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final location = ref.watch(currentLocationProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Location bar
-          Row(
-            children: [
-              const Icon(
-                Icons.location_on_rounded,
-                color: Color(0xFF16A34A),
-                size: 18,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                'Current Location:',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? Colors.slate300 : const Color(0xFF64748B),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                location,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF16A34A)),
-            ],
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
-          const SizedBox(height: 10),
+        ],
+        border: Border.all(
+          color: isDark ? Colors.slate800 : const Color(0xFFF1F5F9),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Green Location Pin Icon
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF16A34A).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.location_on_rounded,
+              color: Color(0xFF16A34A),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
 
-          // Search Bar & Filter Button
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: TextField(
-                    onChanged: onSearchChanged,
-                    decoration: InputDecoration(
-                      hintText: 'Search charging stations or area...',
-                      hintStyle: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? Colors.slate400 : const Color(0xFF94A3B8),
-                      ),
-                      prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF16A34A), size: 22),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
+          // Middle: Text & Input
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Current Location',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF16A34A),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              // Filter Icon Button
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF16A34A),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF16A34A).withOpacity(0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+                TextField(
+                  onChanged: onSearchChanged,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Search charging stations...',
+                    hintStyle: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? Colors.slate400 : const Color(0xFF94A3B8),
                     ),
-                  ],
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                    border: InputBorder.none,
+                  ),
                 ),
-                child: IconButton(
-                  onPressed: onFilterPressed,
-                  icon: const Icon(Icons.tune_rounded, color: Colors.white, size: 22),
-                ),
+              ],
+            ),
+          ),
+
+          // Right: Green Filter Icon Button
+          GestureDetector(
+            onTap: onFilterPressed,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              color: Colors.transparent,
+              child: const Icon(
+                Icons.tune_rounded,
+                color: Color(0xFF16A34A),
+                size: 22,
               ),
-            ],
+            ),
           ),
         ],
       ),

@@ -2,28 +2,30 @@ class ChargingStation {
   final String id;
   final String name;
   final String address;
-  final double distanceKm;
+  final String distanceStr;
   final int totalChargers;
   final int availableChargers;
-  final String chargerType; // AC, DC Fast, Ultra Fast
-  final double pricePerKwh;
+  final String chargerType;
+  final String chargerCategory;
+  final String priceStr;
+  final String priceSubtext;
   final String imageUrl;
   final bool isVerified;
-  final double rating;
   final bool isFavorite;
 
   const ChargingStation({
     required this.id,
     required this.name,
     required this.address,
-    required this.distanceKm,
+    required this.distanceStr,
     required this.totalChargers,
     required this.availableChargers,
     required this.chargerType,
-    required this.pricePerKwh,
+    required this.chargerCategory,
+    required this.priceStr,
+    required this.priceSubtext,
     required this.imageUrl,
     this.isVerified = true,
-    this.rating = 4.8,
     this.isFavorite = false,
   });
 
@@ -32,14 +34,15 @@ class ChargingStation {
       id: id,
       name: name,
       address: address,
-      distanceKm: distanceKm,
+      distanceStr: distanceStr,
       totalChargers: totalChargers,
       availableChargers: availableChargers ?? this.availableChargers,
       chargerType: chargerType,
-      pricePerKwh: pricePerKwh,
+      chargerCategory: chargerCategory,
+      priceStr: priceStr,
+      priceSubtext: priceSubtext,
       imageUrl: imageUrl,
       isVerified: isVerified,
-      rating: rating,
       isFavorite: isFavorite ?? this.isFavorite,
     );
   }

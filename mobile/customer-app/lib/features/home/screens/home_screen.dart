@@ -30,7 +30,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
       drawer: Drawer(
         backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
         child: ListView(
@@ -103,30 +103,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
-              // 1. App Header
+              // 1. App Header (Logo, Tagline, Hamburger Menu, Notification Bell)
               SliverToBoxAdapter(
                 child: AppHeader(
                   onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
                   onNotificationPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Notifications: 3 unread updates')),
+                      const SnackBar(content: Text('Notifications: 1 new alert')),
                     );
                   },
                 ),
               ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 8)),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-              // 2. Hero Banner Slider
+              // 2. Hero Banner (Promotional EV banner with slider & Find Stations CTA)
               SliverToBoxAdapter(
                 child: HeroBannerSlider(
                   onFindStationsPressed: () => context.go('/map'),
                 ),
               ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-              // 3. Search Section
+              // 3. Search Section (Current Location & Search input + Filter button)
               SliverToBoxAdapter(
                 child: SearchSectionWidget(
                   onSearchChanged: (val) {
@@ -140,62 +140,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-              // 4. Quick Actions Grid
-              SliverToBoxAdapter(
-                child: QuickActionsWidget(
-                  onScanQr: () => context.go('/scan'),
-                  onFavorites: () => context.go('/map'),
-                  onHistory: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Opening Charging History')),
-                    );
-                  },
-                  onWallet: () => context.go('/wallet'),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 20)),
-
-              // 5. Wallet Card
-              SliverToBoxAdapter(
-                child: WalletCardWidget(
-                  onAddMoneyPressed: () => context.go('/wallet'),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 20)),
-
-              // 6. Promotional Banner
-              const SliverToBoxAdapter(
-                child: PromoBannerWidget(),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-              // Section Header: Nearby Charging Stations
+              // 4. Nearby Stations Section
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Nearby Charging Stations',
+                        'Nearby Stations',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
                       ),
-                      TextButton(
-                        onPressed: () => context.go('/map'),
-                        child: const Text(
-                          'View All',
-                          style: TextStyle(
-                            color: Color(0xFF16A34A),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
+                      GestureDetector(
+                        onTap: () => context.go('/map'),
+                        child: const Row(
+                          children: [
+                            Text(
+                              'View all',
+                              style: TextStyle(
+                                color: Color(0xFF16A34A),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            SizedBox(width: 2),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: Color(0xFF16A34A),
+                              size: 18,
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -205,7 +183,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-              // 7. Nearby Stations List (SliverList with async state & skeleton fallback)
+              // Nearby Stations List
               stationsAsync.when(
                 data: (stations) {
                   final filtered = stations.where((s) {
@@ -218,22 +196,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: Padding(
                         padding: const EdgeInsets.all(32),
                         child: Center(
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.ev_station_rounded,
-                                size: 48,
-                                color: isDark ? Colors.slate600 : Colors.slate300,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'No charging stations found matching "$_searchQuery"',
-                                style: TextStyle(
-                                  color: isDark ? Colors.slate400 : Colors.slate500,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
+                          child: Text(
+                            'No stations found matching "$_searchQuery"',
+                            style: TextStyle(
+                              color: isDark ? Colors.slate400 : Colors.slate500,
+                            ),
                           ),
                         ),
                       ),
@@ -241,7 +208,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   }
 
                   return SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
@@ -263,28 +230,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 },
                 loading: () => SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      children: List.generate(
-                        2,
-                        (index) => Container(
-                          height: 220,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          child: const Center(
-                            child: CircularProgressIndicator(color: Color(0xFF16A34A)),
-                          ),
-                        ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Container(
+                      height: 180,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(color: Color(0xFF16A34A)),
                       ),
                     ),
                   ),
                 ),
                 error: (err, stack) => SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(16),
                     child: Text(
                       'Failed to load stations: $err',
                       style: const TextStyle(color: Colors.red),
@@ -293,29 +254,60 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+
+              // 5. Quick Actions Section (Scan QR, Favorites, Charging History, Wallet)
+              SliverToBoxAdapter(
+                child: QuickActionsWidget(
+                  onScanQr: () => context.go('/scan'),
+                  onFavorites: () => context.go('/map'),
+                  onHistory: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Opening Charging History')),
+                    );
+                  },
+                  onWallet: () => context.go('/wallet'),
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+              // 6. Wallet Card (Wallet Balance & Add Money Button)
+              SliverToBoxAdapter(
+                child: WalletCardWidget(
+                  onAddMoneyPressed: () => context.go('/wallet'),
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+              // 7. Promotional Banner ("Drive Green, Save More")
+              const SliverToBoxAdapter(
+                child: PromoBannerWidget(),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
             ],
           ),
         ),
       ),
 
-      // 8. Bottom Navigation Bar
+      // 8. Bottom Navigation Bar (Home, Map, Bookings, Profile)
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF0F172A) : Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
+          border: Border(
+            top: BorderSide(
+              color: isDark ? Colors.slate800 : const Color(0xFFE2E8F0),
+              width: 1,
             ),
-          ],
+          ),
         ),
         child: NavigationBar(
           selectedIndex: _currentIndex,
           elevation: 0,
           backgroundColor: Colors.transparent,
-          indicatorColor: const Color(0xFF16A34A).withOpacity(0.15),
+          indicatorColor: const Color(0xFF16A34A).withOpacity(0.12),
           onDestinationSelected: (index) {
             setState(() => _currentIndex = index);
             if (index == 1) context.go('/map');
@@ -371,21 +363,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 spacing: 8,
                 children: [
                   FilterChip(
-                    label: const Text('DC Fast (>100 kW)'),
+                    label: const Text('DC Fast (>60 kW)'),
                     selected: true,
                     onSelected: (val) {},
                     selectedColor: const Color(0xFF16A34A).withOpacity(0.2),
-                  ),
-                  FilterChip(
-                    label: const Text('AC Standard (22 kW)'),
-                    selected: false,
-                    onSelected: (val) {},
                   ),
                   FilterChip(
                     label: const Text('Available Now'),
                     selected: true,
                     onSelected: (val) {},
                     selectedColor: const Color(0xFF16A34A).withOpacity(0.2),
+                  ),
+                  FilterChip(
+                    label: const Text('AC Type 2'),
+                    selected: false,
+                    onSelected: (val) {},
                   ),
                 ],
               ),
@@ -397,7 +389,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF16A34A),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   child: const Text('Apply Filters', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -414,17 +406,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(station.name),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(station.address),
+            Text(station.address, style: const TextStyle(color: Color(0xFF64748B))),
             const SizedBox(height: 12),
-            Text('Charger Type: ${station.chargerType}', style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text('Available: ${station.availableChargers} of ${station.totalChargers} connectors'),
-            Text('Price: \$${station.pricePerKwh}/kWh', style: const TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold)),
+            Text('Charger: ${station.chargerType} (${station.chargerCategory})', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('Available Connectors: ${station.availableChargers} / ${station.totalChargers}'),
+            const SizedBox(height: 4),
+            Text('Rate: ${station.priceStr}', style: const TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold)),
           ],
         ),
         actions: [
@@ -439,7 +432,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF16A34A),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('Start Charging', style: TextStyle(color: Colors.white)),
           ),

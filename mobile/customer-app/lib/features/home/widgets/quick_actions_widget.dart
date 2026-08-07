@@ -22,35 +22,31 @@ class QuickActionsWidget extends StatelessWidget {
       {
         'title': 'Scan QR',
         'icon': Icons.qr_code_scanner_rounded,
-        'color': const Color(0xFF16A34A),
         'onTap': onScanQr,
       },
       {
         'title': 'Favorites',
-        'icon': Icons.favorite_rounded,
-        'color': const Color(0xFFEC4899),
+        'icon': Icons.favorite_border_rounded,
         'onTap': onFavorites,
       },
       {
-        'title': 'History',
+        'title': 'Charging\nHistory',
         'icon': Icons.history_rounded,
-        'color': const Color(0xFF3B82F6),
         'onTap': onHistory,
       },
       {
         'title': 'Wallet',
-        'icon': Icons.account_balance_wallet_rounded,
-        'color': const Color(0xFF8B5CF6),
+        'icon': Icons.account_balance_wallet_outlined,
         'onTap': onWallet,
       },
     ];
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
             'Quick Actions',
             style: TextStyle(
               fontSize: 16,
@@ -58,55 +54,52 @@ class QuickActionsWidget extends StatelessWidget {
               color: isDark ? Colors.white : const Color(0xFF0F172A),
             ),
           ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
             children: actions.map((item) {
-              final color = item['color'] as Color;
               return Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: InkWell(
                     onTap: item['onTap'] as VoidCallback,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      height: 95,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
                       decoration: BoxDecoration(
                         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withOpacity(0.03),
                             blurRadius: 10,
-                            offset: const Offset(0, 4),
+                            offset: const Offset(0, 3),
                           ),
                         ],
                         border: Border.all(
-                          color: isDark ? Colors.transparent : const Color(0xFFF1F5F9),
+                          color: isDark ? Colors.slate800 : const Color(0xFFF1F5F9),
                         ),
                       ),
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.12),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              item['icon'] as IconData,
-                              color: color,
-                              size: 22,
-                            ),
+                          Icon(
+                            item['icon'] as IconData,
+                            color: const Color(0xFF16A34A),
+                            size: 26,
                           ),
                           const SizedBox(height: 8),
                           Text(
                             item['title'] as String,
+                            textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : const Color(0xFF334155),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              height: 1.1,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
                             ),
                           ),
                         ],
@@ -117,8 +110,8 @@ class QuickActionsWidget extends StatelessWidget {
               );
             }).toList(),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

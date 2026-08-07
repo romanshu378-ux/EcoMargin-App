@@ -15,31 +15,41 @@ class HeroBannerSlider extends StatefulWidget {
 
 class _HeroBannerSliderState extends State<HeroBannerSlider> {
   late final PageController _pageController;
-  int _currentPage = 0;
+  int _currentPage = 1;
   Timer? _timer;
 
   final List<Map<String, String>> _banners = [
     {
-      'title': 'Charge Faster, Go Further',
-      'subtitle': 'Access 500+ Ultra-Fast Charging Stations across the country.',
-      'tag': 'PROMO 20% OFF',
+      'title1': 'Powering',
+      'title2': 'a Greener Future',
+      'subtitle': 'Find, Book & Charge at the\nbest EV charging stations.',
     },
     {
-      'title': 'Green Energy Rewards',
-      'subtitle': 'Earn EcoPoints on every charge session & redeem instant cashbacks.',
-      'tag': 'REWARDS PROGRAM',
+      'title1': 'Powering',
+      'title2': 'a Greener Future',
+      'subtitle': 'Find, Book & Charge at the\nbest EV charging stations.',
     },
     {
-      'title': 'Reserve Your Slot Ahead',
-      'subtitle': 'Zero wait times! Book your charger in advance with 1-click.',
-      'tag': 'SMART BOOKING',
+      'title1': 'Powering',
+      'title2': 'a Greener Future',
+      'subtitle': 'Find, Book & Charge at the\nbest EV charging stations.',
+    },
+    {
+      'title1': 'Powering',
+      'title2': 'a Greener Future',
+      'subtitle': 'Find, Book & Charge at the\nbest EV charging stations.',
+    },
+    {
+      'title1': 'Powering',
+      'title2': 'a Greener Future',
+      'subtitle': 'Find, Book & Charge at the\nbest EV charging stations.',
     },
   ];
 
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: 0);
+    _pageController = PageController(initialPage: 1);
     _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
       if (_currentPage < _banners.length - 1) {
         _currentPage++;
@@ -65,152 +75,154 @@ class _HeroBannerSliderState extends State<HeroBannerSlider> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SizedBox(
-          height: 180,
-          child: PageView.builder(
-            controller: _pageController,
-            onPageChanged: (index) {
-              setState(() => _currentPage = index);
-            },
-            itemCount: _banners.length,
-            itemBuilder: (context, index) {
-              final banner = _banners[index];
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF16A34A), Color(0xFF15803D)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF16A34A).withOpacity(0.35),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    // Background EV Icon Overlay
-                    Positioned(
-                      right: -15,
-                      bottom: -20,
-                      child: Icon(
-                        Icons.ev_station_rounded,
-                        size: 150,
-                        color: Colors.white.withOpacity(0.12),
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Tag Badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.25),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            banner['tag']!,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-
-                        // Title & Subtitle
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              banner['title']!,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                height: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              banner['subtitle']!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        // CTA Button
-                        ElevatedButton(
-                          onPressed: widget.onFindStationsPressed,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF16A34A),
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Find Stations',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              SizedBox(width: 4),
-                              Icon(Icons.arrow_forward_rounded, size: 14),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      height: 190,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: const Color(0xFF0D1B1E),
+        image: const DecorationImage(
+          image: NetworkImage('https://images.unsplash.com/photo-1563720223185-11003d516935?w=600&q=80'),
+          fit: BoxFit.cover,
+          colorFilter: ColorFilter.mode(
+            Colors.black54,
+            BlendMode.darken,
           ),
         ),
-        const SizedBox(height: 12),
-        // Indicator Dots
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(_banners.length, (index) {
-            final isActive = _currentPage == index;
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              width: isActive ? 24 : 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: isActive ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1),
-                borderRadius: BorderRadius.circular(4),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          children: [
+            // Dark gradient overlay to match screenshot
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Color(0xEE091316),
+                    Color(0xCC091316),
+                    Color(0x44091316),
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
               ),
-            );
-          }),
+            ),
+
+            // Page View Content
+            PageView.builder(
+              controller: _pageController,
+              onPageChanged: (index) {
+                setState(() => _currentPage = index);
+              },
+              itemCount: _banners.length,
+              itemBuilder: (context, index) {
+                final banner = _banners[index];
+                return Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Headline Title
+                      Text(
+                        banner['title1']!,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          height: 1.1,
+                        ),
+                      ),
+                      Text(
+                        banner['title2']!,
+                        style: const TextStyle(
+                          color: Color(0xFF22C55E),
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Subtitle
+                      Text(
+                        banner['subtitle']!,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // CTA Button: Find Stations >
+                      ElevatedButton(
+                        onPressed: widget.onFindStationsPressed,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF16A34A),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Find Stations',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            SizedBox(width: 6),
+                            Icon(Icons.chevron_right_rounded, size: 18),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            // Page Indicator Dots at Bottom Center of Hero Banner
+            Positioned(
+              bottom: 14,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(_banners.length, (index) {
+                  final isActive = _currentPage == index;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: isActive ? 20 : 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: isActive ? const Color(0xFF22C55E) : Colors.white54,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
