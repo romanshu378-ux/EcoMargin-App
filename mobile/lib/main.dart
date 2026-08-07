@@ -1,16 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'src/core/theme/app_theme.dart';
-import 'src/core/providers/theme_provider.dart';
-import 'src/features/auth/login_screen.dart';
-import 'src/features/map/map_screen.dart';
-import 'src/features/payment/wallet_screen.dart';
-import 'src/features/profile/history_screen.dart';
+import 'core/theme/app_theme.dart';
+import 'core/router/app_router.dart';
+import 'core/storage/storage_service.dart';
+import 'core/providers/core_providers.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Storage (Hive & Secure Storage)
+  final storageService = StorageService();
+  await storageService.init();
+
   runApp(
-    const ProviderScope(
-      child: EcoMarginApp(),
+    ProviderScope(
+      overrides: [
+        storageServiceProvider.overrideWithValue(storageService),
+      ],
+      child: const EcoMarginApp(),
     ),
   );
 }
@@ -20,21 +27,14 @@ class EcoMarginApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDarkMode = ref.watch(themeProvider);
+    final router = ref.watch(routerProvider);
 
-    return MaterialApp(
-      title: 'EcoMargin',
+    return MaterialApp.router(
+      title: 'EcoMargin Customer',
       debugShowCheckedModeBanner: false,
-      themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
       theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      initialRoute: '/login',
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/map': (context) => const MapScreen(),
-        '/wallet': (context) => const WalletScreen(),
-        '/history': (context) => const HistoryScreen(),
-      },
+      themeMode: ThemeMode.light,
+      routerConfig: router,
     );
   }
 }
