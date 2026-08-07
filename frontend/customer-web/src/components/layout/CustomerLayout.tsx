@@ -37,19 +37,19 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
       {/* Top Navbar */}
-      <header className="h-20 bg-slate-900/90 backdrop-blur border-b border-slate-800 px-8 flex items-center justify-between sticky top-0 z-50">
+      <header className="h-20 bg-white/90 backdrop-blur border-b border-slate-200 shadow-sm px-8 flex items-center justify-between sticky top-0 z-50">
         <Link to="/" className="flex items-center gap-3">
           <img src="/logo-dark.png" alt="EcoMargin Logo" className="h-10 w-auto object-contain" />
           <div className="hidden sm:block">
-            <h1 className="font-bold text-xl text-white tracking-tight leading-none">EcoMargin</h1>
-            <p className="text-[11px] text-emerald-400 font-semibold tracking-wide uppercase mt-0.5">EV Driver Portal</p>
+            <h1 className="font-bold text-xl text-slate-900 tracking-tight leading-none">EcoMargin</h1>
+            <p className="text-[11px] text-emerald-600 font-semibold tracking-wide uppercase mt-0.5">EV Driver Portal</p>
           </div>
         </Link>
 
         {/* Navigation Links */}
-        <nav className="hidden md:flex items-center gap-1 bg-slate-950/60 p-1.5 rounded-2xl border border-slate-800/80">
+        <nav className="hidden md:flex items-center gap-1 bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
@@ -59,8 +59,8 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
                 to={item.path}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
                   isActive
-                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -75,12 +75,12 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
           {token ? (
             <div className="flex items-center gap-3">
               <div className="hidden sm:block text-right">
-                <p className="text-xs font-semibold text-white">Alex Rivers</p>
-                <p className="text-[10px] text-emerald-400 font-mono font-bold">$45.00 Balance</p>
+                <p className="text-xs font-semibold text-slate-900">Alex Rivers</p>
+                <p className="text-[10px] text-emerald-600 font-mono font-bold">₹256.50 Balance</p>
               </div>
               <button
                 onClick={handleLogout}
-                className="p-2.5 text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all border border-rose-500/20"
+                className="p-2.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-all border border-rose-200"
                 title="Sign Out"
               >
                 <LogOut className="w-4 h-4" />
@@ -89,7 +89,7 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
           ) : (
             <Link
               to="/login"
-              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 font-semibold text-white text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20"
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 font-semibold text-white text-xs rounded-xl transition-all shadow-md shadow-emerald-600/20"
             >
               Sign In
             </Link>
@@ -103,7 +103,7 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
       </main>
 
       {/* Footer */}
-      <footer className="bg-slate-900 border-t border-slate-800 py-8 px-8 text-center text-xs text-slate-500">
+      <footer className="bg-white border-t border-slate-200 py-8 px-8 text-center text-xs text-slate-500">
         <p>© 2026 EcoMargin Enterprise EV Network. All rights reserved.</p>
       </footer>
     </div>

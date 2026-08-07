@@ -19,16 +19,16 @@ class AppHeader extends ConsumerWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: isDark ? const Color(0xFF0F172A) : Colors.white,
+      color: Colors.white,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Left: Hamburger Menu Icon
           IconButton(
             onPressed: onMenuPressed,
-            icon: Icon(
+            icon: const Icon(
               Icons.menu_rounded,
-              color: isDark ? Colors.white : const Color(0xFF1E293B),
+              color: Color(0xFF1E293B),
               size: 26,
             ),
             padding: EdgeInsets.zero,
@@ -72,22 +72,22 @@ class AppHeader extends ConsumerWidget {
                         ),
                         TextSpan(
                           text: 'Margin',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            color: Color(0xFF0F172A),
                             letterSpacing: -0.5,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Text(
+                  const Text(
                     'Powering a Greener Future',
                     style: TextStyle(
                       fontSize: 9,
                       fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.slate400 : const Color(0xFF64748B),
+                      color: Color(0xFF64748B),
                     ),
                   ),
                 ],
@@ -101,9 +101,9 @@ class AppHeader extends ConsumerWidget {
             children: [
               IconButton(
                 onPressed: onNotificationPressed,
-                icon: Icon(
+                icon: const Icon(
                   Icons.notifications_none_outlined,
-                  color: isDark ? Colors.white : const Color(0xFF1E293B),
+                  color: Color(0xFF1E293B),
                   size: 26,
                 ),
                 padding: EdgeInsets.zero,
@@ -120,7 +120,7 @@ class AppHeader extends ConsumerWidget {
                       color: const Color(0xFF16A34A),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                        color: Colors.white,
                         width: 1.5,
                       ),
                     ),
