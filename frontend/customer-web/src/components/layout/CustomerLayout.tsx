@@ -41,12 +41,10 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
       {/* Top Navbar */}
       <header className="h-20 bg-slate-900/90 backdrop-blur border-b border-slate-800 px-8 flex items-center justify-between sticky top-0 z-50">
         <Link to="/" className="flex items-center gap-3">
-          <div className="bg-emerald-500/10 p-2.5 rounded-xl text-emerald-400 border border-emerald-500/20">
-            <Zap className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="font-bold text-xl text-white tracking-tight">EcoMargin</h1>
-            <p className="text-[11px] text-emerald-400 font-semibold tracking-wide uppercase">EV Driver Portal</p>
+          <img src="/logo-dark.png" alt="EcoMargin Logo" className="h-10 w-auto object-contain" />
+          <div className="hidden sm:block">
+            <h1 className="font-bold text-xl text-white tracking-tight leading-none">EcoMargin</h1>
+            <p className="text-[11px] text-emerald-400 font-semibold tracking-wide uppercase mt-0.5">EV Driver Portal</p>
           </div>
         </Link>
 

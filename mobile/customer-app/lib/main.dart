@@ -1,40 +1,41 @@
 import 'package:flutter/material.dart';
-import 'src/core/theme/app_theme.dart';
-import 'src/screens/login_screen.dart';
-import 'src/screens/map_screen.dart';
-import 'src/screens/qr_scan_screen.dart';
-import 'src/screens/charging_session_screen.dart';
-import 'src/screens/wallet_screen.dart';
-import 'src/screens/payments_screen.dart';
-import 'src/screens/charging_history_screen.dart';
-import 'src/screens/notifications_screen.dart';
-import 'src/screens/profile_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/theme/app_theme.dart';
+import 'core/router/app_router.dart';
+import 'core/storage/storage_service.dart';
+import 'core/providers/core_providers.dart';
 
-void main() {
-  runApp(const CustomerApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Storage (Hive & Secure Storage)
+  final storageService = StorageService();
+  await storageService.init();
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        storageServiceProvider.overrideWithValue(storageService),
+      ],
+      child: const EcoMarginApp(),
+    ),
+  );
 }
 
-class CustomerApp extends StatelessWidget {
-  const CustomerApp({super.key});
+class EcoMarginApp extends ConsumerWidget {
+  const EcoMarginApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'EcoMargin Driver',
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(routerProvider);
+
+    return MaterialApp.router(
+      title: 'EcoMargin Customer',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const MapScreen(),
-        '/login': (context) => const LoginScreen(),
-        '/qr': (context) => const QrScanScreen(),
-        '/charging': (context) => const ChargingSessionScreen(),
-        '/wallet': (context) => const WalletScreen(),
-        '/payments': (context) => const PaymentsScreen(),
-        '/history': (context) => const ChargingHistoryScreen(),
-        '/notifications': (context) => const NotificationsScreen(),
-        '/profile': (context) => const ProfileScreen(),
-      },
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
+      routerConfig: router,
     );
   }
 }

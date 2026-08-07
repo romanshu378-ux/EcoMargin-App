@@ -45,14 +45,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between">
         <div>
           {/* Logo */}
-          <div className="p-6 border-b border-slate-800 flex items-center gap-3">
-            <div className="bg-emerald-500/10 p-2 rounded-lg text-emerald-400 border border-emerald-500/20">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="font-bold text-lg text-white">EcoMargin</h1>
-              <p className="text-xs text-emerald-400 font-medium">Admin Control Center</p>
-            </div>
+          <div className="p-6 border-b border-slate-800 flex flex-col items-start gap-2">
+            <img src="/logo-dark.png" alt="EcoMargin Logo" className="h-12 w-auto object-contain" />
+            <p className="text-xs text-emerald-400 font-medium tracking-wider uppercase ml-1">Admin Control Center</p>
           </div>
 
           {/* Navigation */}

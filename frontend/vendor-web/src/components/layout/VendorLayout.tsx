@@ -43,14 +43,9 @@ export const VendorLayout: React.FC<VendorLayoutProps> = ({ children }) => {
       <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between">
         <div>
           {/* Logo */}
-          <div className="p-6 border-b border-slate-800 flex items-center gap-3">
-            <div className="bg-amber-500/10 p-2 rounded-lg text-amber-400 border border-amber-500/20">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="font-bold text-lg text-white">ChargeTech CPO</h1>
-              <p className="text-xs text-amber-400 font-medium">Vendor Control Portal</p>
-            </div>
+          <div className="p-6 border-b border-slate-800 flex flex-col items-start gap-2">
+            <img src="/logo-dark.png" alt="EcoMargin Logo" className="h-12 w-auto object-contain" />
+            <p className="text-xs text-amber-400 font-medium tracking-wider uppercase ml-1">Vendor Control Portal</p>
           </div>
 
           {/* Navigation */}
