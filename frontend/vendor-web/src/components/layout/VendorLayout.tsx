@@ -9,9 +9,9 @@ import {
   Cpu, 
   LifeBuoy, 
   User, 
-  LogOut,
-  Building2
+  LogOut
 } from 'lucide-react';
+import { PwaInstallButton } from '../PwaInstallButton';
 
 interface VendorLayoutProps {
   children: React.ReactNode;
@@ -44,8 +44,8 @@ export const VendorLayout: React.FC<VendorLayoutProps> = ({ children }) => {
         <div>
           {/* Logo */}
           <div className="p-6 border-b border-slate-800 flex flex-col items-start gap-2">
-            <img src="/logo-dark.png" alt="EcoMargin Logo" className="h-12 w-auto object-contain" />
-            <p className="text-xs text-amber-400 font-medium tracking-wider uppercase ml-1">Vendor Control Portal</p>
+            <h1 className="text-xl font-black text-emerald-500 tracking-tight">EcoMargin</h1>
+            <p className="text-xs text-amber-400 font-medium tracking-wider uppercase">Vendor Control Portal</p>
           </div>
 
           {/* Navigation */}
@@ -59,7 +59,7 @@ export const VendorLayout: React.FC<VendorLayoutProps> = ({ children }) => {
                   to={item.path}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                     isActive
-                      ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/25'
+                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                   }`}
                 >
@@ -98,6 +98,7 @@ export const VendorLayout: React.FC<VendorLayoutProps> = ({ children }) => {
             {navItems.find(i => i.path === location.pathname)?.label || 'Overview'}
           </h2>
           <div className="flex items-center gap-4">
+            <PwaInstallButton />
             <span className="px-3 py-1 text-xs font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
               Verified CPO Vendor
             </span>

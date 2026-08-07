@@ -10,9 +10,9 @@ import {
   CreditCard, 
   BarChart3, 
   Settings, 
-  LogOut,
-  ShieldCheck
+  LogOut
 } from 'lucide-react';
+import { PwaInstallButton } from '../PwaInstallButton';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -46,8 +46,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         <div>
           {/* Logo */}
           <div className="p-6 border-b border-slate-800 flex flex-col items-start gap-2">
-            <img src="/logo-dark.png" alt="EcoMargin Logo" className="h-12 w-auto object-contain" />
-            <p className="text-xs text-emerald-400 font-medium tracking-wider uppercase ml-1">Admin Control Center</p>
+            <h1 className="text-xl font-black text-emerald-500 tracking-tight">EcoMargin</h1>
+            <p className="text-xs text-emerald-400 font-medium tracking-wider uppercase">Admin Control Center</p>
           </div>
 
           {/* Navigation */}
@@ -61,7 +61,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   to={item.path}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                     isActive
-                      ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
+                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                   }`}
                 >
@@ -102,6 +102,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             </h2>
           </div>
           <div className="flex items-center gap-4">
+            <PwaInstallButton />
             <span className="px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               System Online
             </span>
