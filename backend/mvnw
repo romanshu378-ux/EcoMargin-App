@@ -1,0 +1,65 @@
+#!/bin/sh
+# ----------------------------------------------------------------------------
+# Apache Maven Wrapper Executable Script for Unix/Linux/macOS
+# ----------------------------------------------------------------------------
+
+# OS specific support.  $var _must_ be set to true or false.
+cygwin=false
+darwin=false
+os400=false
+hpux=false
+case "`uname`" in
+CYGWIN*) cygwin=true;;
+Darwin*) darwin=true;;
+OS400*) os400=true;;
+HP-UX*) hpux=true;;
+esac
+
+# locate home directory
+PRG="$0"
+
+while [ -h "$PRG" ]; do
+  ls=`ls -ld "$PRG"`
+  link=`expr "$ls" : '.*-> \(.*\)$'`
+  if expr "$link" : '/.*' > /dev/null; then
+    PRG="$link"
+  else
+    PRG=`dirname "$PRG"`/"$link"
+  fi
+done
+
+PRGDIR=`dirname "$PRG"`
+BASEDIR=`cd "$PRGDIR" >/dev/null; pwd`
+
+# Reset option processing
+OPTIND=1
+
+WRAPPER_JAR="$BASEDIR/.mvn/wrapper/maven-wrapper.jar"
+WRAPPER_PROPERTIES="$BASEDIR/.mvn/wrapper/maven-wrapper.properties"
+
+# Download maven-wrapper.jar if not present
+if [ ! -f "$WRAPPER_JAR" ]; then
+  mkdir -p "$BASEDIR/.mvn/wrapper"
+  JAR_URL="https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar"
+  if command -v curl >/dev/null 2>&1; then
+    curl -sS -L -o "$WRAPPER_JAR" "$JAR_URL"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q -O "$WRAPPER_JAR" "$JAR_URL"
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c "import urllib.request; urllib.request.urlretrieve('$JAR_URL', '$WRAPPER_JAR')"
+  fi
+fi
+
+if [ -n "$JAVA_HOME" ]; then
+  JAVACMD="$JAVA_HOME/bin/java"
+else
+  JAVACMD="java"
+fi
+
+exec "$JAVACMD" \
+  $MAVEN_OPTS \
+  -classpath "$WRAPPER_JAR" \
+  "-Dmaven.home=$BASEDIR" \
+  "-Dmaven.multiModuleProjectDirectory=$BASEDIR" \
+  org.apache.maven.wrapper.MavenWrapperMain \
+  "$@"
