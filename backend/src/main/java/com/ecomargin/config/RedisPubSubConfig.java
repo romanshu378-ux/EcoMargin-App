@@ -1,6 +1,7 @@
 package com.ecomargin.config;
 
 import com.ecomargin.websocket.telemetry.TelemetrySubscriber;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -9,6 +10,7 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.listener.adapter.MessageListenerAdapter;
 
 @Configuration
+@ConditionalOnProperty(name = "spring.redis.enabled", havingValue = "true", matchIfMissing = false)
 public class RedisPubSubConfig {
 
     public static final String TELEMETRY_TOPIC = "telemetry-channel";

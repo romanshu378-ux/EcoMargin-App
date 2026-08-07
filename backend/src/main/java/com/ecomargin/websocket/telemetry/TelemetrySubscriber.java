@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
 import org.springframework.stereotype.Component;
@@ -12,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "spring.redis.enabled", havingValue = "true", matchIfMissing = false)
 @RequiredArgsConstructor
 public class TelemetrySubscriber implements MessageListener {
 
@@ -28,8 +30,7 @@ public class TelemetrySubscriber implements MessageListener {
             String type = payload.get("type").asText();
             String resourceId = payload.get("resourceId").asText();
 
-            // Broadast to specific channels based on resource IDs
-            // For example, if it's charger status: broadcast to topic "charger:<chargeBoxId>"
+            // Broadcast to specific channels based on resource IDs
             if (type.startsWith("CHARGER_")) {
                 webSocketHandler.broadcastToTopic("charger:" + resourceId, body);
             } else if (type.startsWith("VENDOR_") || type.startsWith("REVENUE_")) {

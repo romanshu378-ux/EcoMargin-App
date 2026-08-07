@@ -2,8 +2,8 @@ package com.ecomargin.websocket.telemetry;
 
 import com.ecomargin.config.RedisPubSubConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -11,13 +11,19 @@ import java.util.Map;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class TelemetryPublisher {
 
-    private final StringRedisTemplate redisTemplate;
+    @Autowired(required = false)
+    private StringRedisTemplate redisTemplate;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public void publish(String type, String resourceId, Map<String, Object> data) {
+        if (redisTemplate == null) {
+            log.trace("Redis is disabled/unavailable. Skipping telemetry publish for resource {}", resourceId);
+            return;
+        }
+
         try {
             Map<String, Object> payload = Map.of(
                     "type", type, // CHARGER_STATUS, METER_VALUES, REVENUE_UPDATE

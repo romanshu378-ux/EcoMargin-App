@@ -4,7 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -14,15 +15,22 @@ import java.io.IOException;
 import java.time.Duration;
 
 @Component
-@RequiredArgsConstructor
+@ConditionalOnProperty(name = "spring.redis.enabled", havingValue = "true", matchIfMissing = false)
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    private final StringRedisTemplate redisTemplate;
+    @Autowired(required = false)
+    private StringRedisTemplate redisTemplate;
+
     private static final int MAX_REQUESTS_PER_MINUTE = 60; // configurable
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+
+        if (redisTemplate == null) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         String clientIp = request.getRemoteAddr();
         String redisKey = "rate_limit:" + clientIp;
@@ -40,8 +48,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 return;
             }
         } catch (Exception e) {
-            // If Redis is down, we might want to bypass rate limiting or fail closed
-            // Bypassing for now to not block all traffic
+            // If Redis is down, bypass rate limiting to avoid blocking traffic
         }
 
         filterChain.doFilter(request, response);
