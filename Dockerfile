@@ -2,9 +2,9 @@
 FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
 WORKDIR /app
 
-# Copy dependency definition and source code
-COPY pom.xml .
-COPY src ./src
+# Copy dependency definition and source code from backend subfolder
+COPY backend/pom.xml ./pom.xml
+COPY backend/src ./src
 
 # Build production artifact skipping tests
 RUN mvn clean package -DskipTests

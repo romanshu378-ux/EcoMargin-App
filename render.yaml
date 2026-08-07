@@ -3,22 +3,26 @@ services:
   - type: web
     name: ecomargin-backend
     env: docker
-    dockerfilePath: backend/Dockerfile
-    dockerContext: .
+    rootDir: backend
+    dockerfilePath: Dockerfile
     plan: starter
+    healthCheckPath: /actuator/health
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
       - key: SPRING_DATASOURCE_URL
-        value: jdbc:postgresql://${DB_HOST}/${DB_NAME}?ssl=true
+        sync: false
       - key: SPRING_DATASOURCE_USERNAME
-        value: ${DB_USER}
+        sync: false
       - key: SPRING_DATASOURCE_PASSWORD
-        value: ${DB_PASSWORD}
+        sync: false
       - key: SPRING_DATA_REDIS_HOST
-        value: ${REDIS_HOST}
+        sync: false
       - key: SPRING_DATA_REDIS_PORT
-        value: "6379"
+        sync: false
       - key: SPRING_DATA_REDIS_PASSWORD
-        value: ${REDIS_PASSWORD}
-    healthCheckPath: /actuator/health
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CRYPTO_KEY
+        sync: false
