@@ -1,17 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useJsApiLoader, GoogleMap, Marker, InfoWindow } from '@react-google-maps/api';
-import { 
-  Search, 
-  MapPin, 
-  Navigation, 
-  Zap, 
-  AlertTriangle, 
-  Compass, 
-  Star, 
-  Filter, 
-  ExternalLink,
-  Layers
-} from 'lucide-react';
+import { Search, MapPin, Navigation, Zap, AlertTriangle, Compass, Star } from 'lucide-react';
 import { api } from '../services/api';
 
 interface Station {
@@ -26,7 +15,6 @@ interface Station {
   powerKw: number;
   pricePerKwh: number;
   rating: number;
-  reviewsCount: number;
   imageUrl: string;
   isAvailable: boolean;
 }
@@ -46,7 +34,6 @@ const FALLBACK_STATIONS: Station[] = [
     powerKw: 60,
     pricePerKwh: 12,
     rating: 4.8,
-    reviewsCount: 42,
     imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=400&q=80',
     isAvailable: true,
   },
@@ -62,7 +49,6 @@ const FALLBACK_STATIONS: Station[] = [
     powerKw: 120,
     pricePerKwh: 15,
     rating: 4.9,
-    reviewsCount: 88,
     imageUrl: 'https://images.unsplash.com/photo-1558441719-6705166e2860?w=400&q=80',
     isAvailable: true,
   },
@@ -78,7 +64,6 @@ const FALLBACK_STATIONS: Station[] = [
     powerKw: 22,
     pricePerKwh: 10,
     rating: 4.6,
-    reviewsCount: 19,
     imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=400&q=80',
     isAvailable: true,
   },
@@ -94,7 +79,6 @@ const FALLBACK_STATIONS: Station[] = [
     powerKw: 240,
     pricePerKwh: 18,
     rating: 4.95,
-    reviewsCount: 124,
     imageUrl: 'https://images.unsplash.com/photo-1558441719-6705166e2860?w=400&q=80',
     isAvailable: true,
   },
@@ -106,24 +90,24 @@ const mapContainerStyle = {
 };
 
 export const MapPage: React.FC = () => {
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || 'AIzaSyCA9F7oYVMsSVIQosGoLMuUE5ZP-oHOt6g';
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: apiKey,
+    googleMapsApiKey: apiKey || '',
     id: 'google-map-script',
   });
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number }>(DEFAULT_CENTER);
+  const [locationDenied, setLocationDenied] = useState(false);
   const [stations, setStations] = useState<Station[]>(FALLBACK_STATIONS);
   const [isLoadingStations, setIsLoadingStations] = useState(false);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [selectedPlugFilter, setSelectedPlugFilter] = useState('ALL');
   const [minPowerFilter, setMinPowerFilter] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Fetch stations from API with fallback
+  // Fetch stations from backend API
   useEffect(() => {
     setIsLoadingStations(true);
     api.get('/stations')
@@ -142,7 +126,7 @@ export const MapPage: React.FC = () => {
       });
   }, []);
 
-  // Detect GPS position on mount
+  // Detect GPS user position
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -152,21 +136,31 @@ export const MapPage: React.FC = () => {
             lng: position.coords.longitude,
           };
           setUserLocation(userPos);
+          setLocationDenied(false);
           if (map) {
             map.panTo(userPos);
-            map.setZoom(14);
           }
         },
         () => {
           setUserLocation(DEFAULT_CENTER);
+          setLocationDenied(true);
         },
         { enableHighAccuracy: true, timeout: 10000 }
       );
+    } else {
+      setLocationDenied(true);
     }
   }, [map]);
 
   const onMapLoad = useCallback((mapInstance: google.maps.Map) => {
     setMap(mapInstance);
+    // Fit map bounds to encompass user location and station markers
+    if (window.google) {
+      const bounds = new window.google.maps.LatLngBounds();
+      bounds.extend(DEFAULT_CENTER);
+      FALLBACK_STATIONS.forEach((s) => bounds.extend({ lat: s.lat, lng: s.lng }));
+      mapInstance.fitBounds(bounds);
+    }
   }, []);
 
   const calculateDistanceStr = (targetLat: number, targetLng: number): string => {
@@ -212,26 +206,15 @@ export const MapPage: React.FC = () => {
 
   return (
     <div className="h-[calc(100vh-80px)] flex flex-col md:flex-row overflow-hidden bg-slate-50 relative">
-      {/* Mobile Drawer Toggle */}
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="md:hidden absolute top-3 left-3 z-30 p-2.5 bg-slate-900 text-white rounded-xl shadow-lg border border-slate-700"
-      >
-        <Layers className="w-5 h-5" />
-      </button>
-
       {/* Sidebar Station Finder */}
-      <div
-        className={`${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        } transition-transform duration-300 w-full md:w-96 bg-white border-r border-slate-200 flex flex-col overflow-hidden shadow-sm z-20 absolute md:relative inset-y-0 left-0`}
-      >
+      <div className="w-full md:w-96 bg-white border-r border-slate-200 flex flex-col overflow-hidden shadow-sm z-10">
         <div className="p-4 border-b border-slate-200 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-extrabold text-slate-900 text-base">EV Station Finder</h2>
             <button
               onClick={handleRecenter}
               className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-all text-xs font-bold flex items-center gap-1"
+              title="Center on My Location"
             >
               <Compass className="w-4 h-4" /> My GPS
             </button>
@@ -243,7 +226,7 @@ export const MapPage: React.FC = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search station, city or landmark..."
+              placeholder="Search station or locality..."
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
             />
           </div>
@@ -275,7 +258,6 @@ export const MapPage: React.FC = () => {
         {/* Station List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {isLoadingStations ? (
-            // Skeleton Loader
             [1, 2, 3].map((i) => (
               <div key={i} className="p-4 bg-slate-100 rounded-xl space-y-3 animate-pulse">
                 <div className="h-4 bg-slate-200 rounded w-3/4"></div>
@@ -284,11 +266,10 @@ export const MapPage: React.FC = () => {
               </div>
             ))
           ) : filteredStations.length === 0 ? (
-            // Empty State
             <div className="py-12 text-center space-y-3">
               <MapPin className="w-10 h-10 text-slate-300 mx-auto" />
               <p className="text-sm font-bold text-slate-700">No charging stations found</p>
-              <p className="text-xs text-slate-400">Try loosening your search or power filters.</p>
+              <p className="text-xs text-slate-400">Try adjusting your search or power filters.</p>
             </div>
           ) : (
             filteredStations.map((s) => {
@@ -327,20 +308,30 @@ export const MapPage: React.FC = () => {
 
       {/* Main Interactive Google Map View */}
       <div className="flex-1 relative bg-slate-900">
-        {loadError ? (
+        {!apiKey ? (
           <div className="h-full flex items-center justify-center p-6 text-center">
-            <div className="max-w-sm bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-4 shadow-2xl">
-              <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto" />
-              <h3 className="text-lg font-bold text-white">Google Maps Config Required</h3>
-              <p className="text-xs text-slate-400">
-                Ensure `VITE_GOOGLE_MAPS_API_KEY` is specified in environment settings.
+            <div className="max-w-md bg-slate-800 border border-slate-700 rounded-3xl p-8 space-y-4 shadow-2xl">
+              <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto" />
+              <h3 className="text-xl font-bold text-white">Google Maps API Key Missing</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Add <code className="text-emerald-400 bg-slate-900 px-1.5 py-0.5 rounded">VITE_GOOGLE_MAPS_API_KEY</code> to your environment configuration to enable interactive station mapping.
+              </p>
+            </div>
+          </div>
+        ) : loadError ? (
+          <div className="h-full flex items-center justify-center p-6 text-center">
+            <div className="max-w-md bg-slate-800 border border-slate-700 rounded-3xl p-8 space-y-4 shadow-2xl">
+              <AlertTriangle className="w-12 h-12 text-rose-400 mx-auto" />
+              <h3 className="text-xl font-bold text-white">Google Maps Failed to Load</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Could not connect to Google Maps JS API. Verify network connection or key credentials.
               </p>
             </div>
           </div>
         ) : !isLoaded ? (
           <div className="h-full flex items-center justify-center space-y-3 flex-col bg-slate-900">
             <div className="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
-            <p className="text-xs font-semibold text-slate-400">Loading Interactive EV Map...</p>
+            <p className="text-xs font-semibold text-slate-400">Loading Interactive Google Map...</p>
           </div>
         ) : (
           <GoogleMap
@@ -358,7 +349,7 @@ export const MapPage: React.FC = () => {
             {/* User Live Location Blue Marker */}
             <Marker
               position={userLocation}
-              title="Your Current Location"
+              title="Your Location"
               icon={{
                 url: 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png',
               }}
@@ -393,7 +384,7 @@ export const MapPage: React.FC = () => {
                   <div>
                     <div className="flex items-center justify-between">
                       <h4 className="font-bold text-sm text-slate-900 leading-tight">{selectedStation.name}</h4>
-                      <span className="flex items-center gap-0.5 text-xs font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                      <span className="flex items-center gap-0.5 text-xs font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded ml-1">
                         <Star className="w-3 h-3 fill-amber-500 text-amber-500" /> {selectedStation.rating}
                       </span>
                     </div>
@@ -402,7 +393,7 @@ export const MapPage: React.FC = () => {
 
                   <div className="text-xs pt-1.5 border-t border-slate-200 space-y-1">
                     <div className="flex justify-between">
-                      <span className="text-slate-500">Power Speed:</span>
+                      <span className="text-slate-500">Power Rating:</span>
                       <span className="font-bold text-slate-900">{selectedStation.powerKw} kW Fast</span>
                     </div>
                     <div className="flex justify-between">
@@ -426,7 +417,7 @@ export const MapPage: React.FC = () => {
                       rel="noopener noreferrer"
                       className="flex-1 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-center text-xs font-semibold hover:bg-slate-800 inline-flex items-center justify-center gap-1"
                     >
-                      <Navigation className="w-3 h-3" /> Navigate
+                      <Navigation className="w-3 h-3" /> Directions
                     </a>
                     <button
                       onClick={() => alert(`Starting EV charging session at ${selectedStation.name}`)}
