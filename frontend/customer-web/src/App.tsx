@@ -1,6 +1,7 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { CustomerLayout } from './components/layout/CustomerLayout';
+import { AppInitializer } from './components/AppInitializer';
 import { HomePage } from './pages/HomePage';
 import { MapPage } from './pages/MapPage';
 import { WalletPage } from './pages/WalletPage';
@@ -17,38 +18,31 @@ const LoadingFallback: React.FC = () => (
 );
 
 export const App: React.FC = () => {
-  const [initTimeout, setInitTimeout] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setInitTimeout(true);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
-    <BrowserRouter>
-      <CustomerLayout>
-        <Suspense fallback={<LoadingFallback />}>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/dashboard" element={<HomePage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<LoginPage />} />
-            <Route path="/map" element={<MapPage />} />
-            <Route path="/stations" element={<MapPage />} />
-            <Route path="/wallet" element={<WalletPage />} />
-            <Route path="/history" element={<HistoryPage />} />
-            <Route path="/favorites" element={<MapPage />} />
-            <Route path="/notifications" element={<HomePage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/settings" element={<ProfilePage />} />
-            <Route path="/support" element={<SupportPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
-      </CustomerLayout>
-    </BrowserRouter>
+    <AppInitializer>
+      <BrowserRouter>
+        <CustomerLayout>
+          <Suspense fallback={<LoadingFallback />}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/dashboard" element={<HomePage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<LoginPage />} />
+              <Route path="/map" element={<MapPage />} />
+              <Route path="/stations" element={<MapPage />} />
+              <Route path="/wallet" element={<WalletPage />} />
+              <Route path="/history" element={<HistoryPage />} />
+              <Route path="/favorites" element={<MapPage />} />
+              <Route path="/notifications" element={<HomePage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/settings" element={<ProfilePage />} />
+              <Route path="/support" element={<SupportPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </CustomerLayout>
+      </BrowserRouter>
+    </AppInitializer>
   );
 };
 

@@ -2,11 +2,42 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#16A34A" />
     <link rel="manifest" href="/manifest.json" />
     <title>EcoMargin - Smart EV Charging Web Platform</title>
+    <script>
+      // Global error listener to auto-heal stale asset loading errors after new Vercel deployments
+      window.addEventListener('error', function(event) {
+        var isChunkError = event && (
+          (event.target && (event.target.tagName === 'SCRIPT' || event.target.tagName === 'LINK')) ||
+          (event.message && (event.message.indexOf('Loading chunk') !== -1 || event.message.indexOf('imported module') !== -1 || event.message.indexOf('SyntaxError') !== -1))
+        );
+        if (isChunkError) {
+          console.warn('EcoMargin Stale Asset Detected. Auto-healing cache...');
+          if (!sessionStorage.getItem('ecomargin_asset_reloaded')) {
+            sessionStorage.setItem('ecomargin_asset_reloaded', 'true');
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for (var i = 0; i < registrations.length; i++) {
+                  registrations[i].unregister();
+                }
+              });
+            }
+            if ('caches' in window) {
+              caches.keys().then(function(keys) {
+                keys.forEach(function(key) { caches.delete(key); });
+              });
+            }
+            window.location.reload(true);
+          }
+        }
+      }, true);
+    </script>
     <style>
       html, body {
         margin: 0;
@@ -48,8 +79,30 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js').then(function(reg) {
+            reg.update();
+            reg.onupdatefound = function() {
+              var installingWorker = reg.installing;
+              if (installingWorker) {
+                installingWorker.onstatechange = function() {
+                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    installingWorker.postMessage({ type: 'SKIP_WAITING' });
+                  }
+                };
+              }
+            };
+          }).catch(function(err) {
+            console.error('ServiceWorker registration failed: ', err);
+          });
+
+          var refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', function() {
+            if (!refreshing) {
+              refreshing = true;
+              window.location.reload();
+            }
+          });
         });
       }
     </script>
