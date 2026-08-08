@@ -1,10 +1,10 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://ecomargin-app.onrender.com/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://ecomargin-app.onrender.com/api/v1';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 5000, // 5 second max timeout
+  timeout: 3000, // 3 second max timeout for background API requests
   headers: {
     'Content-Type': 'application/json',
   },
@@ -30,4 +30,5 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
 

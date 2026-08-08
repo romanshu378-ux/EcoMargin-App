@@ -376,7 +376,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                                       _selectedStation!.isOpen247 ? '24x7 Open' : 'Open Now',
                                       style: const TextStyle(
                                         color: Color(0xFF16A34A),
-                                        fontWeight: FontWeight.extrabold,
+                                        fontWeight: FontWeight.w800,
                                         fontSize: 10,
                                       ),
                                     ),
@@ -415,13 +415,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                                     '${_calculateDistanceKm(_selectedStation!.position).toStringAsFixed(1)} km away',
                                     style: const TextStyle(
                                       color: Color(0xFF16A34A),
-                                      fontWeight: FontWeight.extrabold,
+                                      fontWeight: FontWeight.w800,
                                       fontSize: 12,
                                     ),
                                   ),
                                   Text(
                                     '₹${_selectedStation!.pricePerKwh.toStringAsFixed(1)} / kWh',
-                                    style: const TextStyle(fontWeight: FontWeight.extrabold, fontSize: 12),
+                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
                                   ),
                                 ],
                               ),

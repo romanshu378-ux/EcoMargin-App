@@ -63,7 +63,7 @@ export const HomePage: React.FC = () => {
       priceStr: '₹12 / kWh',
       priceSubtext: 'Starting from',
       rating: 4.8,
-      imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&w=600&q=80',
       isVerified: true,
       isFavorite: false,
     },
@@ -79,7 +79,7 @@ export const HomePage: React.FC = () => {
       priceStr: '₹15 / kWh',
       priceSubtext: 'Starting from',
       rating: 4.9,
-      imageUrl: 'https://images.unsplash.com/photo-1558441719-6705166e2860?w=500&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1647427017067-8f33ccbae493?auto=format&fit=crop&w=600&q=80',
       isVerified: true,
       isFavorite: true,
     },
@@ -101,7 +101,7 @@ export const HomePage: React.FC = () => {
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-8">
       {/* 1. Hero Banner Slider */}
       <div className="relative rounded-3xl bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 border border-slate-200 p-8 md:p-10 overflow-hidden shadow-xl">
-        <div className="absolute right-0 top-0 bottom-0 w-1/2 opacity-25 pointer-events-none bg-no-repeat bg-cover bg-center" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1563720223185-11003d516935?w=800&q=80')` }}></div>
+        <div className="absolute right-0 top-0 bottom-0 w-1/2 opacity-25 pointer-events-none bg-no-repeat bg-cover bg-center" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&w=800&q=80')` }}></div>
         
         <div className="relative z-10 max-w-xl space-y-4">
           <div className="space-y-1">
@@ -255,6 +255,9 @@ export const HomePage: React.FC = () => {
                   src={station.imageUrl}
                   alt={station.name}
                   loading="lazy"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&w=600&q=80';
+                  }}
                   className="w-full sm:w-28 h-24 object-cover rounded-xl border border-slate-100"
                 />
                 

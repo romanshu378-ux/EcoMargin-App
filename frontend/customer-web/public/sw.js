@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ecomargin-customer-v3';
+const CACHE_NAME = 'ecomargin-customer-v4';
 const STATIC_ASSETS = [
   '/manifest.json'
 ];
@@ -29,8 +29,13 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Bypass API calls completely - always use network directly
-  if (url.pathname.startsWith('/api') || url.hostname.includes('onrender.com')) {
+  // Bypass API & health calls completely - always use network directly
+  if (
+    url.pathname.includes('health') ||
+    url.pathname.startsWith('/api') ||
+    url.hostname.includes('onrender.com') ||
+    url.hostname.includes('vercel.app')
+  ) {
     return;
   }
 

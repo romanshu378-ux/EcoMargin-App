@@ -57,7 +57,7 @@ const FALLBACK_STATIONS: Station[] = [
     pricePerKwh: 12.0,
     rating: 4.8,
     reviewsCount: 42,
-    imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&w=600&q=80',
     isOpen247: true,
     amenities: ['Cafe', 'WiFi', 'Washroom', 'Parking'],
     isAvailable: true,
@@ -75,7 +75,7 @@ const FALLBACK_STATIONS: Station[] = [
     pricePerKwh: 15.0,
     rating: 4.9,
     reviewsCount: 88,
-    imageUrl: 'https://images.unsplash.com/photo-1558441719-6705166e2860?w=500&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1647427017067-8f33ccbae493?auto=format&fit=crop&w=600&q=80',
     isOpen247: true,
     amenities: ['Cafe', 'Washroom', 'Parking'],
     isAvailable: true,
@@ -93,7 +93,7 @@ const FALLBACK_STATIONS: Station[] = [
     pricePerKwh: 10.0,
     rating: 4.6,
     reviewsCount: 19,
-    imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&w=600&q=80',
     isOpen247: false,
     amenities: ['WiFi', 'Parking'],
     isAvailable: true,
@@ -111,7 +111,7 @@ const FALLBACK_STATIONS: Station[] = [
     pricePerKwh: 18.0,
     rating: 4.95,
     reviewsCount: 124,
-    imageUrl: 'https://images.unsplash.com/photo-1558441719-6705166e2860?w=500&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1647427017067-8f33ccbae493?auto=format&fit=crop&w=600&q=80',
     isOpen247: true,
     amenities: ['Cafe', 'WiFi', 'Washroom', 'Parking'],
     isAvailable: true,
@@ -451,6 +451,9 @@ export const MapPage: React.FC = () => {
                   src={selectedStation.imageUrl}
                   alt={selectedStation.name}
                   loading="lazy"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&w=600&q=80';
+                  }}
                   className="w-24 h-24 object-cover rounded-2xl border border-slate-100 shrink-0"
                 />
 
