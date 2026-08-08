@@ -196,6 +196,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       )
                     : const Text('Sign In', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
               ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text("Don't have an account? ", style: TextStyle(color: Colors.grey)),
+                  GestureDetector(
+                    onTap: _isLoading ? null : () => context.go('/register'),
+                    child: const Text(
+                      'Create New Account',
+                      style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -203,4 +217,5 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 }
+
 

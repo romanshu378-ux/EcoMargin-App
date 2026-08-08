@@ -2,8 +2,13 @@ package com.ecomargin.service;
 
 import com.ecomargin.controller.AuthRequest;
 import com.ecomargin.controller.AuthResponse;
+import com.ecomargin.controller.RegisterRequest;
+import com.ecomargin.controller.RegisterResponse;
+import com.ecomargin.exception.UserAlreadyExistsException;
 import com.ecomargin.model.User;
+import com.ecomargin.repository.RoleRepository;
 import com.ecomargin.repository.UserRepository;
+import com.ecomargin.repository.WalletRepository;
 import com.ecomargin.security.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +35,12 @@ class AuthServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private RoleRepository roleRepository;
+
+    @Mock
+    private WalletRepository walletRepository;
+
+    @Mock
     private JwtUtil jwtUtil;
 
     @Mock
@@ -51,6 +62,46 @@ class AuthServiceTest {
                 .password("$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG")
                 .isVerified(true)
                 .build();
+    }
+
+    @Test
+    @DisplayName("register: Successful registration creates user and returns 201 equivalent message")
+    void testRegister_Success() {
+        RegisterRequest request = RegisterRequest.builder()
+                .name("Alex Rivers")
+                .email("newcustomer@ecomargin.com")
+                .password("password123")
+                .phoneNumber("1234567890")
+                .build();
+
+        when(userRepository.findByEmailIgnoreCase("newcustomer@ecomargin.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("password123")).thenReturn("bcrypt_encoded_password");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setId(2L);
+            return u;
+        });
+
+        RegisterResponse response = authService.register(request);
+
+        assertNotNull(response);
+        assertEquals("newcustomer@ecomargin.com", response.getEmail());
+        assertTrue(response.getMessage().contains("Account created successfully"));
+        verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    @Test
+    @DisplayName("register: Duplicate email throws UserAlreadyExistsException (409)")
+    void testRegister_DuplicateEmail() {
+        RegisterRequest request = RegisterRequest.builder()
+                .name("Jane Driver")
+                .email("customer@ecomargin.com")
+                .password("password123")
+                .build();
+
+        when(userRepository.findByEmailIgnoreCase("customer@ecomargin.com")).thenReturn(Optional.of(sampleUser));
+
+        assertThrows(UserAlreadyExistsException.class, () -> authService.register(request));
     }
 
     @Test
@@ -111,4 +162,5 @@ class AuthServiceTest {
         assertThrows(IllegalArgumentException.class, () -> authService.authenticate(request));
     }
 }
+
 

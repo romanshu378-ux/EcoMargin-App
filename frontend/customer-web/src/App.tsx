@@ -11,6 +11,8 @@ const HistoryPage = lazy(() => import('./pages/HistoryPage').then(m => ({ defaul
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(m => ({ default: m.ProfilePage })));
 const SupportPage = lazy(() => import('./pages/SupportPage').then(m => ({ default: m.SupportPage })));
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const RegisterPage = lazy(() => import('./pages/RegisterPage').then(m => ({ default: m.RegisterPage })));
+
 
 const PageSkeleton: React.FC = () => (
   <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6 animate-pulse">
@@ -33,7 +35,8 @@ export const App: React.FC = () => {
               <Route path="/" element={<HomePage />} />
               <Route path="/dashboard" element={<HomePage />} />
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+
               <Route path="/map" element={<MapPage />} />
               <Route path="/stations" element={<MapPage />} />
               <Route path="/wallet" element={<WalletPage />} />
