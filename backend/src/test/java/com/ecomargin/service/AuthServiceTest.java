@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
@@ -34,6 +35,9 @@ class AuthServiceTest {
     @Mock
     private AuthenticationManager authenticationManager;
 
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     @InjectMocks
     private AuthService authService;
 
@@ -44,7 +48,7 @@ class AuthServiceTest {
         sampleUser = User.builder()
                 .id(1L)
                 .email("customer@ecomargin.com")
-                .password("encoded_password")
+                .password("$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG")
                 .isVerified(true)
                 .build();
     }
@@ -53,11 +57,11 @@ class AuthServiceTest {
     @DisplayName("authenticate: Valid credentials return HTTP 200 equivalent token response")
     void testAuthenticate_Success() {
         AuthRequest request = AuthRequest.builder()
-                .email("customer@ecomargin.com")
+                .email("  CUSTOMER@EcoMargin.com  ")
                 .password("password123")
                 .build();
 
-        when(userRepository.findByEmail("customer@ecomargin.com")).thenReturn(Optional.of(sampleUser));
+        when(userRepository.findByEmailIgnoreCase("customer@ecomargin.com")).thenReturn(Optional.of(sampleUser));
         when(jwtUtil.generateToken(sampleUser)).thenReturn("jwt.token.string");
 
         AuthResponse response = authService.authenticate(request);
@@ -76,8 +80,22 @@ class AuthServiceTest {
                 .password("wrongpassword")
                 .build();
 
+        when(userRepository.findByEmailIgnoreCase("customer@ecomargin.com")).thenReturn(Optional.of(sampleUser));
         doThrow(new BadCredentialsException("Bad credentials"))
                 .when(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+
+        assertThrows(BadCredentialsException.class, () -> authService.authenticate(request));
+    }
+
+    @Test
+    @DisplayName("authenticate: Unknown email throws BadCredentialsException (401)")
+    void testAuthenticate_UnknownEmail() {
+        AuthRequest request = AuthRequest.builder()
+                .email("unknown@ecomargin.com")
+                .password("password123")
+                .build();
+
+        when(userRepository.findByEmailIgnoreCase("unknown@ecomargin.com")).thenReturn(Optional.empty());
 
         assertThrows(BadCredentialsException.class, () -> authService.authenticate(request));
     }
@@ -93,3 +111,4 @@ class AuthServiceTest {
         assertThrows(IllegalArgumentException.class, () -> authService.authenticate(request));
     }
 }
+
