@@ -114,11 +114,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleAllOtherExceptions(Exception ex) {
         log.error("[AUTH ERROR] Unexpected internal exception: ({}: {})", ex.getClass().getName(), ex.getMessage(), ex);
 
+        String detailMsg = ex.getMessage();
+        if (detailMsg == null || detailMsg.isBlank()) {
+            Throwable root = ex;
+            while (root.getCause() != null && root.getCause() != root) {
+                root = root.getCause();
+            }
+            detailMsg = root.getMessage() != null && !root.getMessage().isBlank()
+                    ? root.getMessage()
+                    : ex.getClass().getSimpleName();
+        }
+
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", LocalDateTime.now());
         body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
         body.put("error", "Internal Server Error");
-        body.put("message", ex.getMessage() != null && !ex.getMessage().isBlank() ? ex.getMessage() : "An unexpected server error occurred.");
+        body.put("message", detailMsg);
 
         return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
     }

@@ -27,8 +27,11 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @Slf4j
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class AuthService {
 
