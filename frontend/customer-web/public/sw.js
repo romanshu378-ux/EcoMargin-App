@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ecomargin-customer-v2';
+const CACHE_NAME = 'ecomargin-customer-v3';
 const STATIC_ASSETS = [
   '/manifest.json'
 ];
@@ -28,6 +28,11 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
+
+  // Bypass API calls completely - always use network directly
+  if (url.pathname.startsWith('/api') || url.hostname.includes('onrender.com')) {
+    return;
+  }
 
   // 1. Navigation requests (HTML pages): ALWAYS Network-First
   if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html') || url.pathname === '/' || url.pathname === '/index.html') {
@@ -64,7 +69,7 @@ self.addEventListener('fetch', (event) => {
           return cachedResponse;
         }
 
-        return fetch(request).catch((err) => {
+        return fetch(request).catch(() => {
           // Return standard response error, NEVER fallback to HTML index for script requests
           return new Response('Asset Load Failed', { status: 404, statusText: 'Not Found' });
         });
@@ -91,4 +96,5 @@ self.addEventListener('message', (event) => {
     });
   }
 });
+
 

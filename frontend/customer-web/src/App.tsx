@@ -1,19 +1,25 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { CustomerLayout } from './components/layout/CustomerLayout';
 import { AppInitializer } from './components/AppInitializer';
-import { HomePage } from './pages/HomePage';
-import { MapPage } from './pages/MapPage';
-import { WalletPage } from './pages/WalletPage';
-import { HistoryPage } from './pages/HistoryPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { SupportPage } from './pages/SupportPage';
-import { LoginPage } from './pages/LoginPage';
 
-const LoadingFallback: React.FC = () => (
-  <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 space-y-4">
-    <div className="w-10 h-10 border-4 border-emerald-600/20 border-t-emerald-600 rounded-full animate-spin"></div>
-    <p className="text-sm font-semibold text-slate-700">Loading EcoMargin Platform...</p>
+// Dynamic Code Splitting for Routes
+const HomePage = lazy(() => import('./pages/HomePage').then(m => ({ default: m.HomePage })));
+const MapPage = lazy(() => import('./pages/MapPage').then(m => ({ default: m.MapPage })));
+const WalletPage = lazy(() => import('./pages/WalletPage').then(m => ({ default: m.WalletPage })));
+const HistoryPage = lazy(() => import('./pages/HistoryPage').then(m => ({ default: m.HistoryPage })));
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then(m => ({ default: m.ProfilePage })));
+const SupportPage = lazy(() => import('./pages/SupportPage').then(m => ({ default: m.SupportPage })));
+const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+
+const PageSkeleton: React.FC = () => (
+  <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6 animate-pulse">
+    <div className="h-44 bg-slate-200/80 rounded-3xl w-full"></div>
+    <div className="h-28 bg-slate-200/70 rounded-3xl w-full"></div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="h-36 bg-slate-200/60 rounded-2xl"></div>
+      <div className="h-36 bg-slate-200/60 rounded-2xl"></div>
+    </div>
   </div>
 );
 
@@ -22,7 +28,7 @@ export const App: React.FC = () => {
     <AppInitializer>
       <BrowserRouter>
         <CustomerLayout>
-          <Suspense fallback={<LoadingFallback />}>
+          <Suspense fallback={<PageSkeleton />}>
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/dashboard" element={<HomePage />} />
@@ -47,3 +53,4 @@ export const App: React.FC = () => {
 };
 
 export default App;
+

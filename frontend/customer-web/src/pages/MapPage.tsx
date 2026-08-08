@@ -450,6 +450,7 @@ export const MapPage: React.FC = () => {
                 <img
                   src={selectedStation.imageUrl}
                   alt={selectedStation.name}
+                  loading="lazy"
                   className="w-24 h-24 object-cover rounded-2xl border border-slate-100 shrink-0"
                 />
 

@@ -254,6 +254,7 @@ export const HomePage: React.FC = () => {
                 <img
                   src={station.imageUrl}
                   alt={station.name}
+                  loading="lazy"
                   className="w-full sm:w-28 h-24 object-cover rounded-xl border border-slate-100"
                 />
                 

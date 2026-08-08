@@ -4,6 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://ecomargin-app
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 5000, // 5 second max timeout
   headers: {
     'Content-Type': 'application/json',
   },
@@ -20,10 +21,13 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
+    console.warn('[EcoMargin API Error]:', error?.message || 'Network/Server Error');
+
+    if (error.response && error.response.status === 401 && !window.location.pathname.startsWith('/login')) {
       localStorage.removeItem('customer_token');
       window.location.href = '/login';
     }
     return Promise.reject(error);
   }
 );
+

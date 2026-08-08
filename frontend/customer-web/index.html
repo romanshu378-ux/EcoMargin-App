@@ -11,14 +11,14 @@
     <link rel="manifest" href="/manifest.json" />
     <title>EcoMargin - Smart EV Charging Web Platform</title>
     <script>
-      // Global error listener to auto-heal stale asset loading errors after new Vercel deployments
+      // 1. Global error listener for stale asset auto-healing
       window.addEventListener('error', function(event) {
         var isChunkError = event && (
           (event.target && (event.target.tagName === 'SCRIPT' || event.target.tagName === 'LINK')) ||
           (event.message && (event.message.indexOf('Loading chunk') !== -1 || event.message.indexOf('imported module') !== -1 || event.message.indexOf('SyntaxError') !== -1))
         );
         if (isChunkError) {
-          console.warn('EcoMargin Stale Asset Detected. Auto-healing cache...');
+          console.warn('[EcoMargin] Stale asset detected. Purging cache and reloading...');
           if (!sessionStorage.getItem('ecomargin_asset_reloaded')) {
             sessionStorage.setItem('ecomargin_asset_reloaded', 'true');
             if ('serviceWorker' in navigator) {
@@ -37,6 +37,26 @@
           }
         }
       }, true);
+
+      // 2. Startup Watchdog: Ensure app never hangs on static splash screen (> 5 seconds)
+      setTimeout(function() {
+        var rootEl = document.getElementById('root');
+        if (rootEl && rootEl.querySelector('.app-loader')) {
+          console.warn('[EcoMargin] Startup timeout exceeded (5s). Fallback screen displayed.');
+          rootEl.innerHTML = `
+            <div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0f172a; color: #ffffff; padding: 24px; text-align: center; font-family: system-ui, sans-serif;">
+              <div style="width: 56px; height: 56px; border-radius: 16px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; font-size: 24px;">⚠️</div>
+              <h2 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700;">EcoMargin Portal Connection Issue</h2>
+              <p style="margin: 0 0 20px 0; font-size: 13px; color: #94a3b8; max-w: 360px; line-height: 1.5;">
+                Unable to complete initial loading within 5 seconds. The portal may be updating or offline.
+              </p>
+              <button onclick="window.location.reload(true)" style="background: #16a34a; color: #ffffff; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 13px; cursor: pointer; transition: background 0.2s;">
+                Retry Connection
+              </button>
+            </div>
+          `;
+        }
+      }, 5000);
     </script>
     <style>
       html, body {
@@ -93,14 +113,17 @@
               }
             };
           }).catch(function(err) {
-            console.error('ServiceWorker registration failed: ', err);
+            console.error('[EcoMargin] ServiceWorker registration failed: ', err);
           });
 
           var refreshing = false;
           navigator.serviceWorker.addEventListener('controllerchange', function() {
             if (!refreshing) {
               refreshing = true;
-              window.location.reload();
+              if (!sessionStorage.getItem('ecomargin_sw_reloaded')) {
+                sessionStorage.setItem('ecomargin_sw_reloaded', 'true');
+                window.location.reload();
+              }
             }
           });
         });
