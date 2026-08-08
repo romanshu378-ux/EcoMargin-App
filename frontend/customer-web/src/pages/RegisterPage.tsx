@@ -102,7 +102,7 @@ export const RegisterPage: React.FC = () => {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Jane Driver"
+                placeholder="Full Name"
                 required
                 disabled={loading}
                 className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
@@ -118,7 +118,7 @@ export const RegisterPage: React.FC = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="driver@example.com"
+                placeholder="name@example.com"
                 required
                 disabled={loading}
                 className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
@@ -134,13 +134,14 @@ export const RegisterPage: React.FC = () => {
                 type="tel"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="+1 555 0199"
+                placeholder="Phone Number"
                 required
                 disabled={loading}
                 className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
               />
             </div>
           </div>
+
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">Password</label>
