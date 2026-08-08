@@ -83,6 +83,19 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(body, HttpStatus.FORBIDDEN);
     }
 
+    @ExceptionHandler({org.springframework.dao.DataAccessException.class, java.sql.SQLException.class})
+    public ResponseEntity<Map<String, Object>> handleDatabaseExceptions(Exception ex) {
+        log.error("[AUTH ERROR] Database connection failure: {}", ex.getMessage());
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.SERVICE_UNAVAILABLE.value());
+        body.put("error", "Service Unavailable");
+        body.put("message", "Database service is temporarily unavailable. Please try again.");
+
+        return new ResponseEntity<>(body, HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleAllOtherExceptions(Exception ex) {
         log.error("[AUTH ERROR] Unexpected internal exception: ", ex);
@@ -96,4 +109,5 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
+
 

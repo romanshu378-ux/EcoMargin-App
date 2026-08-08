@@ -44,6 +44,15 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:secretpassword}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 10000
+      validation-timeout: 5000
+      idle-timeout: 30000
+      max-lifetime: 300000
+      keepalive-time: 60000
+      connection-test-query: SELECT 1
   jpa:
     hibernate:
       ddl-auto: update
@@ -106,6 +115,15 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 10000
+      validation-timeout: 5000
+      idle-timeout: 30000
+      max-lifetime: 300000
+      keepalive-time: 60000
+      connection-test-query: SELECT 1
   jpa:
     hibernate:
       ddl-auto: update
@@ -116,3 +134,4 @@ jwt:
 
 crypto:
   key: ${CRYPTO_KEY:404E635266556A586E3272357538782F}
+
