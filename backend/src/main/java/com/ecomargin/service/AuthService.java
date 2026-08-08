@@ -75,7 +75,12 @@ public class AuthService {
                 : request.getPhone();
 
         Set<Role> roles = new HashSet<>();
-        roleRepository.findByName(RoleType.ROLE_CUSTOMER).ifPresent(roles::add);
+        Role customerRole = roleRepository.findByName(RoleType.ROLE_CUSTOMER)
+                .orElseGet(() -> {
+                    log.info("[AUTH] ROLE_CUSTOMER missing in DB; creating role on the fly");
+                    return roleRepository.save(Role.builder().name(RoleType.ROLE_CUSTOMER).build());
+                });
+        roles.add(customerRole);
 
         User user = User.builder()
                 .email(cleanEmail)
