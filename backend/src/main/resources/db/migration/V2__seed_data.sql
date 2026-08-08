@@ -42,24 +42,27 @@ WHERE r.name = 'ROLE_CUSTOMER' AND p.name IN ('READ_STATIONS', 'START_CHARGING',
 --------------------------------------------------------------------------------
 -- 4. Seed Platform Users
 --------------------------------------------------------------------------------
--- Passwords are encrypted standard BCrypt for 'password123'
+-- Passwords are encrypted standard BCrypt for 'password123' / 'driver123'
 -- Admin: admin@ecomargin.com
 -- Vendor: vendor@ecomargin.com
--- Customer: customer@ecomargin.com
+-- Customer: customer@ecomargin.com / driver@ecomargin.com
 INSERT INTO users (email, password, first_name, last_name, phone_number, is_verified, is_locked) VALUES
 ('admin@ecomargin.com', '$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG', 'Platform', 'Admin', '+15550100', TRUE, FALSE),
 ('vendor@ecomargin.com', '$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG', 'John', 'CPO', '+15550101', TRUE, FALSE),
-('customer@ecomargin.com', '$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG', 'Jane', 'Driver', '+15550102', TRUE, FALSE);
+('customer@ecomargin.com', '$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG', 'Jane', 'Driver', '+15550102', TRUE, FALSE),
+('driver@ecomargin.com', '$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG', 'Driver', 'User', '+15550103', TRUE, FALSE);
 
 -- Assign User Roles
 INSERT INTO user_roles (user_id, role_id) VALUES
 ((SELECT id FROM users WHERE email = 'admin@ecomargin.com'), (SELECT id FROM roles WHERE name = 'ROLE_ADMIN')),
 ((SELECT id FROM users WHERE email = 'vendor@ecomargin.com'), (SELECT id FROM roles WHERE name = 'ROLE_VENDOR')),
-((SELECT id FROM users WHERE email = 'customer@ecomargin.com'), (SELECT id FROM roles WHERE name = 'ROLE_CUSTOMER'));
+((SELECT id FROM users WHERE email = 'customer@ecomargin.com'), (SELECT id FROM roles WHERE name = 'ROLE_CUSTOMER')),
+((SELECT id FROM users WHERE email = 'driver@ecomargin.com'), (SELECT id FROM roles WHERE name = 'ROLE_CUSTOMER'));
 
 -- Initialize Wallets
 INSERT INTO wallets (user_id, balance, currency) VALUES
 ((SELECT id FROM users WHERE email = 'customer@ecomargin.com'), 100.00, 'USD'),
+((SELECT id FROM users WHERE email = 'driver@ecomargin.com'), 100.00, 'USD'),
 ((SELECT id FROM users WHERE email = 'vendor@ecomargin.com'), 0.00, 'USD');
 
 --------------------------------------------------------------------------------

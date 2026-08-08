@@ -14,7 +14,7 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 });
 
 // Auth State Provider
-final authStateProvider = StateProvider<bool>((ref) => true); // Default logged in for demo
+final authStateProvider = StateProvider<bool>((ref) => false);
 
 // Theme Mode Provider (Light, Dark, System)
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.light);

@@ -53,10 +53,12 @@ class ProfileScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
             title: const Text('Sign Out', style: TextStyle(color: Colors.red)),
-            onTap: () {
-              // Perform sign out
+            onTap: () async {
+              await ref.read(storageServiceProvider).deleteToken();
               ref.read(authStateProvider.notifier).state = false;
-              context.go('/login');
+              if (context.mounted) {
+                context.go('/login');
+              }
             },
           ),
         ],
