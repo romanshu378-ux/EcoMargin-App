@@ -23,14 +23,15 @@ public class Wallet {
     private User user;
 
     @Column(nullable = false, precision = 12, scale = 2)
+    @Builder.Default
     private BigDecimal balance = BigDecimal.ZERO;
 
     @Column(nullable = false, length = 10)
+    @Builder.Default
     private String currency = "USD";
 
     @Version
-    @Column(nullable = false)
-    private Integer version = 0; // Optimistic locking version field
+    private Integer version;
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
