@@ -4,8 +4,8 @@ import { Zap, Lock, Mail, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { api } from '../services/api';
 
 export const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('driver@ecomargin.com');
-  const [password, setPassword] = useState('driver123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -39,22 +39,15 @@ export const LoginPage: React.FC = () => {
         localStorage.setItem('customer_token', token);
         navigate('/');
       } else {
-        // Fallback for offline/demo if API format differs
-        localStorage.setItem('customer_token', 'mock_customer_jwt_token_99999');
-        navigate('/');
+        setErrorMsg('Invalid authentication response structure from server.');
       }
     } catch (err: any) {
       const statusCode = err?.response?.status;
       if (statusCode === 401 || statusCode === 403) {
         setErrorMsg('Invalid email or password.');
       } else {
-        // Fallback offline login for testing if backend is offline
-        if (email.trim() && password) {
-          localStorage.setItem('customer_token', 'mock_customer_jwt_token_99999');
-          navigate('/');
-          return;
-        }
-        setErrorMsg(err?.response?.data?.message || 'Unable to connect to server. Please try again.');
+        const msg = err?.response?.data?.message || err?.message;
+        setErrorMsg(msg || 'Unable to connect to server. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -95,6 +88,7 @@ export const LoginPage: React.FC = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@example.com"
                 required
                 disabled={loading}
                 className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
@@ -110,6 +104,7 @@ export const LoginPage: React.FC = () => {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
                 required
                 disabled={loading}
                 className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-100 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"

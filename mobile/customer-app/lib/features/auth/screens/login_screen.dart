@@ -14,9 +14,10 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _emailController = TextEditingController(text: 'driver@ecomargin.com');
-  final _passwordController = TextEditingController(text: 'driver123');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _isLoading = false;
+
 
   void _showErrorSnackBar(String message) {
     if (!mounted) return;
@@ -165,6 +166,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 enabled: !_isLoading,
                 decoration: InputDecoration(
                   labelText: 'Email Address',
+                  hintText: 'name@example.com',
                   prefixIcon: const Icon(Icons.email_outlined),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -176,10 +178,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 enabled: !_isLoading,
                 decoration: InputDecoration(
                   labelText: 'Password',
+                  hintText: '••••••••',
                   prefixIcon: const Icon(Icons.lock_outline),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
+
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _isLoading ? null : _login,
