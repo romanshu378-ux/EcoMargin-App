@@ -58,13 +58,21 @@ public class AuthService {
             throw new UserAlreadyExistsException("Email is already registered.");
         }
 
+        String rawName = request.getName() != null && !request.getName().isBlank()
+                ? request.getName()
+                : request.getFullName();
+
         String firstName = request.getFirstName();
         String lastName = request.getLastName();
-        if ((firstName == null || firstName.isBlank()) && request.getName() != null && !request.getName().isBlank()) {
-            String[] parts = request.getName().trim().split("\\s+", 2);
+        if ((firstName == null || firstName.isBlank()) && rawName != null && !rawName.isBlank()) {
+            String[] parts = rawName.trim().split("\\s+", 2);
             firstName = parts[0];
             lastName = parts.length > 1 ? parts[1] : "";
         }
+
+        String rawPhone = request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()
+                ? request.getPhoneNumber()
+                : request.getPhone();
 
         Set<Role> roles = new HashSet<>();
         roleRepository.findByName(RoleType.ROLE_CUSTOMER).ifPresent(roles::add);
@@ -74,7 +82,7 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .firstName(firstName != null && !firstName.isBlank() ? firstName : "Customer")
                 .lastName(lastName != null ? lastName : "")
-                .phoneNumber(request.getPhoneNumber() != null ? request.getPhoneNumber().trim() : null)
+                .phoneNumber(rawPhone != null ? rawPhone.trim() : null)
                 .isVerified(true)
                 .isAccountNonLocked(true)
                 .roles(roles)

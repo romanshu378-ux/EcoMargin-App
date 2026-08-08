@@ -15,6 +15,7 @@ import lombok.NoArgsConstructor;
 public class RegisterRequest {
 
     private String name;
+    private String fullName;
 
     private String firstName;
     private String lastName;
@@ -27,5 +28,8 @@ public class RegisterRequest {
     @Size(min = 8, message = "Password must be at least 8 characters")
     private String password;
 
+    private String confirmPassword;
+
     private String phoneNumber;
+    private String phone;
 }

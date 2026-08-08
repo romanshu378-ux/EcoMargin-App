@@ -61,14 +61,18 @@ export const RegisterPage: React.FC = () => {
       }
     } catch (err: any) {
       const statusCode = err?.response?.status;
-      if (statusCode === 409) {
-        setErrorMsg('Email is already registered. Please login.');
+      if (statusCode === 403) {
+        setErrorMsg('Registration is not allowed. Please try again.');
+      } else if (statusCode === 409) {
+        setErrorMsg('Email already registered.');
       } else if (statusCode === 400) {
-        const msg = err?.response?.data?.message;
+        const msg = err?.response?.data?.message || (err?.response?.data?.details ? Object.values(err.response.data.details).join(', ') : null);
         setErrorMsg(msg || 'Invalid registration details. Password must be at least 8 characters.');
+      } else if (statusCode === 500) {
+        setErrorMsg('Server error. Please try again later.');
       } else {
         const msg = err?.response?.data?.message || err?.message;
-        setErrorMsg(msg || 'Unable to connect to server. Please try again.');
+        setErrorMsg(msg || 'Unable to connect to server.');
       }
     } finally {
       setLoading(false);
