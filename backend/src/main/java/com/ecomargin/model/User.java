@@ -65,15 +65,21 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        Set<GrantedAuthority> authorities = roles.stream()
-                .map(role -> new SimpleGrantedAuthority(role.getName().name()))
-                .collect(Collectors.toSet());
-        
-        roles.forEach(role -> {
-            authorities.addAll(role.getPermissions().stream()
-                    .map(permission -> new SimpleGrantedAuthority(permission.getName()))
-                    .collect(Collectors.toSet()));
-        });
+        Set<GrantedAuthority> authorities = new HashSet<>();
+        if (roles != null) {
+            for (Role role : roles) {
+                if (role.getName() != null) {
+                    authorities.add(new SimpleGrantedAuthority(role.getName().name()));
+                }
+                if (role.getPermissions() != null) {
+                    for (Permission permission : role.getPermissions()) {
+                        if (permission.getName() != null) {
+                            authorities.add(new SimpleGrantedAuthority(permission.getName()));
+                        }
+                    }
+                }
+            }
+        }
         return authorities;
     }
 

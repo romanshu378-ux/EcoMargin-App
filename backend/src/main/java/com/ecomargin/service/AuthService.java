@@ -82,12 +82,14 @@ public class AuthService {
                 });
         roles.add(customerRole);
 
+        String phoneVal = (rawPhone != null && !rawPhone.isBlank()) ? rawPhone.trim() : null;
+
         User user = User.builder()
                 .email(cleanEmail)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .firstName(firstName != null && !firstName.isBlank() ? firstName : "Customer")
                 .lastName(lastName != null ? lastName : "")
-                .phoneNumber(rawPhone != null ? rawPhone.trim() : null)
+                .phoneNumber(phoneVal)
                 .isVerified(true)
                 .isAccountNonLocked(true)
                 .roles(roles)
