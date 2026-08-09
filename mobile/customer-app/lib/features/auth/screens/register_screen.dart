@@ -63,7 +63,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       final apiClient = ref.read(apiClientProvider);
 
       if (kDebugMode) {
-        debugPrint('[Register Attempt] Connecting to ${apiClient.dio.options.baseUrl}/auth/register');
+        debugPrint('[REGISTER] API URL: ${apiClient.dio.options.baseUrl}/auth/register');
+        debugPrint('[REGISTER] Request started');
       }
 
       final response = await apiClient.dio.post(
@@ -77,7 +78,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       );
 
       if (kDebugMode) {
-        debugPrint('[Register Response] HTTP Status: ${response.statusCode}');
+        debugPrint('[REGISTER] Status: ${response.statusCode}');
       }
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -89,31 +90,39 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         _showSnackBar('Registration failed. Please try again.');
       }
     } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
       if (kDebugMode) {
-        debugPrint('[Register DioException] Type: ${e.type}, Code: ${e.response?.statusCode}, Message: ${e.message}');
+        debugPrint('[REGISTER] Error Type: ${e.type}');
+        debugPrint('[REGISTER] Status Code: $statusCode');
+        debugPrint('[REGISTER] Request URL: ${e.requestOptions.uri}');
+        if (e.response?.data != null) {
+          debugPrint('[REGISTER] Response Body: ${e.response?.data}');
+        }
       }
 
-      final statusCode = e.response?.statusCode;
-      if (statusCode == 409) {
-        _showSnackBar('Email is already registered. Please login.');
-      } else if (statusCode == 400) {
+      if (statusCode != null) {
         final serverMsg = e.response?.data is Map ? e.response?.data['message'] : null;
-        _showSnackBar(serverMsg?.toString() ?? 'Invalid registration details. Password must be at least 8 characters.');
+        if (statusCode == 409) {
+          _showSnackBar(serverMsg?.toString() ?? 'Email is already registered. Please login.');
+        } else if (statusCode == 400 || statusCode == 422) {
+          _showSnackBar(serverMsg?.toString() ?? 'Invalid registration details. Password must be at least 8 characters.');
+        } else if (statusCode == 500 || statusCode == 502 || statusCode == 503) {
+          _showSnackBar('Server is temporarily unavailable. Please try again.');
+        } else {
+          _showSnackBar(serverMsg?.toString() ?? 'Registration failed ($statusCode).');
+        }
       } else if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.receiveTimeout ||
           e.type == DioExceptionType.sendTimeout ||
           e.type == DioExceptionType.connectionError ||
           e.error is SocketException) {
         _showSnackBar('Unable to connect to server. Please check your internet connection.');
-      } else if (statusCode == 500 || statusCode == 502 || statusCode == 503) {
-        _showSnackBar('Server is temporarily unavailable. Please try again.');
       } else {
-        final serverMsg = e.response?.data is Map ? e.response?.data['message'] : null;
-        _showSnackBar(serverMsg?.toString() ?? 'Registration failed. Please try again.');
+        _showSnackBar(e.message ?? 'An error occurred while connecting to server.');
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[Register Error] $e');
+        debugPrint('[REGISTER] Error: $e');
       }
       _showSnackBar('An unexpected error occurred. Please try again.');
     } finally {

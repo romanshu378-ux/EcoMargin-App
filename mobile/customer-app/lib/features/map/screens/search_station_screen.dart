@@ -99,7 +99,7 @@ class _SearchStationScreenState extends State<SearchStationScreen> {
                         Text(station['distance'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
                       ],
                     ),
-                    onTap: () => context.go('/station-details'),
+                    onTap: () => context.push('/station-details'),
                   ),
                 );
               },

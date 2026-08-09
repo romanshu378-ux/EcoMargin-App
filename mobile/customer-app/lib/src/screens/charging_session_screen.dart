@@ -34,7 +34,7 @@ class ChargingSessionScreen extends StatelessWidget {
                   ),
                   Column(
                     children: [
-                      Text('\$8.10', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                      Text('₹8.10', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
                       Text('Current Cost', style: TextStyle(color: Colors.grey, fontSize: 12)),
                     ],
                   ),

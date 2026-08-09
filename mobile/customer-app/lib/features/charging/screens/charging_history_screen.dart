@@ -1,75 +1,85 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers/core_providers.dart';
 
-class ChargingHistoryScreen extends StatelessWidget {
+class ChargingHistoryScreen extends ConsumerWidget {
   const ChargingHistoryScreen({super.key});
 
-  final List<Map<String, String>> _sessions = const [
-    {
-      'station': 'GreenCharge Hub Sector 62',
-      'date': '07 Aug 2026, 02:30 PM',
-      'energy': '14.5 kWh',
-      'duration': '19 mins',
-      'cost': '₹261.00',
-      'status': 'Completed',
-    },
-    {
-      'station': 'EcoFast Station Whitefield',
-      'date': '04 Aug 2026, 11:15 AM',
-      'energy': '28.2 kWh',
-      'duration': '35 mins',
-      'cost': '₹507.60',
-      'status': 'Completed',
-    },
-    {
-      'station': 'PowerGrid Hub Indiranagar',
-      'date': '29 Jul 2026, 06:45 PM',
-      'energy': '18.0 kWh',
-      'duration': '45 mins',
-      'cost': '₹252.00',
-      'status': 'Completed',
-    },
-  ];
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final historyAsync = ref.watch(chargingHistoryProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Charging History'),
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _sessions.length,
-        itemBuilder: (context, index) {
-          final item = _sessions[index];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(16),
-              leading: const CircleAvatar(
-                backgroundColor: Color(0xFF16A34A),
-                child: Icon(Icons.bolt, color: Colors.white),
-              ),
-              title: Text(item['station']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('${item['date']!}\n${item['energy']!} • ${item['duration']!}'),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(item['cost']!, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF16A34A).withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(item['status']!, style: const TextStyle(fontSize: 10, color: Color(0xFF16A34A), fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            ),
-          );
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(chargingHistoryProvider);
         },
+        child: historyAsync.when(
+          data: (sessions) {
+            if (sessions.isEmpty) {
+              return const Center(
+                child: Text('No charging history found', style: TextStyle(color: Colors.grey)),
+              );
+            }
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: sessions.length,
+              itemBuilder: (context, index) {
+                final session = sessions[index];
+                
+                final stationName = session['stationName'] ?? 'EcoMargin Charging Hub';
+                final energy = double.tryParse(session['kwhDelivered']?.toString() ?? '0') ?? 0.0;
+                final durationSec = int.tryParse(session['durationSeconds']?.toString() ?? '0') ?? 0;
+                final durationMins = durationSec ~/ 60;
+                final cost = double.tryParse(session['totalCost']?.toString() ?? '0') ?? 0.0;
+                final status = session['status'] ?? 'Completed';
+                
+                final dateStr = session['startTime'] != null 
+                    ? session['startTime'].toString().split('T')[0]
+                    : 'Unknown Date';
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(16),
+                    leading: const CircleAvatar(
+                      backgroundColor: Color(0xFF16A34A),
+                      child: Icon(Icons.bolt, color: Colors.white),
+                    ),
+                    title: Text(stationName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: Text('$dateStr\n${energy.toStringAsFixed(1)} kWh • $durationMins mins'),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('₹${cost.toStringAsFixed(2)}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF16A34A).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(status, style: const TextStyle(fontSize: 10, color: Color(0xFF16A34A), fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+          loading: () => const Center(
+            child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+          ),
+          error: (err, st) => Center(
+            child: Text('Failed to load history: $err', style: const TextStyle(color: Colors.red)),
+          ),
+        ),
       ),
     );
   }

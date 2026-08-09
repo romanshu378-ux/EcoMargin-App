@@ -121,7 +121,7 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
               child: ElevatedButton.icon(
                 onPressed: () {
                   ref.read(chargingSessionProvider.notifier).startCharging();
-                  context.go('/live-charging');
+                  context.push('/live-charging');
                 },
                 icon: const Icon(Icons.power_settings_new_rounded, color: Colors.white),
                 label: const Text('Start Charging Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),

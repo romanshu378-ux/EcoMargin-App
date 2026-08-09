@@ -12,6 +12,8 @@ class ChargingStation {
   final String imageUrl;
   final bool isVerified;
   final bool isFavorite;
+  final double latitude;
+  final double longitude;
 
   const ChargingStation({
     required this.id,
@@ -27,14 +29,20 @@ class ChargingStation {
     required this.imageUrl,
     this.isVerified = true,
     this.isFavorite = false,
+    required this.latitude,
+    required this.longitude,
   });
 
-  ChargingStation copyWith({bool? isFavorite, int? availableChargers}) {
+  ChargingStation copyWith({
+    bool? isFavorite,
+    int? availableChargers,
+    String? distanceStr,
+  }) {
     return ChargingStation(
       id: id,
       name: name,
       address: address,
-      distanceStr: distanceStr,
+      distanceStr: distanceStr ?? this.distanceStr,
       totalChargers: totalChargers,
       availableChargers: availableChargers ?? this.availableChargers,
       chargerType: chargerType,
@@ -44,6 +52,8 @@ class ChargingStation {
       imageUrl: imageUrl,
       isVerified: isVerified,
       isFavorite: isFavorite ?? this.isFavorite,
+      latitude: latitude,
+      longitude: longitude,
     );
   }
 }

@@ -23,7 +23,7 @@ class SettingsScreen extends ConsumerWidget {
             title: const Text('Language'),
             subtitle: Text(language),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go('/language'),
+            onTap: () => context.push('/language'),
           ),
           const Divider(),
           ListTile(
@@ -31,7 +31,7 @@ class SettingsScreen extends ConsumerWidget {
             title: const Text('App Theme'),
             subtitle: Text(themeMode == ThemeMode.dark ? 'Dark Mode' : 'Light Mode'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.go('/theme'),
+            onTap: () => context.push('/theme'),
           ),
           const Divider(),
           ListTile(
@@ -52,7 +52,7 @@ class SettingsScreen extends ConsumerWidget {
             leading: const Icon(Icons.delete_forever, color: Colors.red),
             title: const Text('Delete Account', style: TextStyle(color: Colors.red)),
             trailing: const Icon(Icons.chevron_right, color: Colors.red),
-            onTap: () => context.go('/delete-account'),
+            onTap: () => context.push('/delete-account'),
           ),
         ],
       ),

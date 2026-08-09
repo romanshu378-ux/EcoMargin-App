@@ -4,7 +4,18 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/core_providers.dart';
 
 class LiveChargingSessionScreen extends ConsumerWidget {
-  const LiveChargingSessionScreen({super.key});
+  final String? stationId;
+  final String? sessionId;
+  final String? connectorId;
+  final String? chargerId;
+
+  const LiveChargingSessionScreen({
+    super.key,
+    this.stationId,
+    this.sessionId,
+    this.connectorId,
+    this.chargerId,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -14,6 +25,10 @@ class LiveChargingSessionScreen extends ConsumerWidget {
     final minutes = (session.durationSeconds ~/ 60).toString().padLeft(2, '0');
     final seconds = (session.durationSeconds % 60).toString().padLeft(2, '0');
 
+    final displayStationName = stationId != null ? 'EcoMargin Charging Hub' : session.stationName;
+    final displayChargerId = chargerId ?? session.chargerId;
+    final displayConnector = connectorId ?? session.connectorType;
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -22,7 +37,7 @@ class LiveChargingSessionScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.help_outline),
-            onPressed: () => context.go('/help'),
+            onPressed: () => context.push('/help'),
           ),
         ],
       ),
@@ -40,7 +55,7 @@ class LiveChargingSessionScreen extends ConsumerWidget {
                   child: CircularProgressIndicator(
                     value: session.percentage / 100.0,
                     strokeWidth: 16,
-                    backgroundColor: const Color(0xFF16A34A).withOpacity(0.15),
+                    backgroundColor: const Color(0xFF16A34A).withValues(alpha: 0.15),
                     valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
                   ),
                 ),
@@ -73,13 +88,13 @@ class LiveChargingSessionScreen extends ConsumerWidget {
 
             // Station & Charger Info
             Text(
-              session.stationName,
+              displayStationName,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
             Text(
-              'Charger ID: ${session.chargerId} (60 kW DC Fast)',
+              'Charger ID: $displayChargerId • Connector: $displayConnector',
               style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
             ),
             const SizedBox(height: 24),
@@ -125,7 +140,7 @@ class LiveChargingSessionScreen extends ConsumerWidget {
               child: ElevatedButton.icon(
                 onPressed: () {
                   ref.read(chargingSessionProvider.notifier).stopCharging();
-                  context.go('/stop-charging');
+                  context.push('/stop-charging');
                 },
                 icon: const Icon(Icons.stop_circle_outlined, color: Colors.white),
                 label: const Text('Stop Charging Session', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),

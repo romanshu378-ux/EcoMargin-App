@@ -9,9 +9,9 @@ class ApiClient {
 
   ApiClient(this._storageService) : _dio = Dio() {
     _dio.options.baseUrl = const String.fromEnvironment('API_URL', defaultValue: _defaultBaseUrl);
-    _dio.options.connectTimeout = const Duration(seconds: 8);
-    _dio.options.receiveTimeout = const Duration(seconds: 8);
-    _dio.options.sendTimeout = const Duration(seconds: 8);
+    _dio.options.connectTimeout = const Duration(seconds: 30);
+    _dio.options.receiveTimeout = const Duration(seconds: 30);
+    _dio.options.sendTimeout = const Duration(seconds: 30);
 
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -22,19 +22,25 @@ class ApiClient {
           }
           options.headers['Content-Type'] = 'application/json';
           if (kDebugMode) {
-            debugPrint('[API Request] ${options.method} ${options.uri}');
+            debugPrint('[LOGIN] API URL: ${options.uri}');
+            debugPrint('[LOGIN] Request started');
           }
           return handler.next(options);
         },
         onResponse: (response, handler) {
           if (kDebugMode) {
-            debugPrint('[API Response] ${response.statusCode} ${response.requestOptions.uri}');
+            debugPrint('[LOGIN] Status: ${response.statusCode}');
           }
           return handler.next(response);
         },
         onError: (DioException e, handler) {
           if (kDebugMode) {
-            debugPrint('[API Error] ${e.type} Status: ${e.response?.statusCode} URI: ${e.requestOptions.uri}');
+            debugPrint('[LOGIN] Error Type: ${e.type}');
+            debugPrint('[LOGIN] Status: ${e.response?.statusCode}');
+            debugPrint('[LOGIN] URL: ${e.requestOptions.uri}');
+            if (e.response?.data != null) {
+              debugPrint('[LOGIN] Response: ${e.response?.data}');
+            }
           }
           return handler.next(e);
         },

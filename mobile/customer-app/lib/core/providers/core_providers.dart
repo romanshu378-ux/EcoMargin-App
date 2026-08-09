@@ -16,6 +16,9 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 // Auth State Provider
 final authStateProvider = StateProvider<bool>((ref) => false);
 
+// Wallet Balance Provider
+final walletBalanceProvider = StateProvider<double>((ref) => 256.50);
+
 // Theme Mode Provider (Light, Dark, System)
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.light);
 
@@ -27,85 +30,173 @@ class ChargingSessionState {
   final bool isCharging;
   final String stationName;
   final String chargerId;
+  final String connectorType;
   final double percentage; // 0-100
   final double kwhDelivered;
   final double currentPowerKw;
   final int durationSeconds;
   final double totalCost;
+  final bool hasConnectionError;
 
   ChargingSessionState({
     required this.isCharging,
     required this.stationName,
     required this.chargerId,
+    required this.connectorType,
     required this.percentage,
     required this.kwhDelivered,
     required this.currentPowerKw,
     required this.durationSeconds,
     required this.totalCost,
+    this.hasConnectionError = false,
   });
 
   ChargingSessionState copyWith({
     bool? isCharging,
     String? stationName,
     String? chargerId,
+    String? connectorType,
     double? percentage,
     double? kwhDelivered,
     double? currentPowerKw,
     int? durationSeconds,
     double? totalCost,
+    bool? hasConnectionError,
   }) {
     return ChargingSessionState(
       isCharging: isCharging ?? this.isCharging,
       stationName: stationName ?? this.stationName,
       chargerId: chargerId ?? this.chargerId,
+      connectorType: connectorType ?? this.connectorType,
       percentage: percentage ?? this.percentage,
       kwhDelivered: kwhDelivered ?? this.kwhDelivered,
       currentPowerKw: currentPowerKw ?? this.currentPowerKw,
       durationSeconds: durationSeconds ?? this.durationSeconds,
       totalCost: totalCost ?? this.totalCost,
+      hasConnectionError: hasConnectionError ?? this.hasConnectionError,
     );
   }
 }
 
 class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
+  final Ref ref;
   Timer? _timer;
 
-  ChargingSessionNotifier()
+  ChargingSessionNotifier(this.ref)
       : super(ChargingSessionState(
           isCharging: false,
           stationName: 'GreenCharge Hub Sector 62',
           chargerId: 'CHG-DC-04',
+          connectorType: 'CCS2',
           percentage: 42.0,
           kwhDelivered: 14.5,
           currentPowerKw: 58.4,
           durationSeconds: 1140, // 19 mins
           totalCost: 261.0,
-        ));
+        )) {
+    syncWithBackend();
+  }
 
-  void startCharging({String? stationName, String? chargerId}) {
-    state = state.copyWith(
-      isCharging: true,
-      stationName: stationName ?? state.stationName,
-      chargerId: chargerId ?? state.chargerId,
-    );
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      if (state.percentage >= 100) {
-        stopCharging();
-        return;
+  Future<void> syncWithBackend() async {
+    await fetchWalletBalance();
+    await checkActiveSession();
+  }
+
+  Future<void> fetchWalletBalance() async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.get('/wallet/balance');
+      if (response.statusCode == 200 && response.data != null) {
+        final bal = double.tryParse(response.data['balance']?.toString() ?? '0') ?? 0.0;
+        ref.read(walletBalanceProvider.notifier).state = bal;
       }
-      state = state.copyWith(
-        percentage: (state.percentage + 0.5).clamp(0, 100),
-        kwhDelivered: state.kwhDelivered + 0.15,
-        durationSeconds: state.durationSeconds + 2,
-        totalCost: state.totalCost + 2.7,
-      );
+    } catch (_) {}
+  }
+
+  Future<void> checkActiveSession() async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.get('/charging/active');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        state = ChargingSessionState(
+          isCharging: data['status'] == 'ACTIVE' || data['status'] == 'STARTING',
+          stationName: data['stationName'] ?? 'EcoMargin Charging Station',
+          chargerId: data['chargerId'] ?? 'CHG-DC-04',
+          connectorType: data['connectorType'] ?? 'CCS2',
+          percentage: double.tryParse(data['percentage']?.toString() ?? '0') ?? 0.0,
+          kwhDelivered: double.tryParse(data['kwhDelivered']?.toString() ?? '0') ?? 0.0,
+          currentPowerKw: double.tryParse(data['currentPowerKw']?.toString() ?? '0') ?? 42.5,
+          durationSeconds: int.tryParse(data['durationSeconds']?.toString() ?? '0') ?? 0,
+          totalCost: double.tryParse(data['totalCost']?.toString() ?? '0') ?? 0.0,
+          hasConnectionError: false,
+        );
+        if (state.isCharging) {
+          _startPolling();
+        }
+      } else {
+        _timer?.cancel();
+        state = state.copyWith(isCharging: false, hasConnectionError: false);
+      }
+    } catch (_) {
+      if (state.isCharging) {
+        state = state.copyWith(hasConnectionError: true);
+      } else {
+        _timer?.cancel();
+        state = state.copyWith(isCharging: false, hasConnectionError: false);
+      }
+    }
+  }
+
+  void _startPolling() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      await checkActiveSession();
     });
   }
 
-  void stopCharging() {
-    _timer?.cancel();
-    state = state.copyWith(isCharging: false);
+  Future<void> startCharging({String? stationName, String? chargerId, String? connectorType}) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.post('/charging/start');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        state = ChargingSessionState(
+          isCharging: true,
+          stationName: data['stationName'] ?? 'EcoMargin Charging Station',
+          chargerId: data['chargerId'] ?? 'CHG-DC-04',
+          connectorType: data['connectorType'] ?? 'CCS2',
+          percentage: double.tryParse(data['percentage']?.toString() ?? '0') ?? 0.0,
+          kwhDelivered: double.tryParse(data['kwhDelivered']?.toString() ?? '0') ?? 0.0,
+          currentPowerKw: double.tryParse(data['currentPowerKw']?.toString() ?? '0') ?? 42.5,
+          durationSeconds: int.tryParse(data['durationSeconds']?.toString() ?? '0') ?? 0,
+          totalCost: double.tryParse(data['totalCost']?.toString() ?? '0') ?? 0.0,
+          hasConnectionError: false,
+        );
+        _startPolling();
+      }
+    } catch (_) {
+      rethrow;
+    }
+  }
+
+  Future<void> stopCharging() async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.post('/charging/stop');
+      if (response.statusCode == 200) {
+        _timer?.cancel();
+        state = state.copyWith(isCharging: false, hasConnectionError: false);
+        await fetchWalletBalance();
+        ref.invalidate(walletTransactionsProvider);
+        ref.invalidate(chargingHistoryProvider);
+      }
+    } catch (_) {
+      _timer?.cancel();
+      state = state.copyWith(isCharging: false, hasConnectionError: false);
+      ref.invalidate(walletTransactionsProvider);
+      ref.invalidate(chargingHistoryProvider);
+    }
   }
 
   @override
@@ -117,7 +208,25 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
 
 final chargingSessionProvider =
     StateNotifierProvider<ChargingSessionNotifier, ChargingSessionState>((ref) {
-  return ChargingSessionNotifier();
+  return ChargingSessionNotifier(ref);
+});
+
+final walletTransactionsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final apiClient = ref.watch(apiClientProvider);
+  final response = await apiClient.dio.get('/wallet/transactions');
+  if (response.statusCode == 200 && response.data is List) {
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+  return [];
+});
+
+final chargingHistoryProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final apiClient = ref.watch(apiClientProvider);
+  final response = await apiClient.dio.get('/charging/history');
+  if (response.statusCode == 200 && response.data is List) {
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+  return [];
 });
 
 // EV Vehicle Model

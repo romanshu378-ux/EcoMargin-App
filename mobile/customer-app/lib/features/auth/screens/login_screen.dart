@@ -18,7 +18,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
 
-
   void _showErrorSnackBar(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -51,7 +50,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final storageService = ref.read(storageServiceProvider);
 
       if (kDebugMode) {
-        debugPrint('[Login Attempt] Connecting to ${apiClient.dio.options.baseUrl}/auth/login');
+        debugPrint('[LOGIN] API URL: ${apiClient.dio.options.baseUrl}/auth/login');
+        debugPrint('[LOGIN] Request started');
       }
 
       final response = await apiClient.dio.post(
@@ -63,7 +63,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
 
       if (kDebugMode) {
-        debugPrint('[Login Response] HTTP Status: ${response.statusCode}');
+        debugPrint('[LOGIN] Status: ${response.statusCode}');
       }
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -85,7 +85,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           }
         } else {
           if (kDebugMode) {
-            debugPrint('[Login Parsing Error] Unexpected response schema: $data');
+            debugPrint('[LOGIN] Parsing Error: Unexpected response schema: $data');
           }
           _showErrorSnackBar('Invalid response structure received from server.');
         }
@@ -93,33 +93,54 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _showErrorSnackBar('Server returned unexpected status code: ${response.statusCode}');
       }
     } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
       if (kDebugMode) {
-        debugPrint('[Login DioException] Type: ${e.type}, Code: ${e.response?.statusCode}, Message: ${e.message}');
+        debugPrint('[LOGIN] Error Type: ${e.type}');
+        debugPrint('[LOGIN] Status Code: $statusCode');
+        debugPrint('[LOGIN] Request URL: ${e.requestOptions.uri}');
+        if (e.response?.data != null) {
+          debugPrint('[LOGIN] Response Body: ${e.response?.data}');
+        }
       }
 
-      final statusCode = e.response?.statusCode;
-      if (e.type == DioExceptionType.connectionTimeout ||
+      if (statusCode != null) {
+        String? serverMsg;
+        if (e.response?.data is Map) {
+          serverMsg = (e.response?.data as Map)['message']?.toString();
+        }
+
+        if (statusCode == 401) {
+          _showErrorSnackBar(serverMsg ?? 'Invalid email or password');
+        } else if (statusCode == 403) {
+          _showErrorSnackBar(serverMsg ?? 'Access denied');
+        } else if (statusCode == 409) {
+          _showErrorSnackBar(serverMsg ?? 'Account already exists');
+        } else if (statusCode == 422) {
+          _showErrorSnackBar(serverMsg ?? 'Invalid registration/login data');
+        } else if (statusCode == 500) {
+          _showErrorSnackBar(serverMsg ?? 'Server error. Please try again.');
+        } else if (statusCode == 502 || statusCode == 503) {
+          _showErrorSnackBar('Server temporarily unavailable.');
+        } else {
+          _showErrorSnackBar(serverMsg ?? 'Server returned error ($statusCode).');
+        }
+      } else if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.receiveTimeout ||
           e.type == DioExceptionType.sendTimeout ||
           e.type == DioExceptionType.connectionError ||
           e.error is SocketException) {
         _showErrorSnackBar('Unable to connect to server. Please check your internet connection.');
-      } else if (statusCode == 401 || statusCode == 403) {
-        _showErrorSnackBar('Invalid email or password');
-      } else if (statusCode == 500 || statusCode == 502 || statusCode == 503) {
-        _showErrorSnackBar('Server is temporarily unavailable. Please try again.');
       } else {
-        final serverMsg = e.response?.data is Map ? e.response?.data['message'] : null;
-        _showErrorSnackBar(serverMsg?.toString() ?? 'Unable to connect to server. Please check your internet connection.');
+        _showErrorSnackBar(e.message ?? 'An error occurred while connecting to server.');
       }
     } on FormatException catch (e) {
       if (kDebugMode) {
-        debugPrint('[Login FormatException] $e');
+        debugPrint('[LOGIN] FormatException: $e');
       }
       _showErrorSnackBar('Invalid format received from server.');
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[Login Error] $e');
+        debugPrint('[LOGIN] Unexpected Error: $e');
       }
       _showErrorSnackBar('An unexpected error occurred. Please try again.');
     } finally {
@@ -222,7 +243,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
-
 }
 
 

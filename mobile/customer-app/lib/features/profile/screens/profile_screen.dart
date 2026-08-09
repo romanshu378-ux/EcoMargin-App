@@ -35,19 +35,19 @@ class ProfileScreen extends ConsumerWidget {
             leading: const Icon(Icons.electric_car),
             title: const Text('My Vehicles'),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {},
+            onTap: () => context.push('/vehicles'),
           ),
           ListTile(
             leading: const Icon(Icons.history),
             title: const Text('Charging History'),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {},
+            onTap: () => context.push('/charging-history'),
           ),
           ListTile(
             leading: const Icon(Icons.settings),
             title: const Text('App Settings'),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {},
+            onTap: () => context.push('/settings'),
           ),
           const Divider(),
           ListTile(

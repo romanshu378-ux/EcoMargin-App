@@ -88,7 +88,7 @@ class ChargerDetailsScreen extends StatelessWidget {
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: () => context.go('/start-charging'),
+                onPressed: () => context.push('/start-charging'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF16A34A),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

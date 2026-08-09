@@ -88,7 +88,7 @@ class _AddEditVehicleScreenState extends ConsumerState<AddEditVehicleScreen> {
                     isDefault: false,
                   );
                   ref.read(vehicleProvider.notifier).addVehicle(newVehicle);
-                  context.go('/vehicles');
+                  context.pop();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF16A34A),

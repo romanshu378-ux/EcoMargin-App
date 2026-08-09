@@ -17,25 +17,23 @@ class NearbyStationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
+    return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(
+        side: BorderSide(
           color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
         ),
       ),
-      child: Column(
-        children: [
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      child: InkWell(
+        onTap: onViewDetails,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
           // Top Row: Image on left, Title/Address/Distance on right
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -144,7 +142,7 @@ class NearbyStationCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF16A34A).withOpacity(0.1),
+                        color: const Color(0xFF16A34A).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -180,7 +178,7 @@ class NearbyStationCard extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(5),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF16A34A).withOpacity(0.08),
+                              color: const Color(0xFF16A34A).withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Icon(
@@ -225,10 +223,10 @@ class NearbyStationCard extends StatelessWidget {
                     Expanded(
                       child: Row(
                         children: [
-                          Container(
+                           Container(
                             padding: const EdgeInsets.all(5),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF16A34A).withOpacity(0.08),
+                              color: const Color(0xFF16A34A).withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Icon(
@@ -276,7 +274,7 @@ class NearbyStationCard extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(5),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF16A34A).withOpacity(0.08),
+                              color: const Color(0xFF16A34A).withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Icon(
@@ -344,9 +342,10 @@ class NearbyStationCard extends StatelessWidget {
               ),
             ],
           ),
-
         ],
       ),
-    );
+    ),
+  ),
+);
   }
 }

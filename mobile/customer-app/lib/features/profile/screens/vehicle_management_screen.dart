@@ -59,7 +59,7 @@ class VehicleManagementScreen extends ConsumerWidget {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.go('/add-edit-vehicle'),
+        onPressed: () => context.push('/add-edit-vehicle'),
         backgroundColor: const Color(0xFF16A34A),
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('Add EV Vehicle', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),

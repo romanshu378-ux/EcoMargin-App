@@ -171,6 +171,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       );
       final newPos = LatLng(position.latitude, position.longitude);
 
+      if (!mounted) return;
+
       setState(() {
         _userPosition = newPos;
         _isLoadingLocation = false;
@@ -181,6 +183,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         CameraUpdate.newLatLngZoom(newPos, 14.5),
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoadingLocation = false);
     }
   }
@@ -272,7 +275,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.search, color: Color(0xFF64748B)),
+                  if (context.canPop())
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Color(0xFF64748B)),
+                      onPressed: () => context.pop(),
+                    )
+                  else
+                    const Icon(Icons.search, color: Color(0xFF64748B)),
                   const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
@@ -289,7 +298,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   const SizedBox(width: 12),
                   IconButton(
                     icon: const Icon(Icons.tune, color: Color(0xFF64748B)),
-                    onPressed: () => context.go('/search'),
+                    onPressed: () => context.push('/search'),
                   ),
                 ],
               ),
@@ -434,24 +443,28 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Wrap(
-                          spacing: 6,
-                          children: _selectedStation!.connectors
-                              .map(
-                                (c) => Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(6),
+                        Expanded(
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: _selectedStation!.connectors
+                                .map(
+                                  (c) => Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      c,
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
+                                    ),
                                   ),
-                                  child: Text(
-                                    c,
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
-                                  ),
-                                ),
-                              )
-                              .toList(),
+                                )
+                                .toList(),
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
@@ -491,7 +504,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () => context.go('/station-details'),
+                            onPressed: () => context.push('/station-details'),
                             icon: const Icon(Icons.flash_on, size: 16, color: Colors.white),
                             label: const Text('Start Charging', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                             style: ElevatedButton.styleFrom(

@@ -31,7 +31,7 @@ class FavoritesScreen extends StatelessWidget {
                   );
                 },
               ),
-              onTap: () => context.go('/station-details'),
+              onTap: () => context.push('/station-details'),
             ),
           ),
         ],
