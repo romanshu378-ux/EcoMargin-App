@@ -31,29 +31,21 @@ spring:
     activate:
       on-profile: dev
   redis:
-    enabled: ${ENABLE_REDIS:${SPRING_REDIS_ENABLED:true}}
+    enabled: ${ENABLE_REDIS:${SPRING_REDIS_ENABLED:false}}
   data:
     redis:
       repositories:
-        enabled: ${ENABLE_REDIS:${SPRING_REDIS_ENABLED:true}}
+        enabled: ${ENABLE_REDIS:${SPRING_REDIS_ENABLED:false}}
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
       password: ${SPRING_DATA_REDIS_PASSWORD:}
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ecomargin}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:secretpassword}
-    driver-class-name: org.postgresql.Driver
-    hikari:
-      maximum-pool-size: 5
-      minimum-idle: 1
-      connection-timeout: 10000
-      validation-timeout: 5000
-      idle-timeout: 30000
-      max-lifetime: 300000
-      keepalive-time: 60000
-      connection-test-query: SELECT 1
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:ecomargin;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: org.h2.Driver
   jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: update
     show-sql: true
