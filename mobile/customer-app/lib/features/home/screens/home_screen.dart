@@ -25,12 +25,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   Position? _currentPosition;
   bool _isLoadingLocation = true;
   bool _locationError = false;
+  bool _isFetchingLocation = false; // Guard against concurrent location calls
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _determinePosition();
+    Future.microtask(() => ref.read(chargingSessionProvider.notifier).syncWithBackend());
   }
 
   @override
@@ -48,7 +50,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   Future<void> _determinePosition() async {
+    if (_isFetchingLocation) return; // Prevent duplicate concurrent calls
     if (!mounted) return;
+    _isFetchingLocation = true;
     setState(() {
       _isLoadingLocation = true;
       _locationError = false;
@@ -89,8 +93,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         return;
       }
 
+      // Use medium accuracy — faster startup, less battery impact
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        desiredAccuracy: LocationAccuracy.medium,
       );
       if (mounted) {
         setState(() {
@@ -102,9 +107,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       if (mounted) {
         setState(() {
           _isLoadingLocation = false;
-          _locationError = true;
+          _locationError = _currentPosition == null; // Only show error if no cached position
         });
       }
+    } finally {
+      _isFetchingLocation = false;
     }
   }
 
@@ -201,6 +208,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
             onRefresh: () async {
               await ref.read(stationsProvider.notifier).fetchStations();
               await _determinePosition();
+              await ref.read(chargingSessionProvider.notifier).syncWithBackend();
             },
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
@@ -716,7 +724,7 @@ class ActiveChargingCard extends ConsumerWidget {
                     '/live-charging',
                     extra: {
                       'stationId': 'st-01',
-                      'sessionId': 'sess-${session.chargerId}',
+                      'sessionId': session.sessionId,
                       'connectorId': session.connectorType,
                       'chargerId': session.chargerId,
                     },
@@ -730,24 +738,19 @@ class ActiveChargingCard extends ConsumerWidget {
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Flexible(
-                      child: Text(
-                        'View Charging',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    Text(
+                      'View Charging',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    const Icon(
+                    SizedBox(width: 8),
+                    Icon(
                       Icons.arrow_forward_rounded,
                       color: Colors.white,
                       size: 16,

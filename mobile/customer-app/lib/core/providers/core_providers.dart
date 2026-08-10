@@ -17,7 +17,7 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 final authStateProvider = StateProvider<bool>((ref) => false);
 
 // Wallet Balance Provider
-final walletBalanceProvider = StateProvider<double>((ref) => 256.50);
+final walletBalanceProvider = StateProvider<double>((ref) => 0.0);
 
 // Theme Mode Provider (Light, Dark, System)
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.light);
@@ -28,6 +28,8 @@ final languageProvider = StateProvider<String>((ref) => 'English');
 // Live Charging Session Model & Notifier
 class ChargingSessionState {
   final bool isCharging;
+  final String? sessionId;
+  final String status;
   final String stationName;
   final String chargerId;
   final String connectorType;
@@ -40,6 +42,8 @@ class ChargingSessionState {
 
   ChargingSessionState({
     required this.isCharging,
+    this.sessionId,
+    required this.status,
     required this.stationName,
     required this.chargerId,
     required this.connectorType,
@@ -53,6 +57,8 @@ class ChargingSessionState {
 
   ChargingSessionState copyWith({
     bool? isCharging,
+    String? sessionId,
+    String? status,
     String? stationName,
     String? chargerId,
     String? connectorType,
@@ -65,6 +71,8 @@ class ChargingSessionState {
   }) {
     return ChargingSessionState(
       isCharging: isCharging ?? this.isCharging,
+      sessionId: sessionId ?? this.sessionId,
+      status: status ?? this.status,
       stationName: stationName ?? this.stationName,
       chargerId: chargerId ?? this.chargerId,
       connectorType: connectorType ?? this.connectorType,
@@ -81,18 +89,20 @@ class ChargingSessionState {
 class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
   final Ref ref;
   Timer? _timer;
+  bool _isStarting = false;
 
   ChargingSessionNotifier(this.ref)
       : super(ChargingSessionState(
           isCharging: false,
-          stationName: 'GreenCharge Hub Sector 62',
-          chargerId: 'CHG-DC-04',
-          connectorType: 'CCS2',
-          percentage: 42.0,
-          kwhDelivered: 14.5,
-          currentPowerKw: 58.4,
-          durationSeconds: 1140, // 19 mins
-          totalCost: 261.0,
+          status: 'COMPLETED',
+          stationName: 'EcoMargin Charging Hub',
+          chargerId: '',
+          connectorType: '',
+          percentage: 0.0,
+          kwhDelivered: 0.0,
+          currentPowerKw: 0.0,
+          durationSeconds: 0,
+          totalCost: 0.0,
         )) {
     syncWithBackend();
   }
@@ -119,14 +129,23 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
       final response = await apiClient.dio.get('/charging/active');
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
+        final status = data['status'] ?? 'CHARGING';
+        final isActive = status == 'ACTIVE' || status == 'STARTING' || status == 'PREPARING' || status == 'CHARGING' || status == 'FINISHING';
+        
+        if (!isActive) {
+          _timer?.cancel();
+        }
+
         state = ChargingSessionState(
-          isCharging: data['status'] == 'ACTIVE' || data['status'] == 'STARTING',
-          stationName: data['stationName'] ?? 'EcoMargin Charging Station',
-          chargerId: data['chargerId'] ?? 'CHG-DC-04',
-          connectorType: data['connectorType'] ?? 'CCS2',
+          isCharging: isActive,
+          sessionId: data['sessionId']?.toString(),
+          status: status,
+          stationName: data['stationName'] ?? 'EcoMargin Charging Hub',
+          chargerId: data['chargerId'] ?? '',
+          connectorType: data['connectorType'] ?? '',
           percentage: double.tryParse(data['percentage']?.toString() ?? '0') ?? 0.0,
           kwhDelivered: double.tryParse(data['kwhDelivered']?.toString() ?? '0') ?? 0.0,
-          currentPowerKw: double.tryParse(data['currentPowerKw']?.toString() ?? '0') ?? 42.5,
+          currentPowerKw: double.tryParse(data['currentPowerKw']?.toString() ?? '0') ?? 0.0,
           durationSeconds: int.tryParse(data['durationSeconds']?.toString() ?? '0') ?? 0,
           totalCost: double.tryParse(data['totalCost']?.toString() ?? '0') ?? 0.0,
           hasConnectionError: false,
@@ -156,38 +175,79 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
   }
 
   Future<void> startCharging({String? stationName, String? chargerId, String? connectorType}) async {
+    if (_isStarting) return; // Prevent duplicate concurrent starts
+    _isStarting = true;
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.dio.post('/charging/start');
+      final response = await apiClient.dio.post(
+        '/charging/start',
+        data: {
+          if (stationName != null) 'stationName': stationName,
+          if (chargerId != null) 'chargerId': chargerId,
+          if (connectorType != null) 'connectorType': connectorType,
+        },
+      );
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
+        final status = data['status'] ?? 'CHARGING';
         state = ChargingSessionState(
           isCharging: true,
-          stationName: data['stationName'] ?? 'EcoMargin Charging Station',
-          chargerId: data['chargerId'] ?? 'CHG-DC-04',
-          connectorType: data['connectorType'] ?? 'CCS2',
+          sessionId: data['sessionId']?.toString(),
+          status: status,
+          stationName: data['stationName'] ?? stationName ?? 'EcoMargin Charging Hub',
+          chargerId: data['chargerId'] ?? chargerId ?? '',
+          connectorType: data['connectorType'] ?? connectorType ?? '',
           percentage: double.tryParse(data['percentage']?.toString() ?? '0') ?? 0.0,
           kwhDelivered: double.tryParse(data['kwhDelivered']?.toString() ?? '0') ?? 0.0,
-          currentPowerKw: double.tryParse(data['currentPowerKw']?.toString() ?? '0') ?? 42.5,
+          currentPowerKw: double.tryParse(data['currentPowerKw']?.toString() ?? '0') ?? 0.0,
           durationSeconds: int.tryParse(data['durationSeconds']?.toString() ?? '0') ?? 0,
           totalCost: double.tryParse(data['totalCost']?.toString() ?? '0') ?? 0.0,
           hasConnectionError: false,
         );
+        await fetchWalletBalance();
         _startPolling();
+      } else {
+        // Non-200 response: mark connection error so caller can check
+        state = state.copyWith(hasConnectionError: true);
       }
-    } catch (_) {
+    } catch (e) {
+      // Do NOT rethrow bare DioException – surface as hasConnectionError
+      state = state.copyWith(isCharging: false, hasConnectionError: true);
+      // Re-throw so StartChargingScreen can display a message
       rethrow;
+    } finally {
+      _isStarting = false;
     }
   }
 
   Future<void> stopCharging() async {
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.dio.post('/charging/stop');
-      if (response.statusCode == 200) {
+      final activeSessionId = state.sessionId;
+      final url = activeSessionId != null ? '/charging-sessions/$activeSessionId/stop' : '/charging/stop';
+      final response = await apiClient.dio.post(url);
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
         _timer?.cancel();
-        state = state.copyWith(isCharging: false, hasConnectionError: false);
-        await fetchWalletBalance();
+        state = ChargingSessionState(
+          isCharging: false,
+          sessionId: data['sessionId']?.toString() ?? activeSessionId,
+          status: 'COMPLETED',
+          stationName: data['stationName'] ?? state.stationName,
+          chargerId: data['chargerId'] ?? state.chargerId,
+          connectorType: data['connectorType'] ?? state.connectorType,
+          percentage: double.tryParse(data['percentage']?.toString() ?? '100.0') ?? 100.0,
+          kwhDelivered: double.tryParse(data['kwhDelivered']?.toString() ?? '0') ?? 0.0,
+          currentPowerKw: 0.0,
+          durationSeconds: int.tryParse(data['durationSeconds']?.toString() ?? '0') ?? 0,
+          totalCost: double.tryParse(data['totalCost']?.toString() ?? '0') ?? 0.0,
+          hasConnectionError: false,
+        );
+        
+        // Dynamic balance sync
+        final walletBal = double.tryParse(data['walletBalance']?.toString() ?? '0') ?? 0.0;
+        ref.read(walletBalanceProvider.notifier).state = walletBal;
+
         ref.invalidate(walletTransactionsProvider);
         ref.invalidate(chargingHistoryProvider);
       }
@@ -212,20 +272,24 @@ final chargingSessionProvider =
 });
 
 final walletTransactionsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final apiClient = ref.watch(apiClientProvider);
-  final response = await apiClient.dio.get('/wallet/transactions');
-  if (response.statusCode == 200 && response.data is List) {
-    return List<Map<String, dynamic>>.from(response.data);
-  }
+  try {
+    final apiClient = ref.watch(apiClientProvider);
+    final response = await apiClient.dio.get('/wallet/transactions');
+    if (response.statusCode == 200 && response.data is List) {
+      return List<Map<String, dynamic>>.from(response.data);
+    }
+  } catch (_) {}
   return [];
 });
 
 final chargingHistoryProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  final apiClient = ref.watch(apiClientProvider);
-  final response = await apiClient.dio.get('/charging/history');
-  if (response.statusCode == 200 && response.data is List) {
-    return List<Map<String, dynamic>>.from(response.data);
-  }
+  try {
+    final apiClient = ref.watch(apiClientProvider);
+    final response = await apiClient.dio.get('/charging/history');
+    if (response.statusCode == 200 && response.data is List) {
+      return List<Map<String, dynamic>>.from(response.data);
+    }
+  } catch (_) {}
   return [];
 });
 

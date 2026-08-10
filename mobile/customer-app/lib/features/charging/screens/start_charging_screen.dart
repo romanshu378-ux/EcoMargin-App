@@ -12,11 +12,55 @@ class StartChargingScreen extends ConsumerStatefulWidget {
 
 class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
   double _targetPercentage = 80.0;
-  String _paymentMethod = 'EcoMargin Wallet (₹850.00)';
+  String? _selectedMethod;
+  bool _isStarting = false;
+
+  Future<void> _handleStartCharging() async {
+    if (_isStarting) return; // Prevent duplicate taps
+    setState(() => _isStarting = true);
+    try {
+      await ref.read(chargingSessionProvider.notifier).startCharging();
+      if (!mounted) return;
+      // Only navigate when backend confirms session started
+      final session = ref.read(chargingSessionProvider);
+      if (session.isCharging) {
+        context.go('/live-charging');
+      } else {
+        _showError('Failed to start charging session. Please check your connection and try again.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString().contains('timeout')
+          ? 'Cannot reach the server. Please check your Wi-Fi and ensure the backend is running.'
+          : 'Charging start failed: ${e.toString()}';
+      _showError(msg);
+    } finally {
+      if (mounted) setState(() => _isStarting = false);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red.shade700,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final balance = ref.watch(walletBalanceProvider);
+    final walletMethod = 'EcoMargin Wallet (₹${balance.toStringAsFixed(2)})';
+    final paymentMethods = [
+      walletMethod,
+      'UPI / GPay / PhonePe',
+      'Credit / Debit Card',
+    ];
+    final currentMethod = _selectedMethod ?? walletMethod;
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -101,14 +145,10 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
-                  value: _paymentMethod,
+                  value: paymentMethods.contains(currentMethod) ? currentMethod : walletMethod,
                   isExpanded: true,
-                  items: [
-                    'EcoMargin Wallet (₹850.00)',
-                    'UPI / GPay / PhonePe',
-                    'Credit / Debit Card',
-                  ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                  onChanged: (val) => setState(() => _paymentMethod = val!),
+                  items: paymentMethods.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                  onChanged: (val) => setState(() => _selectedMethod = val!),
                 ),
               ),
             ),
@@ -119,14 +159,25 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
               width: double.infinity,
               height: 54,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  ref.read(chargingSessionProvider.notifier).startCharging();
-                  context.push('/live-charging');
-                },
-                icon: const Icon(Icons.power_settings_new_rounded, color: Colors.white),
-                label: const Text('Start Charging Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                // Disabled (null onPressed) while request is in-flight
+                onPressed: _isStarting ? null : _handleStartCharging,
+                icon: _isStarting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.power_settings_new_rounded, color: Colors.white),
+                label: Text(
+                  _isStarting ? 'Starting...' : 'Start Charging Now',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF16A34A),
+                  disabledBackgroundColor: const Color(0xFF4ADE80),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
               ),

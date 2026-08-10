@@ -47,7 +47,7 @@ class StationDetailsScreen extends ConsumerWidget {
               chargerCategory: 'Fast Charger',
               priceStr: '₹18.00 / kWh',
               priceSubtext: 'Starting from',
-              imageUrl: 'https://images.unsplash.com/photo-1558441719-6705166e2860?w=800&q=80',
+              imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=800&q=80',
               isVerified: true,
               latitude: 26.9150,
               longitude: 75.7920,

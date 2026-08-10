@@ -1,17 +1,17 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../storage/storage_service.dart';
+import '../config/app_config.dart';
 
 class ApiClient {
-  static const String _defaultBaseUrl = 'https://ecomargin-app.onrender.com/api/v1';
   final Dio _dio;
   final StorageService _storageService;
 
   ApiClient(this._storageService) : _dio = Dio() {
-    _dio.options.baseUrl = const String.fromEnvironment('API_URL', defaultValue: _defaultBaseUrl);
-    _dio.options.connectTimeout = const Duration(seconds: 30);
+    _dio.options.baseUrl = AppConfig.baseUrl;
+    _dio.options.connectTimeout = const Duration(seconds: 20);
     _dio.options.receiveTimeout = const Duration(seconds: 30);
-    _dio.options.sendTimeout = const Duration(seconds: 30);
+    _dio.options.sendTimeout = const Duration(seconds: 20);
 
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -22,25 +22,20 @@ class ApiClient {
           }
           options.headers['Content-Type'] = 'application/json';
           if (kDebugMode) {
-            debugPrint('[LOGIN] API URL: ${options.uri}');
-            debugPrint('[LOGIN] Request started');
+            debugPrint('[API] --> ${options.method} ${options.uri}');
           }
           return handler.next(options);
         },
         onResponse: (response, handler) {
           if (kDebugMode) {
-            debugPrint('[LOGIN] Status: ${response.statusCode}');
+            debugPrint('[API] <-- ${response.statusCode} ${response.requestOptions.uri}');
           }
           return handler.next(response);
         },
         onError: (DioException e, handler) {
           if (kDebugMode) {
-            debugPrint('[LOGIN] Error Type: ${e.type}');
-            debugPrint('[LOGIN] Status: ${e.response?.statusCode}');
-            debugPrint('[LOGIN] URL: ${e.requestOptions.uri}');
-            if (e.response?.data != null) {
-              debugPrint('[LOGIN] Response: ${e.response?.data}');
-            }
+            debugPrint('[API] ERR ${e.type.name} ${e.requestOptions.uri}');
+            debugPrint('[API]     ${e.response?.statusCode} ${e.message}');
           }
           return handler.next(e);
         },
@@ -50,4 +45,3 @@ class ApiClient {
 
   Dio get dio => _dio;
 }
-

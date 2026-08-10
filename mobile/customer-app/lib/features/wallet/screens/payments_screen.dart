@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers/core_providers.dart';
 
-class PaymentsScreen extends StatelessWidget {
+class PaymentsScreen extends ConsumerWidget {
   const PaymentsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final balance = ref.watch(walletBalanceProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Saved Payment Methods'),
@@ -12,11 +16,11 @@ class PaymentsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const ListTile(
-            leading: Icon(Icons.account_balance_wallet, color: Color(0xFF16A34A)),
-            title: Text('EcoMargin Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('Primary Default Balance: ₹850.00'),
-            trailing: Icon(Icons.check_circle, color: Color(0xFF16A34A)),
+          ListTile(
+            leading: const Icon(Icons.account_balance_wallet, color: Color(0xFF16A34A)),
+            title: const Text('EcoMargin Wallet', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('Primary Default Balance: ₹${balance.toStringAsFixed(2)}'),
+            trailing: const Icon(Icons.check_circle, color: Color(0xFF16A34A)),
           ),
           const Divider(),
           ListTile(

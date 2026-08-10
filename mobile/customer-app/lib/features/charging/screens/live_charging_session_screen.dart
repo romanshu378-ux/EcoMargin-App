@@ -22,6 +22,32 @@ class LiveChargingSessionScreen extends ConsumerWidget {
     final session = ref.watch(chargingSessionProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Listen to session changes to redirect to stop charging receipt or home dashboard
+    ref.listen<ChargingSessionState>(chargingSessionProvider, (previous, next) {
+      if (!next.isCharging && next.status == 'COMPLETED') {
+        context.go('/stop-charging');
+      } else if (!next.isCharging) {
+        context.go('/');
+      }
+    });
+
+    // Prevent manual entry to live screen when not charging
+    if (!session.isCharging) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          final currentPath = GoRouterState.of(context).uri.path;
+          if (currentPath == '/live-charging') {
+            context.go('/');
+          }
+        }
+      });
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+        ),
+      );
+    }
+
     final minutes = (session.durationSeconds ~/ 60).toString().padLeft(2, '0');
     final seconds = (session.durationSeconds % 60).toString().padLeft(2, '0');
 
@@ -138,9 +164,16 @@ class LiveChargingSessionScreen extends ConsumerWidget {
               width: double.infinity,
               height: 52,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  ref.read(chargingSessionProvider.notifier).stopCharging();
-                  context.push('/stop-charging');
+                onPressed: () async {
+                  try {
+                    await ref.read(chargingSessionProvider.notifier).stopCharging();
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to stop charging: $e')),
+                      );
+                    }
+                  }
                 },
                 icon: const Icon(Icons.stop_circle_outlined, color: Colors.white),
                 label: const Text('Stop Charging Session', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),

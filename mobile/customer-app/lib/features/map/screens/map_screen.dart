@@ -47,7 +47,9 @@ class MapScreen extends ConsumerStatefulWidget {
 class _MapScreenState extends ConsumerState<MapScreen> {
   GoogleMapController? _mapController;
   LatLng _userPosition = const LatLng(26.9124, 75.7873); // Default: Jaipur
+  // ignore: unused_field
   bool _isLoadingLocation = true;
+  // ignore: unused_field
   bool _permissionDenied = false;
   Timer? _refreshTimer;
   MapStation? _selectedStation;
@@ -80,7 +82,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       connectors: ['CCS2', 'GB/T'],
       pricePerKwh: 15.0,
       rating: 4.9,
-      imageUrl: 'https://images.unsplash.com/photo-1558441719-6705166e2860?w=500&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
       isOpen247: true,
       isAvailable: true,
     ),
@@ -110,7 +112,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       connectors: ['CCS2'],
       pricePerKwh: 18.0,
       rating: 4.95,
-      imageUrl: 'https://images.unsplash.com/photo-1558441719-6705166e2860?w=500&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
       isOpen247: true,
       isAvailable: true,
     ),
