@@ -27,7 +27,7 @@ class ChargerDetailsScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.between,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,7 +64,7 @@ class ChargerDetailsScreen extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.bolt_rounded, color: Colors.emerald, size: 28),
+                const Icon(Icons.bolt_rounded, color: Color(0xFF10B981), size: 28),
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Column(
@@ -76,12 +76,12 @@ class ChargerDetailsScreen extends ConsumerWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, py: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.emerald.withOpacity(0.1),
+                    color: const Color(0xFF10B981).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text('AVAILABLE', style: TextStyle(color: Colors.emerald, fontSize: 9, fontWeight: FontWeight.bold)),
+                  child: const Text('AVAILABLE', style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -121,7 +121,7 @@ class ChargerDetailsScreen extends ConsumerWidget {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.emerald,
+                    backgroundColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

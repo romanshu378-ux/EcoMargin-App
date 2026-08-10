@@ -23,12 +23,21 @@ class ApiClient {
           options.headers['Content-Type'] = 'application/json';
           if (kDebugMode) {
             debugPrint('[API] --> ${options.method} ${options.uri}');
+            final loggedHeaders = Map<String, dynamic>.from(options.headers);
+            if (loggedHeaders.containsKey('Authorization')) {
+              loggedHeaders['Authorization'] = 'Bearer [HIDDEN]';
+            }
+            debugPrint('[API] Headers: $loggedHeaders');
+            if (options.data != null) {
+              debugPrint('[API] Body: ${options.data}');
+            }
           }
           return handler.next(options);
         },
         onResponse: (response, handler) {
           if (kDebugMode) {
             debugPrint('[API] <-- ${response.statusCode} ${response.requestOptions.uri}');
+            debugPrint('[API] Response data: ${response.data}');
           }
           return handler.next(response);
         },
@@ -36,6 +45,9 @@ class ApiClient {
           if (kDebugMode) {
             debugPrint('[API] ERR ${e.type.name} ${e.requestOptions.uri}');
             debugPrint('[API]     ${e.response?.statusCode} ${e.message}');
+            if (e.response?.data != null) {
+              debugPrint('[API] Response data: ${e.response?.data}');
+            }
           }
           return handler.next(e);
         },

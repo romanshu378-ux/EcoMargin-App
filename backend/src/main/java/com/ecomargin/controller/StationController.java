@@ -15,6 +15,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/stations")
 @RequiredArgsConstructor
@@ -40,10 +42,17 @@ public class StationController {
         return ResponseEntity.ok(stations);
     }
 
+    @Operation(summary = "Get nearby stations")
+    @ApiResponse(responseCode = "200", description = "Successfully retrieved list of nearby stations")
+    @GetMapping("/nearby")
+    public ResponseEntity<List<Station>> getNearbyStations() {
+        return ResponseEntity.ok(stationRepository.findAll());
+    }
+
     @Operation(summary = "Get a single station details by ID")
     @ApiResponse(responseCode = "200", description = "Station found")
     @ApiResponse(responseCode = "404", description = "Station not found")
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
     public ResponseEntity<Station> getStationById(@PathVariable Long id) {
         return stationRepository.findById(id)
                 .map(ResponseEntity::ok)

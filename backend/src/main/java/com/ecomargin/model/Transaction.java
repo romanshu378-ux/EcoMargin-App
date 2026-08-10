@@ -38,6 +38,15 @@ public class Transaction {
     @Column(name = "reference_id", unique = true)
     private String referenceId; // Stripe payment intent identifier, etc.
 
+    @Column(name = "reference_type")
+    private String referenceType; // e.g., CHARGING, TOPUP
+
+    @Column(name = "balance_before", precision = 12, scale = 2)
+    private BigDecimal balanceBefore;
+
+    @Column(name = "balance_after", precision = 12, scale = 2)
+    private BigDecimal balanceAfter;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

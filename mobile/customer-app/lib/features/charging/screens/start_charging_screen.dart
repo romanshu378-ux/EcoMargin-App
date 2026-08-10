@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
 import '../../../core/providers/core_providers.dart';
 
 class StartChargingScreen extends ConsumerStatefulWidget {
@@ -15,14 +16,188 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
   String? _selectedMethod;
   bool _isStarting = false;
 
+  String _formatError(Object e) {
+    if (e is DioException) {
+      final response = e.response;
+      final status = response?.statusCode;
+      
+      // Req 11 - Debug logging
+      debugPrint('[DEBUG] API Method: ${e.requestOptions.method}');
+      debugPrint('[DEBUG] API Path: ${e.requestOptions.path}');
+      if (status != null) {
+        debugPrint('[DEBUG] Response Status: $status');
+      }
+      if (response?.data != null) {
+        debugPrint('[DEBUG] Response Body: ${response?.data}');
+      }
+      
+      // Req 9 - Specific status code checks
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        return 'Unable to connect to server. Please check your Wi-Fi and try again.';
+      }
+      
+      if (status != null) {
+        // Log 404 details
+        if (status == 404) {
+          debugPrint('[CRITICAL] 404 Route Not Found!');
+          debugPrint('[CRITICAL] Requested URL: ${e.requestOptions.uri}');
+          debugPrint('[CRITICAL] Response Data: ${response?.data}');
+          return 'Service temporarily unavailable. Please try again later.';
+        }
+        
+        switch (status) {
+          case 401:
+            return 'Authentication expired. Please log in again.';
+          case 403:
+            return 'Access denied. You do not have permission to start charging.';
+          case 409:
+            return 'A charging session conflict occurred. An active session might already exist.';
+          case 400:
+          case 422:
+            String? serverMsg;
+            if (response?.data is Map) {
+              serverMsg = response?.data['message'] ?? response?.data['error'];
+            }
+            return serverMsg ?? 'Validation failed. Please verify your inputs and try again.';
+          case 500:
+            return 'Temporary server error. Please try again in a few moments.';
+        }
+      }
+    }
+    
+    final str = e.toString();
+    if (str.contains('timeout') || str.contains('SocketException')) {
+      return 'Unable to connect to server. Please check your Wi-Fi and try again.';
+    }
+    return 'Charging start failed. Please try again.';
+  }
+
+  void _showInsufficientBalanceDialog({required double balance, required double requiredBalance}) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 28),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text('Insufficient Wallet Balance', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Your wallet balance is insufficient to start this charging session.',
+              style: TextStyle(fontSize: 14, height: 1.4),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Available Balance:', style: TextStyle(fontSize: 13)),
+                      Text('₹${balance.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Minimum Required:', style: TextStyle(fontSize: 13)),
+                      Text('₹${requiredBalance.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF16A34A))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.push('/add-money');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF16A34A),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Add Money', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleStartCharging() async {
     if (_isStarting) return; // Prevent duplicate taps
     setState(() => _isStarting = true);
+    
+    double minRequiredBalance = 50.0; // Standard business logic fallback
+    
     try {
+      // 1. Fetch current configuration from backend
+      try {
+        final apiClient = ref.read(apiClientProvider);
+        final configResponse = await apiClient.dio.get('/charging-sessions/config');
+        if (configResponse.statusCode == 200 && configResponse.data != null) {
+          final data = configResponse.data;
+          minRequiredBalance = double.tryParse(data['minRequiredBalance']?.toString() ?? '50.0') ?? 50.0;
+        }
+      } catch (e) {
+        debugPrint('[DEBUG] Config fetch failed, using fallback ₹$minRequiredBalance: $e');
+      }
+
+      // 2. Fetch current wallet balance
+      try {
+        await ref.read(chargingSessionProvider.notifier).fetchWalletBalance();
+      } catch (e) {
+        debugPrint('[DEBUG] Failed to fetch latest wallet balance: $e');
+      }
+      final balance = ref.read(walletBalanceProvider);
+      
+      // Debug logging wallet balance and required amount
+      debugPrint('[DEBUG] Current Wallet Balance: ₹$balance');
+      debugPrint('[DEBUG] Required Wallet Balance: ₹$minRequiredBalance');
+      
+      if (balance < minRequiredBalance) {
+        if (!mounted) return;
+        setState(() => _isStarting = false);
+        _showInsufficientBalanceDialog(balance: balance, requiredBalance: minRequiredBalance);
+        return;
+      }
+
+      // 3. Start charging session
       await ref.read(chargingSessionProvider.notifier).startCharging();
       if (!mounted) return;
-      // Only navigate when backend confirms session started
+      
       final session = ref.read(chargingSessionProvider);
+      
+      // Debug logging session start result
+      debugPrint('[DEBUG] Session ID: ${session.sessionId}');
+      debugPrint('[DEBUG] Charging Start Result (isCharging): ${session.isCharging}');
+      
       if (session.isCharging) {
         context.go('/live-charging');
       } else {
@@ -30,10 +205,20 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      final msg = e.toString().contains('timeout')
-          ? 'Cannot reach the server. Please check your Wi-Fi and ensure the backend is running.'
-          : 'Charging start failed: ${e.toString()}';
-      _showError(msg);
+      setState(() => _isStarting = false);
+      
+      // Catch backend-side balance check error (402 or 400 with code INSUFFICIENT_WALLET_BALANCE)
+      if (e is DioException && e.response != null) {
+        final data = e.response!.data;
+        if (data is Map && data['code'] == 'INSUFFICIENT_WALLET_BALANCE') {
+          final avail = double.tryParse(data['availableBalance']?.toString() ?? '0') ?? 0.0;
+          final req = double.tryParse(data['requiredBalance']?.toString() ?? '50.0') ?? 50.0;
+          _showInsufficientBalanceDialog(balance: avail, requiredBalance: req);
+          return;
+        }
+      }
+      
+      _showError(_formatError(e));
     } finally {
       if (mounted) setState(() => _isStarting = false);
     }
@@ -80,19 +265,21 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-              child: const Row(
+               child: Row(
                 children: [
-                  CircleAvatar(
+                  const CircleAvatar(
                     backgroundColor: Color(0xFF16A34A),
                     child: Icon(Icons.bolt, color: Colors.white),
                   ),
-                  SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('GreenCharge Hub Sector 62', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                      Text('Charger: CHG-DC-04 (60 kW DC)', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
-                    ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text('GreenCharge Hub Sector 62', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis),
+                        Text('Charger: CHG-DC-04 (60 kW DC)', style: TextStyle(color: Color(0xFF64748B), fontSize: 13), overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
                   ),
                 ],
               ),

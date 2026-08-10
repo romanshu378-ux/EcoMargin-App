@@ -32,14 +32,14 @@ class _WalletScreenState extends State<WalletScreen> {
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Colors.emerald, Color(0xFF047857)],
+                    colors: [Color(0xFF10B981), Color(0xFF047857)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.emerald.withOpacity(0.3),
+                      color: const Color(0xFF10B981).withOpacity(0.3),
                       blurRadius: 15,
                       offset: const Offset(0, 8),
                     ),
@@ -66,7 +66,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 icon: const Icon(Icons.add_card_rounded),
                 label: const Text('Quick Deposit \$25.00', style: TextStyle(fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.emerald,
+                  backgroundColor: const Color(0xFF10B981),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -99,14 +99,14 @@ class _WalletScreenState extends State<WalletScreen> {
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.emerald.withOpacity(0.1),
+          color: const Color(0xFF10B981).withOpacity(0.1),
           shape: BoxShape.circle,
         ),
-        child: const Icon(Icons.wallet_rounded, color: Colors.emerald, size: 20),
+        child: const Icon(Icons.wallet_rounded, color: Color(0xFF10B981), size: 20),
       ),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
       subtitle: Text('$date • $status', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-      trailing: Text(amount, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: amount.startsWith('+') ? Colors.emerald : null)),
+      trailing: Text(amount, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: amount.startsWith('+') ? const Color(0xFF10B981) : null)),
     );
   }
 }

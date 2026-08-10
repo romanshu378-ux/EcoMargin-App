@@ -75,7 +75,6 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of(
             "https://*.vercel.app",
-            "https://eco-margin-app-7vxf.vercel.app",
             "http://localhost:5173",
             "http://localhost:3000",
             "http://localhost:4173",

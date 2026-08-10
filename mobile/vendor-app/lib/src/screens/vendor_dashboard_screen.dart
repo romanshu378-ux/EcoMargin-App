@@ -51,7 +51,7 @@ class VendorDashboardScreen extends StatelessWidget {
                 child: Card(
                   color: const Color(0xFF1E293B),
                   child: ListTile(
-                    leading: const Icon(Icons.account_balance_wallet, color: Colors.emerald),
+                    leading: const Icon(Icons.account_balance_wallet, color: Color(0xFF10B981)),
                     title: const Text('\$18.4k'),
                     subtitle: const Text('Wallet Balance'),
                     onTap: () => Navigator.pushNamed(context, '/earnings'),

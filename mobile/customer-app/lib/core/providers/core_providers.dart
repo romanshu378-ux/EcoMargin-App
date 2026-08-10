@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import '../storage/storage_service.dart';
 import '../network/api_client.dart';
 
@@ -90,6 +91,7 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
   final Ref ref;
   Timer? _timer;
   bool _isStarting = false;
+  DateTime? _lastSyncTime;
 
   ChargingSessionNotifier(this.ref)
       : super(ChargingSessionState(
@@ -108,25 +110,38 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
   }
 
   Future<void> syncWithBackend() async {
-    await fetchWalletBalance();
-    await checkActiveSession();
+    final now = DateTime.now();
+    if (_lastSyncTime != null && now.difference(_lastSyncTime!) < const Duration(seconds: 3)) {
+      return;
+    }
+    _lastSyncTime = now;
+    try {
+      await fetchWalletBalance();
+    } catch (_) {}
+    try {
+      await checkActiveSession();
+    } catch (_) {}
   }
 
   Future<void> fetchWalletBalance() async {
-    try {
-      final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.dio.get('/wallet/balance');
-      if (response.statusCode == 200 && response.data != null) {
-        final bal = double.tryParse(response.data['balance']?.toString() ?? '0') ?? 0.0;
-        ref.read(walletBalanceProvider.notifier).state = bal;
-      }
-    } catch (_) {}
+    final apiClient = ref.read(apiClientProvider);
+    final response = await apiClient.dio.get('/wallet/balance');
+    if (response.statusCode == 200 && response.data != null) {
+      final bal = double.tryParse(response.data['balance']?.toString() ?? '0') ?? 0.0;
+      ref.read(walletBalanceProvider.notifier).state = bal;
+    } else {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        type: DioExceptionType.badResponse,
+      );
+    }
   }
 
   Future<void> checkActiveSession() async {
     try {
       final apiClient = ref.read(apiClientProvider);
-      final response = await apiClient.dio.get('/charging/active');
+      final response = await apiClient.dio.get('/charging-sessions/active');
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
         final status = data['status'] ?? 'CHARGING';
@@ -180,7 +195,7 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
     try {
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.dio.post(
-        '/charging/start',
+        '/charging-sessions/start',
         data: {
           if (stationName != null) 'stationName': stationName,
           if (chargerId != null) 'chargerId': chargerId,
@@ -224,7 +239,7 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
     try {
       final apiClient = ref.read(apiClientProvider);
       final activeSessionId = state.sessionId;
-      final url = activeSessionId != null ? '/charging-sessions/$activeSessionId/stop' : '/charging/stop';
+      final url = activeSessionId != null ? '/charging-sessions/$activeSessionId/stop' : '/charging-sessions/stop';
       final response = await apiClient.dio.post(url);
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
@@ -259,6 +274,24 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
     }
   }
 
+  void clearCompletedSession() {
+    if (state.status == 'COMPLETED') {
+      state = ChargingSessionState(
+        isCharging: false,
+        status: 'IDLE',
+        stationName: 'EcoMargin Charging Hub',
+        chargerId: '',
+        connectorType: '',
+        percentage: 0.0,
+        kwhDelivered: 0.0,
+        currentPowerKw: 0.0,
+        durationSeconds: 0,
+        totalCost: 0.0,
+        hasConnectionError: false,
+      );
+    }
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -285,7 +318,7 @@ final walletTransactionsProvider = FutureProvider.autoDispose<List<Map<String, d
 final chargingHistoryProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
   try {
     final apiClient = ref.watch(apiClientProvider);
-    final response = await apiClient.dio.get('/charging/history');
+    final response = await apiClient.dio.get('/charging-sessions/history');
     if (response.statusCode == 200 && response.data is List) {
       return List<Map<String, dynamic>>.from(response.data);
     }

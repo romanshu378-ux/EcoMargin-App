@@ -33,8 +33,8 @@ class ChargingSessionScreen extends ConsumerWidget {
                       child: CircularProgressIndicator(
                         value: session.isCharging ? null : 1.0,
                         strokeWidth: 12,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.emerald),
-                        backgroundColor: Colors.emerald.withOpacity(0.1),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+                        backgroundColor: const Color(0xFF10B981).withOpacity(0.1),
                       ),
                     ),
                     Column(
@@ -95,7 +95,7 @@ class ChargingSessionScreen extends ConsumerWidget {
                           const SizedBox(height: 6),
                           Text(
                             '\$${session.totalCost.toStringAsFixed(2)}',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.emerald),
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
                           ),
                         ],
                       ),
@@ -116,7 +116,7 @@ class ChargingSessionScreen extends ConsumerWidget {
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.rose,
+                  backgroundColor: const Color(0xFFF43F5E),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 18),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

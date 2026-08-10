@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../storage/storage_service.dart';
 
 class ApiClient {
@@ -8,21 +9,39 @@ class ApiClient {
 
   ApiClient(this._storageService) : _dio = Dio() {
     _dio.options.baseUrl = const String.fromEnvironment('API_URL', defaultValue: _defaultBaseUrl);
-    _dio.options.connectTimeout = const Duration(seconds: 15);
-    _dio.options.receiveTimeout = const Duration(seconds: 15);
+    _dio.options.connectTimeout = const Duration(seconds: 30);
+    _dio.options.receiveTimeout = const Duration(seconds: 30);
+    _dio.options.sendTimeout = const Duration(seconds: 30);
 
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           final token = await _storageService.getToken();
-          if (token != null) {
+          if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
           options.headers['Content-Type'] = 'application/json';
+          if (kDebugMode) {
+            debugPrint('[LOGIN] API URL: ${options.uri}');
+            debugPrint('[LOGIN] Request started');
+          }
           return handler.next(options);
         },
+        onResponse: (response, handler) {
+          if (kDebugMode) {
+            debugPrint('[LOGIN] Status: ${response.statusCode}');
+          }
+          return handler.next(response);
+        },
         onError: (DioException e, handler) {
-          // Handle token refresh logic here in a real production scenario
+          if (kDebugMode) {
+            debugPrint('[LOGIN] Error Type: ${e.type}');
+            debugPrint('[LOGIN] Status: ${e.response?.statusCode}');
+            debugPrint('[LOGIN] URL: ${e.requestOptions.uri}');
+            if (e.response?.data != null) {
+              debugPrint('[LOGIN] Response: ${e.response?.data}');
+            }
+          }
           return handler.next(e);
         },
       ),

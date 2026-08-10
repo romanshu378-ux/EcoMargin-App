@@ -19,6 +19,7 @@ class StopChargingScreen extends ConsumerWidget {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
+        ref.read(chargingSessionProvider.notifier).clearCompletedSession();
         context.go('/');
       },
       child: Scaffold(
@@ -28,7 +29,10 @@ class StopChargingScreen extends ConsumerWidget {
           automaticallyImplyLeading: false,
           leading: IconButton(
             icon: const Icon(Icons.close_rounded),
-            onPressed: () => context.go('/'),
+            onPressed: () {
+              ref.read(chargingSessionProvider.notifier).clearCompletedSession();
+              context.go('/');
+            },
           ),
         ),
         body: SingleChildScrollView(
@@ -115,7 +119,10 @@ class StopChargingScreen extends ConsumerWidget {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: () => context.go('/'),
+                  onPressed: () {
+                    ref.read(chargingSessionProvider.notifier).clearCompletedSession();
+                    context.go('/');
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF16A34A),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

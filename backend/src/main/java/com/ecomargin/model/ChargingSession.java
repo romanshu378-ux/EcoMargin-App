@@ -45,6 +45,18 @@ public class ChargingSession {
     @Column(name = "total_cost", precision = 10, scale = 2)
     private BigDecimal totalCost = BigDecimal.ZERO;
 
+    @Column(name = "ocpp_transaction_id")
+    private String ocppTransactionId;
+
+    @Column(name = "meter_start_wh", precision = 12, scale = 3)
+    private BigDecimal meterStartWh = BigDecimal.ZERO;
+
+    @Column(name = "meter_stop_wh", precision = 12, scale = 3)
+    private BigDecimal meterStopWh = BigDecimal.ZERO;
+
+    @Column(name = "stop_reason")
+    private String stopReason;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

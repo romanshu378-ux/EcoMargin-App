@@ -18,7 +18,7 @@ class MapScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.map_rounded, size: 96, color: Colors.emerald.withOpacity(0.2)),
+                  Icon(Icons.map_rounded, size: 96, color: const Color(0xFF10B981).withOpacity(0.2)),
                   const SizedBox(height: 8),
                   const Text('Map View Sandbox', style: TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
@@ -34,7 +34,7 @@ class MapScreen extends StatelessWidget {
               onTap: () => _showDetailsSheet(context, 'Austin Downtown Hub', '120 E 6th St'),
               child: const Column(
                 children: [
-                  Icon(Icons.location_on_rounded, size: 36, color: Colors.emerald),
+                  Icon(Icons.location_on_rounded, size: 36, color: Color(0xFF10B981)),
                   Text('Downtown Hub', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                 ],
               ),
@@ -48,7 +48,7 @@ class MapScreen extends StatelessWidget {
               onTap: () => _showDetailsSheet(context, 'North Loop Charger Point', '5310 Airport Blvd'),
               child: const Column(
                 children: [
-                  Icon(Icons.location_on_rounded, size: 36, color: Colors.emerald),
+                  Icon(Icons.location_on_rounded, size: 36, color: Color(0xFF10B981)),
                   Text('North Loop Pt', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                 ],
               ),
@@ -96,7 +96,7 @@ class MapScreen extends StatelessWidget {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 0,
-        selectedItemColor: Colors.emerald,
+        selectedItemColor: const Color(0xFF10B981),
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
         items: const [

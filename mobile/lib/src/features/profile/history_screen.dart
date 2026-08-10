@@ -32,7 +32,7 @@ class HistoryScreen extends StatelessWidget {
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.between,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -45,7 +45,7 @@ class HistoryScreen extends StatelessWidget {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
-                                Text(item['cost'] ?? '\$6.47', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.emerald)),
+                                Text(item['cost'] ?? '\$6.47', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF10B981))),
                                 const SizedBox(height: 4),
                                 GestureDetector(
                                   onTap: () {
