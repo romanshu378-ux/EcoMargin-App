@@ -38,6 +38,20 @@ public class User implements UserDetails {
 
     private String googleId;
 
+    private java.time.LocalDate dateOfBirth;
+    private String gender;
+    private String address;
+    private String city;
+    private String state;
+    private String pinCode;
+    private String emergencyContactName;
+    private String emergencyContactNumber;
+    private String profileImageUrl;
+
+    @Lob
+    @Column(name = "profile_image", columnDefinition = "bytea")
+    private byte[] profileImage;
+
     private boolean isVerified = false;
     private boolean isAccountNonLocked = true;
 

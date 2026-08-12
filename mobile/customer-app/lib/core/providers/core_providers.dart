@@ -327,75 +327,290 @@ final chargingHistoryProvider = FutureProvider.autoDispose<List<Map<String, dyna
   return [];
 });
 
+// User Profile Model
+class UserProfile {
+  final int? id;
+  final String email;
+  final String firstName;
+  final String lastName;
+  final String fullName;
+  final String phoneNumber;
+  final String? dateOfBirth; // yyyy-MM-dd
+  final String? gender;
+  final String? address;
+  final String? city;
+  final String? state;
+  final String? pinCode;
+  final String? emergencyContactName;
+  final String? emergencyContactNumber;
+  final String? profileImageUrl;
+
+  UserProfile({
+    this.id,
+    required this.email,
+    required this.firstName,
+    required this.lastName,
+    required this.fullName,
+    required this.phoneNumber,
+    this.dateOfBirth,
+    this.gender,
+    this.address,
+    this.city,
+    this.state,
+    this.pinCode,
+    this.emergencyContactName,
+    this.emergencyContactNumber,
+    this.profileImageUrl,
+  });
+
+  factory UserProfile.fromJson(Map<String, dynamic> json) {
+    return UserProfile(
+      id: json['id'],
+      email: json['email'] ?? '',
+      firstName: json['firstName'] ?? '',
+      lastName: json['lastName'] ?? '',
+      fullName: json['fullName'] ?? '',
+      phoneNumber: json['phoneNumber'] ?? '',
+      dateOfBirth: json['dateOfBirth'],
+      gender: json['gender'],
+      address: json['address'],
+      city: json['city'],
+      state: json['state'],
+      pinCode: json['pinCode'],
+      emergencyContactName: json['emergencyContactName'],
+      emergencyContactNumber: json['emergencyContactNumber'],
+      profileImageUrl: json['profileImageUrl'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'email': email,
+      'firstName': firstName,
+      'lastName': lastName,
+      'fullName': fullName,
+      'phoneNumber': phoneNumber,
+      'dateOfBirth': dateOfBirth,
+      'gender': gender,
+      'address': address,
+      'city': city,
+      'state': state,
+      'pinCode': pinCode,
+      'emergencyContactName': emergencyContactName,
+      'emergencyContactNumber': emergencyContactNumber,
+      'profileImageUrl': profileImageUrl,
+    };
+  }
+}
+
+class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile>> {
+  final Ref ref;
+
+  ProfileNotifier(this.ref) : super(const AsyncValue.loading()) {
+    fetchProfile();
+  }
+
+  Future<void> fetchProfile() async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.get('/profile');
+      if (response.statusCode == 200) {
+        state = AsyncValue.data(UserProfile.fromJson(response.data));
+      } else {
+        state = AsyncValue.error('Failed to load profile', StackTrace.current);
+      }
+    } catch (e) {
+      state = AsyncValue.error(e, StackTrace.current);
+    }
+  }
+
+  Future<void> updateProfile(UserProfile updatedProfile) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.put('/profile', data: updatedProfile.toJson());
+      if (response.statusCode == 200) {
+        state = AsyncValue.data(UserProfile.fromJson(response.data));
+      } else {
+        throw Exception('Failed to update profile');
+      }
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  Future<void> uploadPhoto(List<int> bytes, String filename) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: filename),
+      });
+      final response = await apiClient.dio.post('/profile/photo', data: formData);
+      if (response.statusCode == 200) {
+        await fetchProfile(); // Reload profile
+      } else {
+        throw Exception('Failed to upload photo');
+      }
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  Future<void> removePhoto() async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.delete('/profile/photo');
+      if (response.statusCode == 200) {
+        await fetchProfile(); // Reload profile
+      } else {
+        throw Exception('Failed to remove photo');
+      }
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+}
+
+final profileProvider = StateNotifierProvider<ProfileNotifier, AsyncValue<UserProfile>>((ref) {
+  return ProfileNotifier(ref);
+});
+
 // EV Vehicle Model
 class EvVehicle {
   final String id;
   final String brand;
   final String model;
+  final String? variant;
+  final String? type;
   final String registrationNumber;
   final double batteryCapacityKwh;
   final String connectorType;
+  final String? nickname;
   final bool isDefault;
 
   EvVehicle({
     required this.id,
     required this.brand,
     required this.model,
+    this.variant,
+    this.type,
     required this.registrationNumber,
     required this.batteryCapacityKwh,
     required this.connectorType,
+    this.nickname,
     this.isDefault = false,
   });
 }
 
 class VehicleNotifier extends StateNotifier<List<EvVehicle>> {
-  VehicleNotifier()
-      : super([
-          EvVehicle(
-            id: '1',
-            brand: 'Tata Motors',
-            model: 'Nexon EV Max',
-            registrationNumber: 'MH 12 AB 4589',
-            batteryCapacityKwh: 40.5,
-            connectorType: 'CCS2 (DC Fast)',
-            isDefault: true,
-          ),
-          EvVehicle(
-            id: '2',
-            brand: 'MG Motor',
-            model: 'ZS EV',
-            registrationNumber: 'MH 14 EV 9912',
-            batteryCapacityKwh: 50.3,
-            connectorType: 'CCS2 (DC Fast)',
-            isDefault: false,
-          ),
-        ]);
+  final Ref ref;
 
-  void addVehicle(EvVehicle vehicle) {
-    state = [...state, vehicle];
+  VehicleNotifier(this.ref) : super([]) {
+    fetchVehicles();
   }
 
-  void removeVehicle(String id) {
-    state = state.where((v) => v.id != id).toList();
+  Future<void> fetchVehicles() async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.get('/vehicles');
+      if (response.statusCode == 200 && response.data is List) {
+        final List list = response.data;
+        state = list.map((item) => EvVehicle(
+          id: item['id'].toString(),
+          brand: item['brand'] ?? '',
+          model: item['model'] ?? '',
+          variant: item['variant'],
+          type: item['type'],
+          registrationNumber: item['registrationNumber'] ?? '',
+          batteryCapacityKwh: double.tryParse(item['batteryCapacityKwh']?.toString() ?? '0') ?? 0.0,
+          connectorType: item['connectorType'] ?? '',
+          nickname: item['nickname'],
+          isDefault: item['isDefault'] ?? false,
+        )).toList();
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch vehicles: $e');
+    }
   }
 
-  void setDefault(String id) {
-    state = [
-      for (final v in state)
-        EvVehicle(
-          id: v.id,
-          brand: v.brand,
-          model: v.model,
-          registrationNumber: v.registrationNumber,
-          batteryCapacityKwh: v.batteryCapacityKwh,
-          connectorType: v.connectorType,
-          isDefault: v.id == id,
-        )
-    ];
+  Future<void> addVehicle(EvVehicle vehicle) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.post('/vehicles', data: {
+        'registrationNumber': vehicle.registrationNumber,
+        'brand': vehicle.brand,
+        'model': vehicle.model,
+        'variant': vehicle.variant,
+        'type': vehicle.type,
+        'batteryCapacityKwh': vehicle.batteryCapacityKwh,
+        'connectorType': vehicle.connectorType,
+        'nickname': vehicle.nickname,
+        'isDefault': vehicle.isDefault,
+      });
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        await fetchVehicles();
+      } else {
+        throw Exception('Failed to add vehicle');
+      }
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  Future<void> updateVehicle(EvVehicle vehicle) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.put('/vehicles/${vehicle.id}', data: {
+        'registrationNumber': vehicle.registrationNumber,
+        'brand': vehicle.brand,
+        'model': vehicle.model,
+        'variant': vehicle.variant,
+        'type': vehicle.type,
+        'batteryCapacityKwh': vehicle.batteryCapacityKwh,
+        'connectorType': vehicle.connectorType,
+        'nickname': vehicle.nickname,
+        'isDefault': vehicle.isDefault,
+      });
+      if (response.statusCode == 200) {
+        await fetchVehicles();
+      } else {
+        throw Exception('Failed to update vehicle');
+      }
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  Future<void> removeVehicle(String id) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.delete('/vehicles/$id');
+      if (response.statusCode == 200) {
+        await fetchVehicles();
+      } else {
+        throw Exception('Failed to delete vehicle');
+      }
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  Future<void> setDefault(String id) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.post('/vehicles/$id/default');
+      if (response.statusCode == 200) {
+        await fetchVehicles();
+      } else {
+        throw Exception('Failed to set default vehicle');
+      }
+    } catch (e) {
+      throw Exception(e.toString());
+    }
   }
 }
 
 final vehicleProvider =
     StateNotifierProvider<VehicleNotifier, List<EvVehicle>>((ref) {
-  return VehicleNotifier();
+  return VehicleNotifier(ref);
 });

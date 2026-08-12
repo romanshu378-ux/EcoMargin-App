@@ -217,7 +217,13 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       GoRoute(path: '/edit-profile', builder: (context, state) => const EditProfileScreen()),
       GoRoute(path: '/vehicles', builder: (context, state) => const VehicleManagementScreen()),
-      GoRoute(path: '/add-edit-vehicle', builder: (context, state) => const AddEditVehicleScreen()),
+      GoRoute(
+        path: '/add-edit-vehicle',
+        builder: (context, state) {
+          final vehicle = state.extra as EvVehicle?;
+          return AddEditVehicleScreen(vehicle: vehicle);
+        },
+      ),
 
       GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
       GoRoute(path: '/language', builder: (context, state) => const LanguageScreen()),

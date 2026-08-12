@@ -114,6 +114,9 @@ public class ChargingController {
         map.put("totalCost", cost);
         map.put("startTime", session.getStartTime());
         map.put("endTime", session.getEndTime());
+        map.put("ratePerKwh", pricePerKwh);
+        map.put("paymentMethod", "Wallet");
+        map.put("ocppTransactionId", session.getOcppTransactionId() != null ? session.getOcppTransactionId() : ("OCPP-TX-" + session.getId()));
 
         // Support additional structure for Requirement 3
         map.put("powerKw", speedKw);
