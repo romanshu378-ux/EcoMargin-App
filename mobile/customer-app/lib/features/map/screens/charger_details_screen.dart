@@ -2,7 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 class ChargerDetailsScreen extends StatelessWidget {
-  const ChargerDetailsScreen({super.key});
+  final String? connectorId;
+  final String? chargerId;
+  final String? stationId;
+
+  const ChargerDetailsScreen({
+    super.key,
+    this.connectorId,
+    this.chargerId,
+    this.stationId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -27,11 +36,11 @@ class ChargerDetailsScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  const Row(
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Charger ID', style: TextStyle(color: Color(0xFF64748B))),
-                      Text('CHG-DC-04', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text('Charger ID', style: TextStyle(color: Color(0xFF64748B))),
+                      Text(chargerId ?? 'CHG-DC-04', style: const TextStyle(fontWeight: FontWeight.bold)),
                     ],
                   ),
                   const Divider(height: 24),
@@ -88,7 +97,14 @@ class ChargerDetailsScreen extends StatelessWidget {
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: () => context.push('/start-charging'),
+                onPressed: () => context.push(
+                  '/start-charging',
+                  extra: {
+                    'connectorId': connectorId,
+                    'chargerId': chargerId,
+                    'stationId': stationId,
+                  },
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF16A34A),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

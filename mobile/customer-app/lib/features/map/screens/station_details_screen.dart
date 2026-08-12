@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../home/providers/home_providers.dart';
 import '../../home/models/station.dart';
 
@@ -17,44 +18,44 @@ class StationDetailsScreen extends ConsumerWidget {
     final stationsAsync = ref.watch(stationsProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text('Station Overview'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Station link copied to clipboard')),
-              );
-            },
+    return stationsAsync.when(
+      data: (stations) {
+        final station = stations.firstWhere(
+          (s) => s.id == stationId,
+          orElse: () => stations.isNotEmpty ? stations.first : const ChargingStation(
+            id: 'st-01',
+            name: 'GreenCharge Hub Sector 62',
+            address: 'Plot 42, Electronic City Phase 1, Bengaluru, Karnataka 560100',
+            distanceStr: '0.8 km Away',
+            totalChargers: 6,
+            availableChargers: 4,
+            chargerType: 'DC 60kW',
+            chargerCategory: 'Fast Charger',
+            priceStr: '₹18.00 / kWh',
+            priceSubtext: 'Starting from',
+            imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=800&q=80',
+            isVerified: true,
+            latitude: 26.9150,
+            longitude: 75.7920,
           ),
-        ],
-      ),
-      body: stationsAsync.when(
-        data: (stations) {
-          final station = stations.firstWhere(
-            (s) => s.id == stationId,
-            orElse: () => stations.isNotEmpty ? stations.first : const ChargingStation(
-              id: 'st-01',
-              name: 'GreenCharge Hub Sector 62',
-              address: 'Plot 42, Electronic City Phase 1, Bengaluru, Karnataka 560100',
-              distanceStr: '0.8 km Away',
-              totalChargers: 6,
-              availableChargers: 4,
-              chargerType: 'DC 60kW',
-              chargerCategory: 'Fast Charger',
-              priceStr: '₹18.00 / kWh',
-              priceSubtext: 'Starting from',
-              imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=800&q=80',
-              isVerified: true,
-              latitude: 26.9150,
-              longitude: 75.7920,
-            ),
-          );
+        );
 
-          return SafeArea(
+        return Scaffold(
+          backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+          appBar: AppBar(
+            title: const Text('Station Overview'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.share_outlined),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Station link copied to clipboard')),
+                  );
+                },
+              ),
+            ],
+          ),
+          body: SafeArea(
             top: false,
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -172,21 +173,21 @@ class StationDetailsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 12),
                         // Connectors List
-                        _buildConnectorTile(
-                          context,
-                          title: 'DC Fast Charger (CCS2)',
-                          power: station.chargerType,
-                          price: station.priceStr,
-                          isAvailable: station.availableChargers > 0,
-                        ),
-                        const SizedBox(height: 10),
-                        _buildConnectorTile(
-                          context,
-                          title: 'AC Dual Charger (Type 2)',
-                          power: '22 kW Standard',
-                          price: '₹12.00 / kWh',
-                          isAvailable: false,
-                        ),
+                        ...station.connectors.map((conn) => Column(
+                          children: [
+                            _buildConnectorTile(
+                              context,
+                              title: '${conn.type} Connector',
+                              power: '${conn.maxPowerKw.toInt()} kW',
+                              price: station.priceStr,
+                              isAvailable: conn.status.toUpperCase() == 'AVAILABLE',
+                              connectorId: conn.id,
+                              chargerId: conn.chargerId,
+                              stationId: station.id,
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                        )).toList(),
                         const SizedBox(height: 20),
                         const Text(
                           'Station Amenities',
@@ -207,80 +208,110 @@ class StationDetailsScreen extends ConsumerWidget {
                 ],
               ),
             ),
-          );
-        },
-        loading: () => const Center(
+          ),
+          bottomNavigationBar: SafeArea(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final url = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${station.latitude},${station.longitude}');
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url, mode: LaunchMode.externalApplication);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Could not launch navigation application.')),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.directions_outlined, color: Color(0xFF16A34A), size: 18),
+                      label: const Text(
+                        'Directions',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF16A34A)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final availableConn = station.connectors.firstWhere(
+                          (c) => c.status.toUpperCase() == 'AVAILABLE',
+                          orElse: () => station.connectors.isNotEmpty
+                              ? station.connectors.first
+                              : const StationConnector(
+                                  id: '1',
+                                  type: 'CCS2',
+                                  status: 'AVAILABLE',
+                                  maxPowerKw: 60.0,
+                                  chargerId: 'CHG-DC-04',
+                                ),
+                        );
+                        context.push(
+                          '/start-charging',
+                          extra: {
+                            'connectorId': availableConn.id,
+                            'chargerId': availableConn.chargerId,
+                            'stationId': station.id,
+                          },
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF16A34A),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text(
+                        'Start Charging',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      loading: () => const Scaffold(
+        body: Center(
           child: CircularProgressIndicator(color: Color(0xFF16A34A)),
         ),
-        error: (err, stack) => Center(
+      ),
+      error: (err, stack) => Scaffold(
+        body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Text(
               'Failed to load station details: $err',
               style: const TextStyle(color: Colors.red, fontSize: 14),
             ),
-          ),
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-            border: Border(
-              top: BorderSide(
-                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-              ),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Opening Google Maps Directions...')),
-                    );
-                  },
-                  icon: const Icon(Icons.directions_outlined, color: Color(0xFF16A34A), size: 18),
-                  label: const Text(
-                    'Directions',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF16A34A)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => context.push('/start-charging'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF16A34A),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text(
-                    'Start Charging',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
       ),
@@ -293,6 +324,9 @@ class StationDetailsScreen extends ConsumerWidget {
     required String power,
     required String price,
     required bool isAvailable,
+    required String connectorId,
+    required String chargerId,
+    required String stationId,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -343,7 +377,14 @@ class StationDetailsScreen extends ConsumerWidget {
           ),
           const SizedBox(width: 8),
           ElevatedButton(
-            onPressed: () => context.push('/charger-details'),
+            onPressed: () => context.push(
+              '/charger-details',
+              extra: {
+                'connectorId': connectorId,
+                'chargerId': chargerId,
+                'stationId': stationId,
+              },
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: isAvailable ? const Color(0xFF16A34A) : Colors.grey.shade600,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

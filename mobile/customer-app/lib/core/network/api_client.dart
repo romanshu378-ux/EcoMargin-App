@@ -16,6 +16,14 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          var path = options.path;
+          if (path.startsWith('/') && !path.startsWith('http')) {
+            options.path = path.substring(1);
+          }
+          if (!options.baseUrl.endsWith('/')) {
+            options.baseUrl = '${options.baseUrl}/';
+          }
+
           final token = await _storageService.getToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';

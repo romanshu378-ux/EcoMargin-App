@@ -136,9 +136,36 @@ public class ChargingController {
 
     @GetMapping("/config")
     public ResponseEntity<?> getChargingConfig() {
+        BigDecimal minRequired = new BigDecimal("50.00");
+        try {
+            Setting minBalanceSetting = settingRepository.findById("min_wallet_balance_to_start").orElse(null);
+            if (minBalanceSetting != null) {
+                minRequired = new BigDecimal(minBalanceSetting.getValue());
+            }
+        } catch (Exception e) {
+            // ignore
+        }
+
+        BigDecimal chargingRate = new BigDecimal("18.00");
+        try {
+            Setting rateSetting = settingRepository.findById("default_charging_rate_per_kwh").orElse(null);
+            if (rateSetting != null) {
+                double rate = Double.parseDouble(rateSetting.getValue());
+                if (rate > 0.0) {
+                    if (rate == 0.35) {
+                        chargingRate = new BigDecimal("18.00");
+                    } else {
+                        chargingRate = BigDecimal.valueOf(rate);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // ignore
+        }
+
         Map<String, Object> config = new HashMap<>();
-        config.put("minRequiredBalance", new BigDecimal("50.00"));
-        config.put("chargingRatePerKwh", new BigDecimal("18.00"));
+        config.put("minRequiredBalance", minRequired);
+        config.put("chargingRatePerKwh", chargingRate);
         return ResponseEntity.ok(config);
     }
 
@@ -161,16 +188,29 @@ public class ChargingController {
         Optional<ChargingSession> activeOpt = chargingSessionRepository
                 .findFirstByUserAndStatusInOrderByCreatedAtDesc(user, ACTIVE_STATUSES);
         if (activeOpt.isPresent()) {
-            return ResponseEntity.ok(mapSessionToMap(activeOpt.get()));
+            return ResponseEntity.status(409).body(Map.of(
+                    "code", "ACTIVE_SESSION_EXISTS",
+                    "message", "User already has an active charging session."
+            ));
         }
 
         Wallet wallet = walletRepository.findByUserId(user.getId())
                 .orElseThrow(() -> new RuntimeException("Wallet not found"));
+        
         BigDecimal minRequired = new BigDecimal("50.00");
+        try {
+            Setting minBalanceSetting = settingRepository.findById("min_wallet_balance_to_start").orElse(null);
+            if (minBalanceSetting != null) {
+                minRequired = new BigDecimal(minBalanceSetting.getValue());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to load min_wallet_balance_to_start setting: {}", e.getMessage());
+        }
+
         if (wallet.getBalance().compareTo(minRequired) < 0) {
             Map<String, Object> body = new HashMap<>();
             body.put("code", "INSUFFICIENT_WALLET_BALANCE");
-            body.put("message", "Insufficient wallet balance to start charging. Minimum ₹50.00 required.");
+            body.put("message", "Insufficient wallet balance to start charging. Minimum ₹" + minRequired + " required.");
             body.put("availableBalance", wallet.getBalance());
             body.put("requiredBalance", minRequired);
             return ResponseEntity.status(402).body(body);
@@ -193,12 +233,50 @@ public class ChargingController {
         Connector connector = null;
         if (connectorId != null) {
             connector = connectorRepository.findById(connectorId).orElse(null);
-        }
-        if (connector == null) {
+            if (connector == null) {
+                return ResponseEntity.status(404).body(Map.of(
+                        "code", "CONNECTOR_NOT_FOUND",
+                        "message", "The specified connector was not found."
+                ));
+            }
+        } else {
             List<Connector> connectors = connectorRepository.findAll();
             if (!connectors.isEmpty()) {
                 connector = connectors.get(0);
             }
+        }
+
+        if (connector == null) {
+            return ResponseEntity.status(404).body(Map.of(
+                    "code", "CONNECTOR_NOT_FOUND",
+                    "message", "No connectors available on the system."
+            ));
+        }
+
+        // Validate connector is available
+        if (!"AVAILABLE".equalsIgnoreCase(connector.getStatus())) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "code", "CONNECTOR_UNAVAILABLE",
+                    "message", "Connector is currently unavailable."
+            ));
+        }
+
+        // Validate charger is available
+        Charger charger = connector.getCharger();
+        if (charger == null || !"AVAILABLE".equalsIgnoreCase(charger.getStatus())) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "code", "CHARGER_UNAVAILABLE",
+                    "message", "Charger is currently unavailable."
+            ));
+        }
+
+        // Validate station is active
+        Station station = charger.getStation();
+        if (station == null || !"ACTIVE".equalsIgnoreCase(station.getStatus())) {
+            return ResponseEntity.status(409).body(Map.of(
+                    "code", "STATION_UNAVAILABLE",
+                    "message", "Station is currently unavailable."
+            ));
         }
 
         ChargingSession session = ChargingSession.builder()

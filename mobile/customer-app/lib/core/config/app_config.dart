@@ -4,7 +4,7 @@
 ///
 /// 1. Default (physical device / production cloud):
 ///    flutter run
-///    Connects to: https://eco-margin.onrender.com/api/v1
+///    Connects to: https://ecomargin-app.onrender.com/api/v1
 ///
 /// 2. Android Emulator (local backend):
 ///    flutter run --dart-define=TARGET_ENV=emulator
@@ -16,11 +16,11 @@
 ///
 /// 4. Explicit production:
 ///    flutter run --dart-define=TARGET_ENV=production
-///    Connects to: https://eco-margin.onrender.com/api/v1
+///    Connects to: https://ecomargin-app.onrender.com/api/v1
 
 class AppConfig {
   /// The cloud/production backend URL.
-  static const String _productionUrl = 'https://eco-margin.onrender.com/api/v1';
+  static const String _productionUrl = 'https://ecomargin-app.onrender.com/api/v1';
 
   /// LAN IP of development machine (override via --dart-define=DEV_HOST=x.x.x.x)
   static const String _devPhysicalIp = String.fromEnvironment(

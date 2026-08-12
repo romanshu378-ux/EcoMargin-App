@@ -2,10 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
+import 'dart:convert';
 import '../../../core/providers/core_providers.dart';
+import '../../home/providers/home_providers.dart';
+import '../../home/models/station.dart';
 
 class StartChargingScreen extends ConsumerStatefulWidget {
-  const StartChargingScreen({super.key});
+  final String? connectorId;
+  final String? chargerId;
+  final String? stationId;
+
+  const StartChargingScreen({
+    super.key,
+    this.connectorId,
+    this.chargerId,
+    this.stationId,
+  });
 
   @override
   ConsumerState<StartChargingScreen> createState() => _StartChargingScreenState();
@@ -36,23 +48,17 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
           e.type == DioExceptionType.sendTimeout ||
           e.type == DioExceptionType.receiveTimeout ||
           e.type == DioExceptionType.connectionError) {
-        return 'Unable to connect to server. Please check your Wi-Fi and try again.';
+        return 'Unable to connect to server. Please check your network connection and try again.';
       }
       
       if (status != null) {
-        // Log 404 details
-        if (status == 404) {
-          debugPrint('[CRITICAL] 404 Route Not Found!');
-          debugPrint('[CRITICAL] Requested URL: ${e.requestOptions.uri}');
-          debugPrint('[CRITICAL] Response Data: ${response?.data}');
-          return 'Service temporarily unavailable. Please try again later.';
-        }
-        
         switch (status) {
           case 401:
             return 'Authentication expired. Please log in again.';
           case 403:
             return 'Access denied. You do not have permission to start charging.';
+          case 404:
+            return 'Endpoint mismatch or service not found. Please contact support.';
           case 409:
             return 'A charging session conflict occurred. An active session might already exist.';
           case 400:
@@ -60,6 +66,13 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
             String? serverMsg;
             if (response?.data is Map) {
               serverMsg = response?.data['message'] ?? response?.data['error'];
+            } else if (response?.data is String) {
+              try {
+                final parsed = jsonDecode(response?.data as String);
+                if (parsed is Map) {
+                  serverMsg = parsed['message'] ?? parsed['error'];
+                }
+              } catch (_) {}
             }
             return serverMsg ?? 'Validation failed. Please verify your inputs and try again.';
           case 500:
@@ -70,7 +83,7 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
     
     final str = e.toString();
     if (str.contains('timeout') || str.contains('SocketException')) {
-      return 'Unable to connect to server. Please check your Wi-Fi and try again.';
+      return 'Unable to connect to server. Please check your network connection and try again.';
     }
     return 'Charging start failed. Please try again.';
   }
@@ -189,7 +202,10 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
       }
 
       // 3. Start charging session
-      await ref.read(chargingSessionProvider.notifier).startCharging();
+      await ref.read(chargingSessionProvider.notifier).startCharging(
+        chargerId: widget.chargerId,
+        connectorId: widget.connectorId,
+      );
       if (!mounted) return;
       
       final session = ref.read(chargingSessionProvider);
@@ -210,9 +226,17 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
       // Catch backend-side balance check error (402 or 400 with code INSUFFICIENT_WALLET_BALANCE)
       if (e is DioException && e.response != null) {
         final data = e.response!.data;
-        if (data is Map && data['code'] == 'INSUFFICIENT_WALLET_BALANCE') {
-          final avail = double.tryParse(data['availableBalance']?.toString() ?? '0') ?? 0.0;
-          final req = double.tryParse(data['requiredBalance']?.toString() ?? '50.0') ?? 50.0;
+        Map<String, dynamic>? errorData;
+        if (data is Map) {
+          errorData = Map<String, dynamic>.from(data);
+        } else if (data is String) {
+          try {
+            errorData = Map<String, dynamic>.from(jsonDecode(data) as Map);
+          } catch (_) {}
+        }
+        if (errorData != null && errorData['code'] == 'INSUFFICIENT_WALLET_BALANCE') {
+          final avail = double.tryParse(errorData['availableBalance']?.toString() ?? '0') ?? 0.0;
+          final req = double.tryParse(errorData['requiredBalance']?.toString() ?? '50.0') ?? 50.0;
           _showInsufficientBalanceDialog(balance: avail, requiredBalance: req);
           return;
         }
@@ -275,9 +299,29 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text('GreenCharge Hub Sector 62', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15), overflow: TextOverflow.ellipsis),
-                        Text('Charger: CHG-DC-04 (60 kW DC)', style: TextStyle(color: Color(0xFF64748B), fontSize: 13), overflow: TextOverflow.ellipsis),
+                      children: [
+                        Text(
+                          (() {
+                            final stations = ref.read(stationsProvider).value;
+                            ChargingStation? station;
+                            if (stations != null) {
+                              for (final s in stations) {
+                                if (s.id == widget.stationId) {
+                                  station = s;
+                                  break;
+                                }
+                              }
+                            }
+                            return station?.name ?? 'GreenCharge Hub Sector 62';
+                          })(),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          'Charger: ${widget.chargerId ?? "CHG-DC-04"} (60 kW DC)',
+                          style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),

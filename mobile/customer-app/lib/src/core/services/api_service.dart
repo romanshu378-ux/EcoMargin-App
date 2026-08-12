@@ -6,7 +6,7 @@ import 'package:dio/dio.dart';
 /// This file is kept for compatibility only.
 class ApiService {
   /// Production backend URL — single source of truth.
-  static const String baseUrl = 'https://eco-margin.onrender.com/api/v1';
+  static const String baseUrl = 'https://ecomargin-app.onrender.com/api/v1';
 
   static String? authToken;
 

@@ -158,11 +158,37 @@ final routerProvider = Provider<GoRouter>((ref) {
           return StationDetailsScreen(stationId: id);
         },
       ),
-      GoRoute(path: '/charger-details', builder: (context, state) => const ChargerDetailsScreen()),
+      GoRoute(
+        path: '/charger-details',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final connectorId = state.uri.queryParameters['connectorId'] ?? extra?['connectorId'];
+          final chargerId = state.uri.queryParameters['chargerId'] ?? extra?['chargerId'];
+          final stationId = state.uri.queryParameters['stationId'] ?? extra?['stationId'];
+          return ChargerDetailsScreen(
+            connectorId: connectorId,
+            chargerId: chargerId,
+            stationId: stationId,
+          );
+        },
+      ),
       GoRoute(path: '/favorites', builder: (context, state) => const FavoritesScreen()),
 
       GoRoute(path: '/scan', builder: (context, state) => const QrScanScreen()),
-      GoRoute(path: '/start-charging', builder: (context, state) => const StartChargingScreen()),
+      GoRoute(
+        path: '/start-charging',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final connectorId = state.uri.queryParameters['connectorId'] ?? extra?['connectorId'];
+          final chargerId = state.uri.queryParameters['chargerId'] ?? extra?['chargerId'];
+          final stationId = state.uri.queryParameters['stationId'] ?? extra?['stationId'];
+          return StartChargingScreen(
+            connectorId: connectorId,
+            chargerId: chargerId,
+            stationId: stationId,
+          );
+        },
+      ),
       GoRoute(
         path: '/live-charging',
         builder: (context, state) {

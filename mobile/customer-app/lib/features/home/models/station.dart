@@ -1,3 +1,19 @@
+class StationConnector {
+  final String id;
+  final String type;
+  final String status;
+  final double maxPowerKw;
+  final String chargerId;
+
+  const StationConnector({
+    required this.id,
+    required this.type,
+    required this.status,
+    required this.maxPowerKw,
+    required this.chargerId,
+  });
+}
+
 class ChargingStation {
   final String id;
   final String name;
@@ -14,6 +30,7 @@ class ChargingStation {
   final bool isFavorite;
   final double latitude;
   final double longitude;
+  final List<StationConnector> connectors;
 
   const ChargingStation({
     required this.id,
@@ -31,12 +48,14 @@ class ChargingStation {
     this.isFavorite = false,
     required this.latitude,
     required this.longitude,
+    this.connectors = const [],
   });
 
   ChargingStation copyWith({
     bool? isFavorite,
     int? availableChargers,
     String? distanceStr,
+    List<StationConnector>? connectors,
   }) {
     return ChargingStation(
       id: id,
@@ -54,6 +73,7 @@ class ChargingStation {
       isFavorite: isFavorite ?? this.isFavorite,
       latitude: latitude,
       longitude: longitude,
+      connectors: connectors ?? this.connectors,
     );
   }
 }

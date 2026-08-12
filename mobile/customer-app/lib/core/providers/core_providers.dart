@@ -189,7 +189,7 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
     });
   }
 
-  Future<void> startCharging({String? stationName, String? chargerId, String? connectorType}) async {
+  Future<void> startCharging({String? stationName, String? chargerId, String? connectorType, String? connectorId}) async {
     if (_isStarting) return; // Prevent duplicate concurrent starts
     _isStarting = true;
     try {
@@ -200,6 +200,7 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
           if (stationName != null) 'stationName': stationName,
           if (chargerId != null) 'chargerId': chargerId,
           if (connectorType != null) 'connectorType': connectorType,
+          if (connectorId != null) 'connectorId': connectorId,
         },
       );
       if (response.statusCode == 200 && response.data != null) {
