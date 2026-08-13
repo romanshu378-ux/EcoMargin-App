@@ -15,6 +15,11 @@ spring:
     redis:
       repositories:
         enabled: ${ENABLE_REDIS:${SPRING_REDIS_ENABLED:false}}
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
 
 management:
   endpoints:
@@ -46,6 +51,8 @@ spring:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
       password: ${SPRING_DATA_REDIS_PASSWORD:}
+  flyway:
+    enabled: ${SPRING_FLYWAY_ENABLED:false}
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:ecomargin;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL}
     username: ${SPRING_DATASOURCE_USERNAME:sa}
@@ -84,6 +91,8 @@ spring:
         enabled: false
       host: localhost
       port: 6379
+  flyway:
+    enabled: false
   datasource:
     url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
     driver-class-name: org.h2.Driver

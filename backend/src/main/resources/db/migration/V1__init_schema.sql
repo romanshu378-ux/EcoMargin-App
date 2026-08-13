@@ -288,7 +288,7 @@ CREATE TABLE support_tickets (
 );
 
 CREATE TABLE settings (
-    key VARCHAR(100) PRIMARY KEY,
+    setting_key VARCHAR(100) PRIMARY KEY,
     value TEXT NOT NULL,
     description TEXT,
     metadata JSONB, -- For configurations with complex structural requirements

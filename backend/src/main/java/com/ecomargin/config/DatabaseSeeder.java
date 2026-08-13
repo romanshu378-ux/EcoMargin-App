@@ -53,20 +53,28 @@ public class DatabaseSeeder implements CommandLineRunner {
     @Value("${app.seed.demo-user:false}")
     private boolean seedDemoUser;
 
+    public static final List<String> REQUIRED_SETTINGS = List.of(
+            "min_wallet_balance_to_start",
+            "default_charging_rate_per_kwh",
+            "home_sections",
+            "support_info",
+            "app_maintenance",
+            "charging_session_rules",
+            "faqs",
+            "offers_banners"
+    );
+
     @Override
     public void run(String... args) {
         log.info("=== DATABASE CONNECTED ===");
         log.info("=== RUNNING APPLICATION STARTUP DATABASE SEEDER ===");
 
-        List<String> phaseErrors = new ArrayList<>();
-
         // 1. Seed Roles
         try {
             seedRoles();
         } catch (Exception e) {
-            String msg = "Roles seeding failed: " + e.getMessage();
-            log.error("[SEEDER] {}", msg, e);
-            phaseErrors.add(msg);
+            log.error("[SEEDER FATAL] Roles seeding failed: {}", e.getMessage(), e);
+            throw new IllegalStateException("Application startup failed during role seeding: " + e.getMessage(), e);
         }
 
         // 2. Seed Demo Users (conditional)
@@ -77,35 +85,30 @@ public class DatabaseSeeder implements CommandLineRunner {
                 log.info("[SEEDER] Demo user seeding is DISABLED (app.seed.demo-user=false). Preserving existing database users.");
             }
         } catch (Exception e) {
-            String msg = "Users seeding failed: " + e.getMessage();
-            log.error("[SEEDER] {}", msg, e);
-            phaseErrors.add(msg);
+            log.error("[SEEDER] Non-fatal error during demo user seeding: {}", e.getMessage(), e);
         }
 
         // 3. Seed Default Settings (Idempotent — never overwrites existing production settings)
-        List<String> settingErrors = seedDefaultSettings();
-        phaseErrors.addAll(settingErrors);
+        try {
+            seedDefaultSettings();
+        } catch (Exception e) {
+            log.error("[SEEDER FATAL] Settings seeding failed: {}", e.getMessage(), e);
+            throw new IllegalStateException("Application startup failed during settings seeding: " + e.getMessage(), e);
+        }
 
         // 4. Seed Stations
         try {
             seedDefaultStations();
         } catch (Exception e) {
-            String msg = "Stations seeding failed: " + e.getMessage();
-            log.error("[SEEDER] {}", msg, e);
-            phaseErrors.add(msg);
+            log.error("[SEEDER] Non-fatal error during station seeding: {}", e.getMessage(), e);
         }
 
-        // Final status — clearly distinguish SUCCESS vs PARTIAL_FAILURE vs FAILURE
-        if (phaseErrors.isEmpty()) {
-            log.info("=== SEEDER STATUS: SUCCESS ===");
-            log.info("=== SERVER STARTED ===");
-        } else {
-            log.warn("=== SEEDER STATUS: PARTIAL_FAILURE ({} phase(s) encountered errors) ===", phaseErrors.size());
-            for (String err : phaseErrors) {
-                log.warn("[SEEDER] Error detail: {}", err);
-            }
-            log.warn("=== SERVER STARTED WITH SEEDER WARNINGS — review errors above ===");
-        }
+        // 5. Mandatory Startup Validation — Fail startup if any of the 8 required settings are missing
+        validateRequiredSettings();
+
+        log.info("=== SEEDER STATUS: SUCCESS ===");
+        log.info("=== ALL 8 REQUIRED SETTINGS VERIFIED IN DATABASE ===");
+        log.info("=== SERVER STARTED ===");
     }
 
     // -------------------------------------------------------------------------
@@ -121,16 +124,9 @@ public class DatabaseSeeder implements CommandLineRunner {
 
     private Role seedRole(RoleType name) {
         return roleRepository.findByName(name)
-                .orElseGet(() -> {
-                    try {
-                        return roleRepository.save(
-                                Role.builder().name(name).permissions(Collections.emptySet()).build()
-                        );
-                    } catch (Exception e) {
-                        log.warn("[SEEDER] Role seeding fallback for {}: {}", name, e.getMessage());
-                        return roleRepository.findByName(name).orElse(null);
-                    }
-                });
+                .orElseGet(() -> roleRepository.save(
+                        Role.builder().name(name).permissions(Collections.emptySet()).build()
+                ));
     }
 
     // -------------------------------------------------------------------------
@@ -139,9 +135,9 @@ public class DatabaseSeeder implements CommandLineRunner {
 
     private void seedDemoUsers() {
         log.info("[SEEDER] Demo user seeding is ENABLED (app.seed.demo-user=true)");
-        Role customerRole  = roleRepository.findByName(RoleType.ROLE_CUSTOMER).orElse(null);
-        Role vendorRole    = roleRepository.findByName(RoleType.ROLE_VENDOR).orElse(null);
-        Role adminRole     = roleRepository.findByName(RoleType.ROLE_ADMIN).orElse(null);
+        Role customerRole   = roleRepository.findByName(RoleType.ROLE_CUSTOMER).orElse(null);
+        Role vendorRole     = roleRepository.findByName(RoleType.ROLE_VENDOR).orElse(null);
+        Role adminRole      = roleRepository.findByName(RoleType.ROLE_ADMIN).orElse(null);
         Role superAdminRole = roleRepository.findByName(RoleType.ROLE_SUPER_ADMIN).orElse(null);
 
         User customerUser = seedUser("romanshu@gmail.com", "password123", "Romanshu", "Sharma", "+919876543210",
@@ -228,60 +224,45 @@ public class DatabaseSeeder implements CommandLineRunner {
 
     // -------------------------------------------------------------------------
     // Settings — Idempotent, never overwrites existing production values
-    // Returns a list of per-setting error messages (empty = all succeeded)
+    // Throws exception if required settings cannot be created
     // -------------------------------------------------------------------------
 
-    /**
-     * Seeds all default application settings.
-     * Each setting is individually guarded: a failure on one setting does NOT abort the rest.
-     * Returns the list of error messages (one per failed setting key).
-     */
-    private List<String> seedDefaultSettings() {
-        List<String> errors = new ArrayList<>();
-
-        errors.addAll(seedSetting("min_wallet_balance_to_start", "50.00",
-                "Minimum wallet balance required to initiate charging"));
-        errors.addAll(seedSetting("default_charging_rate_per_kwh", "15.00",
-                "Default per kWh charging price in INR"));
-        errors.addAll(seedSetting("home_sections",
+    private void seedDefaultSettings() {
+        seedSetting("min_wallet_balance_to_start", "50.00",
+                "Minimum wallet balance required to initiate charging");
+        seedSetting("default_charging_rate_per_kwh", "15.00",
+                "Default per kWh charging price in INR");
+        seedSetting("home_sections",
                 "{\"hero_slider\": true, \"quick_actions\": true, \"wallet_card\": true, \"nearby_stations\": true, \"promo_banner\": true, \"search_section\": true}",
-                "Home screen section visibility configuration"));
-        errors.addAll(seedSetting("support_info",
+                "Home screen section visibility configuration");
+        seedSetting("support_info",
                 "{\"phone\": \"1800-123-4567\", \"email\": \"support@ecomargin.com\", \"hours\": \"24/7 Helpline\"}",
-                "Support helpline contact information"));
-        errors.addAll(seedSetting("app_maintenance",
+                "Support helpline contact information");
+        seedSetting("app_maintenance",
                 "{\"enabled\": false, \"message\": \"EcoMargin is currently undergoing scheduled maintenance. Please check back shortly.\"}",
-                "Global app maintenance flag"));
-        errors.addAll(seedSetting("charging_session_rules",
+                "Global app maintenance flag");
+        seedSetting("charging_session_rules",
                 "{\"max_duration_hours\": 12, \"idle_fee_per_min\": 2.0, \"auto_stop_target_pct\": 100}",
-                "Charging session operational parameters"));
-        errors.addAll(seedSetting("faqs",
+                "Charging session operational parameters");
+        seedSetting("faqs",
                 "[{\"q\": \"How do I start an EV charging session?\", \"a\": \"Simply find a nearby charger on the map, select the connector details, set your target battery limit, and tap Start Charging.\"}, {\"q\": \"How does EcoMargin Wallet billing work?\", \"a\": \"Your wallet balance is automatically debited based on the exact kWh energy consumed at the end of every charging session.\"}, {\"q\": \"What connector types are supported?\", \"a\": \"EcoMargin supports DC Fast Chargers (CCS2, GB/T, CHAdeMO) and AC Chargers (Type 2).\"}]",
-                "Customer FAQs list"));
-        errors.addAll(seedSetting("offers_banners",
+                "Customer FAQs list");
+        seedSetting("offers_banners",
                 "[{\"code\": \"ECOGREEN20\", \"title\": \"20% Cashback on First Charging Session\", \"desc\": \"Get up to ₹100 cashback credited into your EcoMargin Wallet.\", \"expiry\": \"Valid till 31 Aug 2026\"}, {\"code\": \"FASTCHARGE50\", \"title\": \"Flat ₹50 OFF on DC Fast Chargers\", \"desc\": \"Applicable on session power > 50 kW.\", \"expiry\": \"Valid till 15 Aug 2026\"}]",
-                "Active promotional offers & coupons"));
-
-        return errors;
+                "Active promotional offers & coupons");
     }
 
     /**
      * Inserts a single default setting only if it does not already exist.
-     * Existing production values are preserved and never overwritten.
-     * Never passes null as the setting_key.
-     *
-     * @return empty list on success, single-item error list on failure
+     * Preserves existing production setting values. Never uses null setting_key.
+     * Throws IllegalStateException if setting fails to insert.
      */
-    private List<String> seedSetting(String key, String val, String desc) {
+    private void seedSetting(String key, String val, String desc) {
         if (key == null || key.isBlank()) {
-            String err = "Skipped seedSetting — setting_key is null or blank (val=" + val + ")";
-            log.warn("[SEEDER] {}", err);
-            return List.of(err);
+            throw new IllegalArgumentException("Cannot seed setting with null or blank setting_key");
         }
         if (val == null) {
-            String err = "Skipped seedSetting key='" + key + "' — value is null";
-            log.warn("[SEEDER] {}", err);
-            return List.of(err);
+            throw new IllegalArgumentException("Cannot seed setting key='" + key + "' with null value");
         }
         try {
             if (settingRepository.findById(key).isEmpty()) {
@@ -296,11 +277,31 @@ public class DatabaseSeeder implements CommandLineRunner {
             } else {
                 log.debug("[SEEDER] Setting setting_key='{}' already exists — preserving existing value.", key);
             }
-            return Collections.emptyList();
         } catch (Exception e) {
-            String err = "Failed to seed setting_key='" + key + "': " + e.getMessage();
-            log.error("[SEEDER] {} (full stack below)", err, e);
-            return List.of(err);
+            log.error("[SEEDER FATAL] Failed to seed setting_key='{}': {}", key, e.getMessage(), e);
+            throw new IllegalStateException("Failed to seed required setting setting_key='" + key + "': " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Validates that all 8 required settings exist in the database.
+     * Throws IllegalStateException to halt application startup if any setting is missing.
+     */
+    public void validateRequiredSettings() {
+        List<String> missingKeys = new ArrayList<>();
+
+        for (String reqKey : REQUIRED_SETTINGS) {
+            Optional<Setting> opt = settingRepository.findById(reqKey);
+            if (opt.isEmpty() || opt.get().getKey() == null || opt.get().getValue() == null) {
+                missingKeys.add(reqKey);
+                log.error("[FATAL STARTUP ERROR] Required setting_key='{}' is missing or invalid in database!", reqKey);
+            }
+        }
+
+        if (!missingKeys.isEmpty()) {
+            String errorMsg = "Application startup failed! Required application settings are missing from database: " + missingKeys;
+            log.error("[FATAL STARTUP ERROR] {}", errorMsg);
+            throw new IllegalStateException(errorMsg);
         }
     }
 
