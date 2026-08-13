@@ -19,7 +19,7 @@ public class Role {
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(unique = true, nullable = false)
+    @Column(name = "name", unique = true, nullable = false, columnDefinition = "VARCHAR(255)")
     private RoleType name;
 
     @ManyToMany(fetch = FetchType.EAGER)

@@ -51,9 +51,19 @@ public class DatabaseSeeder implements CommandLineRunner {
         
         // 0. Ensure safe schema migration for roles_name_check constraint & jwt_version
         try {
+            java.util.List<String> constraints = jdbcTemplate.queryForList(
+                "SELECT constraint_name FROM information_schema.constraint_column_usage WHERE LOWER(table_name) = 'roles' AND LOWER(column_name) = 'name'",
+                String.class
+            );
+            for (String constraint : constraints) {
+                if (constraint != null && constraint.toLowerCase().contains("check")) {
+                    log.info("Dropping check constraint on roles.name: {}", constraint);
+                    jdbcTemplate.execute("ALTER TABLE roles DROP CONSTRAINT IF EXISTS " + constraint + ";");
+                }
+            }
             jdbcTemplate.execute("ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_name_check;");
         } catch (Exception e) {
-            log.warn("Schema migration check for roles_name_check drop: {}", e.getMessage());
+            log.warn("Schema migration check for roles constraints drop: {}", e.getMessage());
         }
 
         try {
