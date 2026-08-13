@@ -17,10 +17,10 @@ import java.util.Map;
 public class Setting {
 
     @Id
-    @Column(nullable = false, length = 100)
+    @Column(name = "setting_key", nullable = false, length = 100)
     private String key;
 
-    @Column(columnDefinition = "TEXT", nullable = false)
+    @Column(name = "setting_value", columnDefinition = "TEXT", nullable = false)
     private String value;
 
     @Column(columnDefinition = "TEXT")
@@ -28,7 +28,7 @@ public class Setting {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata")
-    private Map<String, Object> metadata; // For custom metadata schemas
+    private Map<String, Object> metadata;
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;

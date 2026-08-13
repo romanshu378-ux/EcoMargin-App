@@ -1,3 +1,5 @@
+library app_config;
+
 /// Environment-aware API configuration for EcoMargin.
 ///
 /// HOW TO SWITCH ENVIRONMENTS:

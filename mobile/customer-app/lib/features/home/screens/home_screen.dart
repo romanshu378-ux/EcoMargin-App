@@ -1,13 +1,13 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/home_providers.dart';
-import '../../../core/providers/core_providers.dart';
+import '../../../core/providers/app_config_provider.dart';
 import '../widgets/app_header.dart';
+import '../widgets/hero_banner_slider.dart';
 import '../widgets/search_section_widget.dart';
+import '../widgets/quick_actions_widget.dart';
 import '../widgets/wallet_card_widget.dart';
 import '../widgets/nearby_station_card.dart';
 import '../widgets/promo_banner_widget.dart';
@@ -19,229 +19,143 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  int _currentIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String _searchQuery = '';
-  Position? _currentPosition;
-  bool _isLoadingLocation = true;
-  bool _locationError = false;
-  bool _isFetchingLocation = false; // Guard against concurrent location calls
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _determinePosition();
-    Future.microtask(() => ref.read(chargingSessionProvider.notifier).syncWithBackend());
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _determinePosition();
-      ref.read(chargingSessionProvider.notifier).syncWithBackend();
-    }
-  }
-
-  Future<void> _determinePosition() async {
-    if (_isFetchingLocation) return; // Prevent duplicate concurrent calls
-    if (!mounted) return;
-    _isFetchingLocation = true;
-    setState(() {
-      _isLoadingLocation = true;
-      _locationError = false;
-    });
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (mounted) {
-          setState(() {
-            _isLoadingLocation = false;
-            _locationError = true;
-          });
-        }
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          if (mounted) {
-            setState(() {
-              _isLoadingLocation = false;
-              _locationError = true;
-            });
-          }
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          setState(() {
-            _isLoadingLocation = false;
-            _locationError = true;
-          });
-        }
-        return;
-      }
-
-      // Use medium accuracy — faster startup, less battery impact
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-      );
-      if (mounted) {
-        setState(() {
-          _currentPosition = position;
-          _isLoadingLocation = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _isLoadingLocation = false;
-          _locationError = _currentPosition == null; // Only show error if no cached position
-        });
-      }
-    } finally {
-      _isFetchingLocation = false;
-    }
-  }
-
-  double _calculateDistanceKm(double lat1, double lon1, double lat2, double lon2) {
-    return Geolocator.distanceBetween(lat1, lon1, lat2, lon2) / 1000.0;
-  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final stationsAsync = ref.watch(stationsProvider);
+    final appConfig = ref.watch(appConfigProvider);
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {},
-      child: Scaffold(
-        key: _scaffoldKey,
-        backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-        drawer: Drawer(
-          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              UserAccountsDrawerHeader(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF16A34A), Color(0xFF15803D)],
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: const Color(0xFFF8FAFC),
+      drawer: Drawer(
+        backgroundColor: Colors.white,
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            UserAccountsDrawerHeader(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF16A34A), Color(0xFF15803D)],
+                ),
+              ),
+              accountName: const Text(
+                'Alex Rivers',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              accountEmail: const Text('driver@ecomargin.com'),
+              currentAccountPicture: const CircleAvatar(
+                backgroundColor: Colors.white,
+                child: Text(
+                  'AR',
+                  style: TextStyle(
+                    color: Color(0xFF16A34A),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
                   ),
                 ),
-                accountName: const Text(
-                  'Alex Rivers',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                ),
-                accountEmail: const Text('driver@ecomargin.com'),
-                currentAccountPicture: CircleAvatar(
-                  backgroundColor: Colors.white,
-                  child: Text(
-                    'AR',
-                    style: TextStyle(
-                      color: const Color(0xFF16A34A),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.electric_car_rounded, color: Color(0xFF16A34A)),
+              title: const Text('My Vehicles'),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.bookmark_border_rounded, color: Color(0xFF16A34A)),
+              title: const Text('Saved Stations'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/map');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.receipt_long_rounded, color: Color(0xFF16A34A)),
+              title: const Text('Charging History'),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.help_outline_rounded, color: Color(0xFF16A34A)),
+              title: const Text('Customer Support'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/help');
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout_rounded, color: Colors.red),
+              title: const Text('Sign Out', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/login');
+              },
+            ),
+          ],
+        ),
+      ),
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: const Color(0xFF16A34A),
+          onRefresh: () async {
+            await ref.read(stationsProvider.notifier).fetchStations();
+            await ref.read(appConfigProvider.notifier).fetchAppConfig();
+          },
+          child: CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              // 1. Maintenance Alert Banner if Maintenance Mode Enabled by Admin
+              if (appConfig.maintenanceEnabled)
+                SliverToBoxAdapter(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    color: Colors.amber.shade800,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            appConfig.maintenanceMessage,
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
+
+              // 2. App Header (Logo, Tagline, Hamburger Menu, Notification Bell)
+              SliverToBoxAdapter(
+                child: AppHeader(
+                  onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                  onNotificationPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Notifications: 1 new alert')),
+                    );
+                  },
+                ),
               ),
-              ListTile(
-                leading: const Icon(Icons.electric_car_rounded, color: Color(0xFF16A34A)),
-                title: Text('My Vehicles', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-                onTap: () {
-                  Navigator.pop(context);
-                  context.push('/vehicles');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.bookmark_border_rounded, color: Color(0xFF16A34A)),
-                title: Text('Saved Stations', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-                onTap: () {
-                  Navigator.pop(context);
-                  context.push('/map');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.receipt_long_rounded, color: Color(0xFF16A34A)),
-                title: Text('Charging History', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-                onTap: () {
-                  Navigator.pop(context);
-                  context.push('/charging-history');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.help_outline_rounded, color: Color(0xFF16A34A)),
-                title: Text('Customer Support', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-                onTap: () {
-                  Navigator.pop(context);
-                  context.push('/help');
-                },
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.logout_rounded, color: Colors.red),
-                title: const Text('Sign Out', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(context);
-                  context.go('/login');
-                },
-              ),
-            ],
-          ),
-        ),
-        body: SafeArea(
-          child: RefreshIndicator(
-            color: const Color(0xFF16A34A),
-            onRefresh: () async {
-              await ref.read(stationsProvider.notifier).fetchStations();
-              await _determinePosition();
-              await ref.read(chargingSessionProvider.notifier).syncWithBackend();
-            },
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                // 1. App Header
+
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+
+              // 3. Hero Banner (Admin Configurable)
+              if (appConfig.heroSliderEnabled) ...[
                 SliverToBoxAdapter(
-                  child: AppHeader(
-                    onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                    onNotificationPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Notifications: 1 new alert')),
-                      );
-                    },
+                  child: HeroBannerSlider(
+                    onFindStationsPressed: () => context.go('/map'),
                   ),
                 ),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 12)),
-
-                // 2. EcoMargin Wallet Hero Card (Replaces HeroBannerSlider completely)
-                SliverToBoxAdapter(
-                  child: WalletCardWidget(
-                    onAddMoneyPressed: () => context.push('/add-money'),
-                    onViewWalletPressed: () => context.push('/wallet'),
-                  ),
-                ),
-
-                const SliverToBoxAdapter(
-                  child: ActiveChargingCard(),
-                ),
-
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              ],
 
-                // 3. Search Section
+              // 4. Search Section (Admin Configurable)
+              if (appConfig.searchSectionEnabled) ...[
                 SliverToBoxAdapter(
                   child: SearchSectionWidget(
                     onSearchChanged: (val) {
@@ -252,10 +166,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                     },
                   ),
                 ),
-
                 const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              ],
 
-                // 4. Nearby Stations Header & View All
+              // 5. Nearby Stations Section (Admin Configurable)
+              if (appConfig.nearbyStationsEnabled) ...[
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -263,7 +178,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Nearby Charging Stations',
+                          'Nearby Stations',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -271,7 +186,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                           ),
                         ),
                         GestureDetector(
-                          onTap: () => context.push('/map'),
+                          onTap: () => context.go('/map'),
                           child: const Row(
                             children: [
                               Text(
@@ -298,181 +213,164 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
                 const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-                // 5. Nearby Stations List
-                _isLoadingLocation
-                    ? SliverToBoxAdapter(
+                // Nearby Stations List
+                stationsAsync.when(
+                  data: (stations) {
+                    final filtered = stations.where((s) {
+                      return s.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                          s.address.toLowerCase().contains(_searchQuery.toLowerCase());
+                    }).toList();
+
+                    if (filtered.isEmpty) {
+                      return SliverToBoxAdapter(
                         child: Padding(
-                          padding: const EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(32),
                           child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const CircularProgressIndicator(color: Color(0xFF16A34A)),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'Finding nearest stations...',
-                                  style: TextStyle(
-                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
+                            child: Text(
+                              'No stations found matching "$_searchQuery"',
+                              style: TextStyle(
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
                             ),
                           ),
                         ),
-                      )
-                    : _locationError
-                        ? SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: Container(
-                                padding: const EdgeInsets.all(24),
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                                  ),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Icon(
-                                      Icons.location_off_rounded,
-                                      size: 48,
-                                      color: Colors.grey.shade400,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    const Text(
-                                      'Location Permission Required',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    const Text(
-                                      'Please enable location access to see the nearest charging stations.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    ElevatedButton.icon(
-                                      onPressed: _determinePosition,
-                                      icon: const Icon(Icons.my_location_rounded, size: 16, color: Colors.white),
-                                      label: const Text('Allow Location Access', style: TextStyle(color: Colors.white)),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF16A34A),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          )
-                        : stationsAsync.when(
-                            data: (stations) {
-                              // Calculate dynamic distance for each station
-                              final sortedStations = stations.map((station) {
-                                if (_currentPosition != null) {
-                                  final dist = _calculateDistanceKm(
-                                    _currentPosition!.latitude,
-                                    _currentPosition!.longitude,
-                                    station.latitude,
-                                    station.longitude,
-                                  );
-                                  return station.copyWith(distanceStr: '${dist.toStringAsFixed(1)} km');
-                                }
-                                return station;
-                              }).toList();
+                      );
+                    }
 
-                              // Sort by distance in ascending order (nearest first)
-                              if (_currentPosition != null) {
-                                sortedStations.sort((a, b) {
-                                  final distA = double.tryParse(a.distanceStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
-                                  final distB = double.tryParse(b.distanceStr.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0;
-                                  return distA.compareTo(distB);
-                                });
-                              }
-
-                              final filtered = sortedStations.where((s) {
-                                return s.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                                    s.address.toLowerCase().contains(_searchQuery.toLowerCase());
-                              }).toList();
-
-                              if (filtered.isEmpty) {
-                                return SliverToBoxAdapter(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(32),
-                                    child: Center(
-                                      child: Text(
-                                        'No stations found matching "$_searchQuery"',
-                                        style: TextStyle(
-                                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              return SliverPadding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                sliver: SliverList(
-                                  delegate: SliverChildBuilderDelegate(
-                                    (context, index) {
-                                      final station = filtered[index];
-                                      return NearbyStationCard(
-                                        station: station,
-                                        onFavoriteToggle: () {
-                                          ref.read(stationsProvider.notifier).toggleFavorite(station.id);
-                                        },
-                                        onViewDetails: () {
-                                          context.push('/station-details', extra: station.id);
-                                        },
-                                      );
-                                    },
-                                    childCount: filtered.length,
-                                  ),
-                                ),
-                              );
-                            },
-                            loading: () => SliverToBoxAdapter(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                child: Container(
-                                  height: 180,
-                                  decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: const Center(
-                                    child: CircularProgressIndicator(color: Color(0xFF16A34A)),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            error: (err, stack) => SliverToBoxAdapter(
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Center(
-                                  child: Text(
-                                    'Failed to load stations: $err',
-                                    style: const TextStyle(color: Colors.red),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                    return SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final station = filtered[index];
+                            return NearbyStationCard(
+                              station: station,
+                              onFavoriteToggle: () {
+                                ref.read(stationsProvider.notifier).toggleFavorite(station.id);
+                              },
+                              onViewDetails: () {
+                                _showStationDetailsDialog(context, station);
+                              },
+                            );
+                          },
+                          childCount: filtered.length,
+                        ),
+                      ),
+                    );
+                  },
+                  loading: () => SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        height: 180,
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Center(
+                          child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  error: (err, stack) => SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'Failed to load stations: $err',
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ),
+                ),
 
                 const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              ],
 
-                // 6. Promotional Banner
+              // 6. Quick Actions Section (Admin Configurable)
+              if (appConfig.quickActionsEnabled) ...[
+                SliverToBoxAdapter(
+                  child: QuickActionsWidget(
+                    onScanQr: () => context.go('/scan'),
+                    onFavorites: () => context.go('/map'),
+                    onHistory: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Opening Charging History')),
+                      );
+                    },
+                    onWallet: () => context.go('/wallet'),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              ],
+
+              // 7. Wallet Card (Admin Configurable)
+              if (appConfig.walletCardEnabled) ...[
+                SliverToBoxAdapter(
+                  child: WalletCardWidget(
+                    onAddMoneyPressed: () => context.go('/wallet'),
+                    onViewWalletPressed: () => context.go('/wallet'),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              ],
+
+              // 8. Promotional Banner (Admin Configurable)
+              if (appConfig.promoBannerEnabled) ...[
                 const SliverToBoxAdapter(
                   child: PromoBannerWidget(),
                 ),
-
                 const SliverToBoxAdapter(child: SizedBox(height: 24)),
               ],
+            ],
+          ),
+        ),
+      ),
+
+      // Bottom Navigation Bar
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : Colors.white,
+          border: Border(
+            top: BorderSide(
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+              width: 1,
             ),
           ),
+        ),
+        child: NavigationBar(
+          selectedIndex: _currentIndex,
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          indicatorColor: const Color(0xFF16A34A).withOpacity(0.12),
+          onDestinationSelected: (index) {
+            setState(() => _currentIndex = index);
+            if (index == 1) context.go('/map');
+            if (index == 2) context.go('/scan');
+            if (index == 3) context.go('/profile');
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home_rounded, color: Color(0xFF16A34A)),
+              label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.map_outlined),
+              selectedIcon: Icon(Icons.map_rounded, color: Color(0xFF16A34A)),
+              label: 'Map',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.calendar_today_outlined),
+              selectedIcon: Icon(Icons.calendar_today_rounded, color: Color(0xFF16A34A)),
+              label: 'Bookings',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline_rounded),
+              selectedIcon: Icon(Icons.person_rounded, color: Color(0xFF16A34A)),
+              label: 'Profile',
+            ),
+          ],
         ),
       ),
     );
@@ -503,13 +401,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                     label: const Text('DC Fast (>60 kW)'),
                     selected: true,
                     onSelected: (val) {},
-                    selectedColor: const Color(0xFF16A34A).withValues(alpha: 0.2),
+                    selectedColor: const Color(0xFF16A34A).withOpacity(0.2),
                   ),
                   FilterChip(
                     label: const Text('Available Now'),
                     selected: true,
                     onSelected: (val) {},
-                    selectedColor: const Color(0xFF16A34A).withValues(alpha: 0.2),
+                    selectedColor: const Color(0xFF16A34A).withOpacity(0.2),
                   ),
                   FilterChip(
                     label: const Text('AC Type 2'),
@@ -538,255 +436,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       },
     );
   }
-}
 
-class AnimatedPulseDot extends StatefulWidget {
-  const AnimatedPulseDot({super.key});
-
-  @override
-  State<AnimatedPulseDot> createState() => _AnimatedPulseDotState();
-}
-
-class _AnimatedPulseDotState extends State<AnimatedPulseDot> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 1),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _controller,
-      child: Container(
-        width: 8,
-        height: 8,
-        decoration: const BoxDecoration(
-          color: Color(0xFF16A34A),
-          shape: BoxShape.circle,
-        ),
-      ),
-    );
-  }
-}
-
-class ActiveChargingCard extends ConsumerWidget {
-  const ActiveChargingCard({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(chargingSessionProvider);
-    if (!session.isCharging) return const SizedBox.shrink();
-
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final minutes = session.durationSeconds ~/ 60;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
+  void _showStationDetailsDialog(BuildContext context, station) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(station.name),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Row: Title & Pulse
-            Row(
-              children: [
-                const AnimatedPulseDot(),
-                const SizedBox(width: 8),
-                Text(
-                  '⚡ Active Charging',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A),
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  '${session.percentage.toInt()}%',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  ),
-                ),
-              ],
-            ),
+            Text(station.address, style: const TextStyle(color: Color(0xFF64748B))),
             const SizedBox(height: 12),
-
-            // Station Name & Address
-            Text(
-              session.stationName,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : const Color(0xFF0F172A),
-              ),
-            ),
+            Text('Charger: ${station.chargerType} (${station.chargerCategory})', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('Available Connectors: ${station.availableChargers} / ${station.totalChargers}'),
             const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(
-                  Icons.flash_on_rounded,
-                  size: 14,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '${session.connectorType} • ${session.currentPowerKw.toStringAsFixed(1)} kW',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-            if (session.hasConnectionError) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.error_outline, color: Colors.red, size: 16),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Unable to sync charging status. Please check your connection.',
-                        style: TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            const Divider(height: 24),
-
-            // Metrics Row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildMiniMetric(
-                  context,
-                  'Delivered',
-                  '${session.kwhDelivered.toStringAsFixed(1)} kWh',
-                ),
-                _buildMiniMetric(
-                  context,
-                  'Duration',
-                  '$minutes min',
-                ),
-                _buildMiniMetric(
-                  context,
-                  'Current Cost',
-                  '₹${session.totalCost.toStringAsFixed(2)}',
-                  valueColor: const Color(0xFF16A34A),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Action Button: View Details
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: ElevatedButton(
-                onPressed: () {
-                  context.push(
-                    '/live-charging',
-                    extra: {
-                      'stationId': 'st-01',
-                      'sessionId': session.sessionId,
-                      'connectorId': session.connectorType,
-                      'chargerId': session.chargerId,
-                    },
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF16A34A),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'View Charging',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Icon(
-                      Icons.arrow_forward_rounded,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            Text('Rate: ${station.priceStr}', style: const TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold)),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.go('/scan');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF16A34A),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Start Charging', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildMiniMetric(BuildContext context, String label, String value, {Color? valueColor}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10,
-            color: Color(0xFF64748B),
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: valueColor ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
-          ),
-        ),
-      ],
     );
   }
 }

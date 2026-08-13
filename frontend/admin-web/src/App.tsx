@@ -11,6 +11,7 @@ import { OrdersPage } from './pages/OrdersPage';
 import { PaymentsPage } from './pages/PaymentsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { AuditLogsPage } from './pages/AuditLogsPage';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem('admin_token');
@@ -32,6 +33,7 @@ export const App: React.FC = () => {
         <Route path="/chargers" element={<ProtectedRoute><ChargersPage /></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
         <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
+        <Route path="/audit-logs" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />

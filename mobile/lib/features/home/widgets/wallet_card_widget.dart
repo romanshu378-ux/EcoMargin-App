@@ -4,10 +4,12 @@ import '../providers/home_providers.dart';
 
 class WalletCardWidget extends ConsumerWidget {
   final VoidCallback onAddMoneyPressed;
+  final VoidCallback? onViewWalletPressed;
 
   const WalletCardWidget({
     super.key,
     required this.onAddMoneyPressed,
+    this.onViewWalletPressed,
   });
 
   @override

@@ -42,6 +42,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/health", "/api/v1/health", "/actuator/health").permitAll()
                 .requestMatchers(
                     "/api/v1/profile/photo/**",
+                    "/api/v1/app/config",
+                    "/api/v1/faqs",
+                    "/api/v1/offers",
+                    "/api/v1/support",
                     "/health",
                     "/api/v1/health",
                     "/actuator/health",
@@ -60,9 +64,11 @@ public class SecurityConfig {
                     "/webjars/**",
                     "/swagger-ui.html"
                 ).permitAll()
-                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                .requestMatchers("/api/v1/operator/**").hasAnyRole("STATION_OPERATOR", "ADMIN")
-                .requestMatchers("/api/v1/support/**").hasAnyRole("SUPPORT", "ADMIN")
+                .requestMatchers("/api/v1/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                .requestMatchers("/api/v1/vendor/**").hasAnyRole("VENDOR", "ADMIN", "SUPER_ADMIN")
+                .requestMatchers("/api/v1/operator/**").hasAnyRole("STATION_OPERATOR", "ADMIN", "SUPER_ADMIN")
+                .requestMatchers("/api/v1/support/**").hasAnyRole("SUPPORT", "ADMIN", "SUPER_ADMIN")
+
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session

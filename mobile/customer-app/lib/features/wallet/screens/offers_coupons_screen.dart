@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers/app_config_provider.dart';
 
-class OffersCouponsScreen extends StatelessWidget {
+class OffersCouponsScreen extends ConsumerWidget {
   const OffersCouponsScreen({super.key});
 
-  final List<Map<String, String>> _coupons = const [
+  final List<Map<String, String>> _defaultCoupons = const [
     {
       'code': 'ECOGREEN20',
       'title': '20% Cashback on First Charging Session',
@@ -19,16 +21,19 @@ class OffersCouponsScreen extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appConfig = ref.watch(appConfigProvider);
+    final coupons = appConfig.offers.isNotEmpty ? appConfig.offers : _defaultCoupons;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Offers & Promo Coupons'),
+        title: const Text('Offers & Promo Banners'),
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: _coupons.length,
+        itemCount: coupons.length,
         itemBuilder: (context, index) {
-          final item = _coupons[index];
+          final item = coupons[index];
           return Container(
             margin: const EdgeInsets.only(bottom: 16),
             padding: const EdgeInsets.all(20),
@@ -51,7 +56,7 @@ class OffersCouponsScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        item['code']!,
+                        item['code'] ?? 'OFFER',
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 1),
                       ),
                     ),
@@ -72,17 +77,17 @@ class OffersCouponsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  item['title']!,
+                  item['title'] ?? '',
                   style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  item['desc']!,
+                  item['desc'] ?? '',
                   style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
                 const Divider(color: Colors.white24, height: 20),
                 Text(
-                  item['expiry']!,
+                  item['expiry'] ?? '',
                   style: const TextStyle(color: Color(0xFF22C55E), fontSize: 11, fontWeight: FontWeight.bold),
                 ),
               ],

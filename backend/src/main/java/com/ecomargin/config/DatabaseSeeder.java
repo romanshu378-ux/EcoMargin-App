@@ -8,6 +8,7 @@ import com.ecomargin.model.Station;
 import com.ecomargin.model.Charger;
 import com.ecomargin.model.Connector;
 import com.ecomargin.model.Vendor;
+import com.ecomargin.model.Setting;
 import com.ecomargin.model.enums.RoleType;
 import com.ecomargin.repository.UserRepository;
 import com.ecomargin.repository.WalletRepository;
@@ -17,6 +18,7 @@ import com.ecomargin.repository.StationRepository;
 import com.ecomargin.repository.ChargerRepository;
 import com.ecomargin.repository.ConnectorRepository;
 import com.ecomargin.repository.VendorRepository;
+import com.ecomargin.repository.SettingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -40,6 +42,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final ChargerRepository chargerRepository;
     private final ConnectorRepository connectorRepository;
     private final VendorRepository vendorRepository;
+    private final SettingRepository settingRepository;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @Override
@@ -53,24 +56,19 @@ public class DatabaseSeeder implements CommandLineRunner {
             log.warn("Schema migration check for jwt_version: {}", e.getMessage());
         }
         
-        // 1. Seed Customer Role
-        Role customerRole = roleRepository.findByName(RoleType.ROLE_CUSTOMER)
-                .orElseGet(() -> roleRepository.save(
-                        Role.builder().name(RoleType.ROLE_CUSTOMER).permissions(Collections.emptySet()).build()
-                ));
+        // 1. Seed Roles
+        Role customerRole = seedRole(RoleType.ROLE_CUSTOMER);
+        Role vendorRole = seedRole(RoleType.ROLE_VENDOR);
+        Role adminRole = seedRole(RoleType.ROLE_ADMIN);
+        Role superAdminRole = seedRole(RoleType.ROLE_SUPER_ADMIN);
 
-        // Seed Vendor Role
-        Role vendorRole = roleRepository.findByName(RoleType.ROLE_VENDOR)
-                .orElseGet(() -> roleRepository.save(
-                        Role.builder().name(RoleType.ROLE_VENDOR).permissions(Collections.emptySet()).build()
-                ));
-
-        // 2. Seed User romanshu@gmail.com
-        String email = "romanshu@gmail.com";
-        User user = userRepository.findByEmailIgnoreCase(email)
+        // 2. Seed Users
+        // Customer User
+        String customerEmail = "romanshu@gmail.com";
+        User user = userRepository.findByEmailIgnoreCase(customerEmail)
                 .orElseGet(() -> userRepository.save(
                         User.builder()
-                                .email(email)
+                                .email(customerEmail)
                                 .password(passwordEncoder.encode("password123"))
                                 .firstName("Romanshu")
                                 .lastName("Sharma")
@@ -81,7 +79,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                                 .build()
                 ));
 
-        // Seed default Vendor user and Vendor profile
+        // Vendor User
         String vendorEmail = "vendor@ecomargin.com";
         User vendorUser = userRepository.findByEmailIgnoreCase(vendorEmail)
                 .orElseGet(() -> userRepository.save(
@@ -103,6 +101,38 @@ public class DatabaseSeeder implements CommandLineRunner {
                                 .user(vendorUser)
                                 .businessName("EcoMargin Default Vendor")
                                 .status("ACTIVE")
+                                .build()
+                ));
+
+        // Admin User
+        String adminEmail = "operator@ecomargin.com";
+        userRepository.findByEmailIgnoreCase(adminEmail)
+                .orElseGet(() -> userRepository.save(
+                        User.builder()
+                                .email(adminEmail)
+                                .password(passwordEncoder.encode("admin123"))
+                                .firstName("System")
+                                .lastName("Admin")
+                                .phoneNumber("+919999999991")
+                                .isVerified(true)
+                                .isAccountNonLocked(true)
+                                .roles(Collections.singleton(adminRole))
+                                .build()
+                ));
+
+        // Super Admin User
+        String superAdminEmail = "admin@ecomargin.com";
+        userRepository.findByEmailIgnoreCase(superAdminEmail)
+                .orElseGet(() -> userRepository.save(
+                        User.builder()
+                                .email(superAdminEmail)
+                                .password(passwordEncoder.encode("admin123"))
+                                .firstName("Super")
+                                .lastName("Admin")
+                                .phoneNumber("+919999999999")
+                                .isVerified(true)
+                                .isAccountNonLocked(true)
+                                .roles(Collections.singleton(superAdminRole))
                                 .build()
                 ));
 
@@ -133,14 +163,21 @@ public class DatabaseSeeder implements CommandLineRunner {
                     .build();
             transactionRepository.save(transaction);
             log.info("Startup Seeder: Successfully topped up romanshu@gmail.com with ₹100.00");
-        } else {
-            log.info("Startup Seeder: romanshu@gmail.com wallet balance already has ₹100.00 top-up.");
         }
 
-        // 4. Seed Stations
-        log.info("Seeding/updating default charging stations, chargers, and connectors...");
+        // 4. Seed Default Settings
+        seedSetting("min_wallet_balance_to_start", "50.00", "Minimum wallet balance required to initiate charging");
+        seedSetting("default_charging_rate_per_kwh", "15.00", "Default per kWh charging price in INR");
+        seedSetting("home_sections", "{\"hero_slider\": true, \"quick_actions\": true, \"wallet_card\": true, \"nearby_stations\": true, \"promo_banner\": true, \"search_section\": true}", "Home screen section visibility configuration");
+        seedSetting("support_info", "{\"phone\": \"1800-123-4567\", \"email\": \"support@ecomargin.com\", \"hours\": \"24/7 Helpline\"}", "Support helpline contact information");
+        seedSetting("app_maintenance", "{\"enabled\": false, \"message\": \"EcoMargin is currently undergoing scheduled maintenance. Please check back shortly.\"}", "Global app maintenance flag");
+        seedSetting("charging_session_rules", "{\"max_duration_hours\": 12, \"idle_fee_per_min\": 2.0, \"auto_stop_target_pct\": 100}", "Charging session operational parameters");
+        seedSetting("faqs", "[{\"q\": \"How do I start an EV charging session?\", \"a\": \"Simply find a nearby charger on the map, select the connector details, set your target battery limit, and tap Start Charging.\"}, {\"q\": \"How does EcoMargin Wallet billing work?\", \"a\": \"Your wallet balance is automatically debited based on the exact kWh energy consumed at the end of every charging session.\"}, {\"q\": \"What connector types are supported?\", \"a\": \"EcoMargin supports DC Fast Chargers (CCS2, GB/T, CHAdeMO) and AC Chargers (Type 2).\"}]", "Customer FAQs list");
+        seedSetting("offers_banners", "[{\"code\": \"ECOGREEN20\", \"title\": \"20% Cashback on First Charging Session\", \"desc\": \"Get up to ₹100 cashback credited into your EcoMargin Wallet.\", \"expiry\": \"Valid till 31 Aug 2026\"}, {\"code\": \"FASTCHARGE50\", \"title\": \"Flat ₹50 OFF on DC Fast Chargers\", \"desc\": \"Applicable on session power > 50 kW.\", \"expiry\": \"Valid till 15 Aug 2026\"}]", "Active promotional offers & coupons");
 
-        // Station 1: Alwar Charging Hub
+        // 5. Seed Stations
+        log.info("Seeding default charging stations, chargers, and connectors...");
+
         Station alwarStation = seedStation(
                 "Alwar Charging Hub",
                 new BigDecimal("27.568400"),
@@ -152,7 +189,6 @@ public class DatabaseSeeder implements CommandLineRunner {
         seedConnector(alwarCharger, 1, "CCS2", BigDecimal.valueOf(50.00));
         seedConnector(alwarCharger, 2, "CHADEMO", BigDecimal.valueOf(50.00));
 
-        // Station 2: Jaipur Fast Charger
         Station jaipurStation = seedStation(
                 "Jaipur EV Charging Hub",
                 new BigDecimal("26.915000"),
@@ -163,7 +199,6 @@ public class DatabaseSeeder implements CommandLineRunner {
         Charger jaipurCharger = seedCharger(jaipurStation, "IN_JAI_01", "ABB Terra 184", "ABB");
         seedConnector(jaipurCharger, 1, "CCS2", BigDecimal.valueOf(180.00));
 
-        // Station 3: Austin Downtown Hub
         Station austinStation = seedStation(
                 "Austin Downtown Hub",
                 new BigDecimal("30.267153"),
@@ -175,13 +210,27 @@ public class DatabaseSeeder implements CommandLineRunner {
         seedConnector(austinCharger, 1, "CCS2", BigDecimal.valueOf(180.00));
         seedConnector(austinCharger, 2, "CCS2", BigDecimal.valueOf(180.00));
 
-        log.info("Successfully completed station seeding.");
+        log.info("Successfully completed database seeding.");
+    }
+
+    private Role seedRole(RoleType name) {
+        return roleRepository.findByName(name)
+                .orElseGet(() -> roleRepository.save(
+                        Role.builder().name(name).permissions(Collections.emptySet()).build()
+                ));
+    }
+
+    private void seedSetting(String key, String val, String desc) {
+        if (settingRepository.findById(key).isEmpty()) {
+            settingRepository.save(Setting.builder()
+                    .key(key)
+                    .value(val)
+                    .description(desc)
+                    .build());
+        }
     }
 
     private Station seedStation(String name, BigDecimal lat, BigDecimal lng, String address, Vendor vendor) {
-        if (vendor == null) {
-            throw new IllegalStateException("Validation Error: Cannot create station '" + name + "' without a valid Vendor!");
-        }
         return stationRepository.findByName(name)
                 .orElseGet(() -> stationRepository.save(Station.builder()
                         .name(name)

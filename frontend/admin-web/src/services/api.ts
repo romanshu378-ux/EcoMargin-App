@@ -22,8 +22,46 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('admin_token');
-      window.location.href = '/login';
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
 );
+
+// Admin API Endpoints
+export const adminApi = {
+  // System Settings
+  getSettings: () => api.get('/admin/settings'),
+  updateSetting: (key: string, value: string, description?: string) =>
+    api.put(`/admin/settings/${key}`, { value, description }),
+  updateSettingsBatch: (settings: Record<string, string>) =>
+    api.post('/admin/settings/batch', settings),
+
+  // Stations & Chargers
+  getStations: () => api.get('/admin/stations'),
+  createStation: (data: any) => api.post('/admin/stations', data),
+  updateStation: (id: number, data: any) => api.put(`/admin/stations/${id}`, data),
+  deleteStation: (id: number) => api.delete(`/admin/stations/${id}`),
+  createCharger: (data: any) => api.post('/admin/chargers', data),
+  updateChargerStatus: (id: number, status: string) =>
+    api.put(`/admin/chargers/${id}/status`, { status }),
+
+  // Users & Access Control
+  getUsers: () => api.get('/admin/users'),
+  updateUserStatus: (id: number, status: { isLocked?: boolean; isVerified?: boolean }) =>
+    api.put(`/admin/users/${id}/status`, status),
+  updateUserRole: (id: number, role: string) =>
+    api.put(`/admin/users/${id}/role`, { role }),
+  creditUserWallet: (id: number, amount: number, reason: string) =>
+    api.post(`/admin/users/${id}/wallet/credit`, { amount, reason }),
+
+  // Charging Sessions
+  getActiveSessions: () => api.get('/admin/sessions/active'),
+  getSessionHistory: () => api.get('/admin/sessions/history'),
+
+  // Transactions & Audit Logs
+  getTransactions: () => api.get('/admin/transactions'),
+  getAuditLogs: () => api.get('/admin/audit-logs'),
+};

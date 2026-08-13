@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/providers/app_config_provider.dart';
 
-class HelpSupportScreen extends StatelessWidget {
+class HelpSupportScreen extends ConsumerWidget {
   const HelpSupportScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appConfig = ref.watch(appConfigProvider);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Help & 24/7 Support'),
+        title: const Text('Help & Support'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -20,8 +24,8 @@ class HelpSupportScreen extends StatelessWidget {
                 backgroundColor: Color(0xFF16A34A),
                 child: Icon(Icons.phone_in_talk, color: Colors.white),
               ),
-              title: const Text('24/7 EV Helpline Number', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Toll Free: 1800-123-4567'),
+              title: Text('${appConfig.supportHours} Number', style: const TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text('Toll Free: ${appConfig.supportPhone}'),
               trailing: ElevatedButton(
                 onPressed: () {},
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A)),

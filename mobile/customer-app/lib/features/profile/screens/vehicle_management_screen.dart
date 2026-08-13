@@ -96,8 +96,7 @@ class VehicleManagementScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '${item.batteryCapacityKwh} kWh • ${item.connectorType}' +
-                            (item.variant != null && item.variant!.isNotEmpty ? ' • ${item.variant}' : ''),
+                            '${item.batteryCapacityKwh} kWh • ${item.connectorType}${item.variant != null && item.variant!.isNotEmpty ? ' • ${item.variant}' : ''}',
                             style: const TextStyle(color: Colors.grey, fontSize: 12),
                           ),
                           if (item.nickname != null && item.nickname!.isNotEmpty) ...[

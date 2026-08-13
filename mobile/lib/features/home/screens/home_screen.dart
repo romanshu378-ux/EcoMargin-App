@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/home_providers.dart';
+import '../../../core/providers/app_config_provider.dart';
 import '../widgets/app_header.dart';
 import '../widgets/hero_banner_slider.dart';
 import '../widgets/search_section_widget.dart';
@@ -27,6 +28,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final stationsAsync = ref.watch(stationsProvider);
+    final appConfig = ref.watch(appConfigProvider);
 
     return Scaffold(
       key: _scaffoldKey,
@@ -47,12 +49,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
               accountEmail: const Text('driver@ecomargin.com'),
-              currentAccountPicture: CircleAvatar(
+              currentAccountPicture: const CircleAvatar(
                 backgroundColor: Colors.white,
                 child: Text(
                   'AR',
                   style: TextStyle(
-                    color: const Color(0xFF16A34A),
+                    color: Color(0xFF16A34A),
                     fontWeight: FontWeight.bold,
                     fontSize: 20,
                   ),
@@ -80,7 +82,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.help_outline_rounded, color: Color(0xFF16A34A)),
               title: const Text('Customer Support'),
-              onTap: () => Navigator.pop(context),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/help');
+              },
             ),
             const Divider(),
             ListTile(
@@ -99,11 +104,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           color: const Color(0xFF16A34A),
           onRefresh: () async {
             await ref.read(stationsProvider.notifier).fetchStations();
+            await ref.read(appConfigProvider.notifier).fetchAppConfig();
           },
           child: CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
-              // 1. App Header (Logo, Tagline, Hamburger Menu, Notification Bell)
+              // 1. Maintenance Alert Banner if Maintenance Mode Enabled by Admin
+              if (appConfig.maintenanceEnabled)
+                SliverToBoxAdapter(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    color: Colors.amber.shade800,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            appConfig.maintenanceMessage,
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // 2. App Header (Logo, Tagline, Hamburger Menu, Notification Bell)
               SliverToBoxAdapter(
                 child: AppHeader(
                   onMenuPressed: () => _scaffoldKey.currentState?.openDrawer(),
@@ -117,182 +144,190 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-              // 2. Hero Banner (Promotional EV banner with slider & Find Stations CTA)
-              SliverToBoxAdapter(
-                child: HeroBannerSlider(
-                  onFindStationsPressed: () => context.go('/map'),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-              // 3. Search Section (Current Location & Search input + Filter button)
-              SliverToBoxAdapter(
-                child: SearchSectionWidget(
-                  onSearchChanged: (val) {
-                    setState(() => _searchQuery = val);
-                  },
-                  onFilterPressed: () {
-                    _showFilterBottomSheet(context);
-                  },
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 20)),
-
-              // 4. Nearby Stations Section
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Nearby Stations',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => context.go('/map'),
-                        child: const Row(
-                          children: [
-                            Text(
-                              'View all',
-                              style: TextStyle(
-                                color: Color(0xFF16A34A),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                            SizedBox(width: 2),
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              color: Color(0xFF16A34A),
-                              size: 18,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+              // 3. Hero Banner (Admin Configurable)
+              if (appConfig.heroSliderEnabled) ...[
+                SliverToBoxAdapter(
+                  child: HeroBannerSlider(
+                    onFindStationsPressed: () => context.go('/map'),
                   ),
                 ),
-              ),
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              ],
 
-              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              // 4. Search Section (Admin Configurable)
+              if (appConfig.searchSectionEnabled) ...[
+                SliverToBoxAdapter(
+                  child: SearchSectionWidget(
+                    onSearchChanged: (val) {
+                      setState(() => _searchQuery = val);
+                    },
+                    onFilterPressed: () {
+                      _showFilterBottomSheet(context);
+                    },
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              ],
 
-              // Nearby Stations List
-              stationsAsync.when(
-                data: (stations) {
-                  final filtered = stations.where((s) {
-                    return s.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                        s.address.toLowerCase().contains(_searchQuery.toLowerCase());
-                  }).toList();
+              // 5. Nearby Stations Section (Admin Configurable)
+              if (appConfig.nearbyStationsEnabled) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Nearby Stations',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => context.go('/map'),
+                          child: const Row(
+                            children: [
+                              Text(
+                                'View all',
+                                style: TextStyle(
+                                  color: Color(0xFF16A34A),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              SizedBox(width: 2),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                color: Color(0xFF16A34A),
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
 
-                  if (filtered.isEmpty) {
-                    return SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Center(
-                          child: Text(
-                            'No stations found matching "$_searchQuery"',
-                            style: TextStyle(
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
+
+                // Nearby Stations List
+                stationsAsync.when(
+                  data: (stations) {
+                    final filtered = stations.where((s) {
+                      return s.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                          s.address.toLowerCase().contains(_searchQuery.toLowerCase());
+                    }).toList();
+
+                    if (filtered.isEmpty) {
+                      return SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Center(
+                            child: Text(
+                              'No stations found matching "$_searchQuery"',
+                              style: TextStyle(
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  }
+                      );
+                    }
 
-                  return SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final station = filtered[index];
-                          return NearbyStationCard(
-                            station: station,
-                            onFavoriteToggle: () {
-                              ref.read(stationsProvider.notifier).toggleFavorite(station.id);
-                            },
-                            onViewDetails: () {
-                              _showStationDetailsDialog(context, station);
-                            },
-                          );
-                        },
-                        childCount: filtered.length,
+                    return SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final station = filtered[index];
+                            return NearbyStationCard(
+                              station: station,
+                              onFavoriteToggle: () {
+                                ref.read(stationsProvider.notifier).toggleFavorite(station.id);
+                              },
+                              onViewDetails: () {
+                                _showStationDetailsDialog(context, station);
+                              },
+                            );
+                          },
+                          childCount: filtered.length,
+                        ),
                       ),
-                    ),
-                  );
-                },
-                loading: () => SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Container(
-                      height: 180,
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Center(
-                        child: CircularProgressIndicator(color: Color(0xFF16A34A)),
-                      ),
-                    ),
-                  ),
-                ),
-                error: (err, stack) => SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'Failed to load stations: $err',
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 12)),
-
-              // 5. Quick Actions Section (Scan QR, Favorites, Charging History, Wallet)
-              SliverToBoxAdapter(
-                child: QuickActionsWidget(
-                  onScanQr: () => context.go('/scan'),
-                  onFavorites: () => context.go('/map'),
-                  onHistory: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Opening Charging History')),
                     );
                   },
-                  onWallet: () => context.go('/wallet'),
+                  loading: () => SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        height: 180,
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Center(
+                          child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  error: (err, stack) => SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'Failed to load stations: $err',
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              ],
 
-              // 6. Wallet Card (Wallet Balance & Add Money Button)
-              SliverToBoxAdapter(
-                child: WalletCardWidget(
-                  onAddMoneyPressed: () => context.go('/wallet'),
+              // 6. Quick Actions Section (Admin Configurable)
+              if (appConfig.quickActionsEnabled) ...[
+                SliverToBoxAdapter(
+                  child: QuickActionsWidget(
+                    onScanQr: () => context.go('/scan'),
+                    onFavorites: () => context.go('/map'),
+                    onHistory: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Opening Charging History')),
+                      );
+                    },
+                    onWallet: () => context.go('/wallet'),
+                  ),
                 ),
-              ),
+                const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              ],
 
-              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              // 7. Wallet Card (Admin Configurable)
+              if (appConfig.walletCardEnabled) ...[
+                SliverToBoxAdapter(
+                  child: WalletCardWidget(
+                    onAddMoneyPressed: () => context.go('/wallet'),
+                    onViewWalletPressed: () => context.go('/wallet'),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              ],
 
-              // 7. Promotional Banner ("Drive Green, Save More")
-              const SliverToBoxAdapter(
-                child: PromoBannerWidget(),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              // 8. Promotional Banner (Admin Configurable)
+              if (appConfig.promoBannerEnabled) ...[
+                const SliverToBoxAdapter(
+                  child: PromoBannerWidget(),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              ],
             ],
           ),
         ),
       ),
 
-      // 8. Bottom Navigation Bar (Home, Map, Bookings, Profile)
+      // Bottom Navigation Bar
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF0F172A) : Colors.white,

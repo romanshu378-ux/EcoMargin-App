@@ -187,7 +187,7 @@ class StationDetailsScreen extends ConsumerWidget {
                             ),
                             const SizedBox(height: 10),
                           ],
-                        )).toList(),
+                        )),
                         const SizedBox(height: 20),
                         const Text(
                           'Station Amenities',

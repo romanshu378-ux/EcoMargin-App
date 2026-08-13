@@ -2,9 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers/core_providers.dart';
+import '../../../core/providers/app_config_provider.dart';
 
 class StartChargingScreen extends ConsumerStatefulWidget {
-  const StartChargingScreen({super.key});
+  final String? connectorId;
+  final String? chargerId;
+  final String? stationId;
+
+  const StartChargingScreen({
+    super.key,
+    this.connectorId,
+    this.chargerId,
+    this.stationId,
+  });
 
   @override
   ConsumerState<StartChargingScreen> createState() => _StartChargingScreenState();
@@ -12,11 +22,12 @@ class StartChargingScreen extends ConsumerStatefulWidget {
 
 class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
   double _targetPercentage = 80.0;
-  String _paymentMethod = 'EcoMargin Wallet (₹850.00)';
+  String _paymentMethod = 'EcoMargin Wallet';
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final appConfig = ref.watch(appConfigProvider);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -36,18 +47,21 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  CircleAvatar(
+                  const CircleAvatar(
                     backgroundColor: Color(0xFF16A34A),
                     child: Icon(Icons.bolt, color: Colors.white),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('GreenCharge Hub Sector 62', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                      Text('Charger: CHG-DC-04 (60 kW DC)', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                      Text(widget.stationId ?? 'GreenCharge Hub Sector 62', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text(
+                        'Charger: ${widget.chargerId ?? "CHG-DC-04"} (Rate: ₹${appConfig.defaultChargingRate.toStringAsFixed(2)}/kWh)',
+                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                      ),
                     ],
                   ),
                 ],
@@ -55,7 +69,7 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Target Battery Slider
+            // Target Battery Limit
             const Text('Target Battery Limit', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Container(
@@ -89,6 +103,29 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
             ),
             const SizedBox(height: 24),
 
+            // Minimum Balance Rule Card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF16A34A).withOpacity(0.08),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF16A34A).withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF16A34A)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Minimum required wallet balance: ₹${appConfig.minWalletBalance.toStringAsFixed(2)}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
             // Payment Option
             const Text('Payment Method', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -104,7 +141,7 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> {
                   value: _paymentMethod,
                   isExpanded: true,
                   items: [
-                    'EcoMargin Wallet (₹850.00)',
+                    'EcoMargin Wallet',
                     'UPI / GPay / PhonePe',
                     'Credit / Debit Card',
                   ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),

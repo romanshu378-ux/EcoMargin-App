@@ -12,4 +12,5 @@ import java.util.Optional;
 public interface ChargingSessionRepository extends JpaRepository<ChargingSession, Long> {
     List<ChargingSession> findByUserOrderByCreatedAtDesc(User user);
     Optional<ChargingSession> findFirstByUserAndStatusInOrderByCreatedAtDesc(User user, List<String> statuses);
+    List<ChargingSession> findByStatus(String status);
 }

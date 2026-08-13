@@ -10,6 +10,7 @@ import {
   CreditCard, 
   BarChart3, 
   Settings, 
+  ShieldAlert,
   LogOut
 } from 'lucide-react';
 import { PwaInstallButton } from '../PwaInstallButton';
@@ -35,6 +36,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { label: 'Chargers', path: '/chargers', icon: Zap },
     { label: 'Orders', path: '/orders', icon: ShoppingBag },
     { label: 'Payments', path: '/payments', icon: CreditCard },
+    { label: 'Audit Logs', path: '/audit-logs', icon: ShieldAlert },
     { label: 'Reports', path: '/reports', icon: BarChart3 },
     { label: 'Settings', path: '/settings', icon: Settings },
   ];
