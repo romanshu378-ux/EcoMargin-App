@@ -142,7 +142,12 @@ spring:
       connection-test-query: SELECT 1
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: '6'
+    locations: classpath:db/migration
 
 app:
   seed:
