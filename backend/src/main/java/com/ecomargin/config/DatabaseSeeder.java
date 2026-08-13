@@ -52,18 +52,29 @@ public class DatabaseSeeder implements CommandLineRunner {
         // 0. Ensure safe schema migration for roles_name_check constraint & jwt_version
         try {
             java.util.List<String> constraints = jdbcTemplate.queryForList(
-                "SELECT constraint_name FROM information_schema.constraint_column_usage WHERE LOWER(table_name) = 'roles' AND LOWER(column_name) = 'name'",
+                "SELECT constraint_name FROM information_schema.table_constraints WHERE LOWER(table_name) = 'roles' AND UPPER(constraint_type) = 'CHECK'",
                 String.class
             );
             for (String constraint : constraints) {
-                if (constraint != null && constraint.toLowerCase().contains("check")) {
-                    log.info("Dropping check constraint on roles.name: {}", constraint);
-                    jdbcTemplate.execute("ALTER TABLE roles DROP CONSTRAINT IF EXISTS " + constraint + ";");
+                if (constraint != null) {
+                    log.info("Dropping check constraint on roles table: {}", constraint);
+                    try {
+                        jdbcTemplate.execute("ALTER TABLE roles DROP CONSTRAINT IF EXISTS " + constraint + ";");
+                    } catch (Exception ex) {
+                        log.warn("Could not drop constraint {}: {}", constraint, ex.getMessage());
+                    }
                 }
             }
-            jdbcTemplate.execute("ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_name_check;");
         } catch (Exception e) {
-            log.warn("Schema migration check for roles constraints drop: {}", e.getMessage());
+            log.warn("Schema migration check for information_schema table_constraints: {}", e.getMessage());
+        }
+
+        try {
+            jdbcTemplate.execute("ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_name_check;");
+            jdbcTemplate.execute("ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_name_check1;");
+            jdbcTemplate.execute("ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_name_check2;");
+        } catch (Exception e) {
+            log.warn("Schema migration check for explicit roles constraint drop: {}", e.getMessage());
         }
 
         try {
