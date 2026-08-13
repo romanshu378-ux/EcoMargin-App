@@ -134,6 +134,35 @@ public class ProfileController {
                 .body(imageBytes);
     }
 
+    @DeleteMapping
+    public ResponseEntity<?> deleteAccount() {
+        User user = getAuthenticatedUser();
+        log.info("[PROFILE] Request to delete account for user_id={}", user.getId());
+
+        String timestamp = String.valueOf(System.currentTimeMillis());
+        user.setEmail("deleted_" + user.getId() + "_" + timestamp + "@ecomargin.com");
+        user.setFirstName("Deleted");
+        user.setLastName("User");
+        user.setPhoneNumber(null);
+        user.setPassword(null);
+        user.setGoogleId(null);
+        user.setAddress(null);
+        user.setCity(null);
+        user.setState(null);
+        user.setPinCode(null);
+        user.setEmergencyContactName(null);
+        user.setEmergencyContactNumber(null);
+        user.setProfileImage(null);
+        user.setProfileImageUrl(null);
+        user.setVerified(false);
+        user.setAccountNonLocked(false);
+        user.setDeletedAt(java.time.LocalDateTime.now());
+
+        userRepository.save(user);
+        log.info("[PROFILE] Account successfully soft-deleted and anonymized for user_id={}", user.getId());
+        return ResponseEntity.ok(Map.of("message", "Account deleted successfully."));
+    }
+
     private Map<String, Object> mapUserToProfileMap(User user) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", user.getId());

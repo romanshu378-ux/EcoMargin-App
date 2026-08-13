@@ -69,6 +69,9 @@ public class User implements UserDetails {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
