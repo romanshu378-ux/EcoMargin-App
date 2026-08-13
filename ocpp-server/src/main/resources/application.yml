@@ -5,17 +5,6 @@ spring:
   application:
     name: ocpp-server
 
-  datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:ocppdevdb;DB_CLOSE_DELAY=-1}
-    username: ${SPRING_DATASOURCE_USERNAME:sa}
-    password: ${SPRING_DATASOURCE_PASSWORD:sa}
-    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.h2.Driver}
-    hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
-      idle-timeout: 30000
-      connection-timeout: 20000
-
   jpa:
     hibernate:
       ddl-auto: update
