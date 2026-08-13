@@ -92,6 +92,27 @@ class ProfileScreen extends ConsumerWidget {
                   onTap: () => context.push('/charging-history'),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.credit_card_rounded, color: Color(0xFF16A34A)),
+                  title: const Text('RFID Card'),
+                  subtitle: const Text('Manage your EcoMargin RFID card', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () => context.push('/rfid-card'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.shield_outlined, color: Color(0xFF16A34A)),
+                  title: const Text('Privacy Settings'),
+                  subtitle: const Text('Control your privacy and data', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () => context.push('/privacy-settings'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.help_outline_rounded, color: Color(0xFF16A34A)),
+                  title: const Text('FAQs'),
+                  subtitle: const Text('Frequently asked questions', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () => context.push('/faqs'),
+                ),
+                ListTile(
                   leading: const Icon(Icons.settings, color: Color(0xFF16A34A)),
                   title: const Text('App Settings'),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 16),

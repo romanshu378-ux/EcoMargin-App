@@ -33,6 +33,8 @@ import '../../features/profile/screens/profile_screen.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/profile/screens/vehicle_management_screen.dart';
 import '../../features/profile/screens/add_edit_vehicle_screen.dart';
+import '../../features/profile/screens/rfid_card_screen.dart';
+import '../../features/profile/screens/privacy_settings_screen.dart';
 
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/settings/screens/language_screen.dart';
@@ -41,6 +43,7 @@ import '../../features/settings/screens/notifications_screen.dart';
 import '../../features/settings/screens/help_support_screen.dart';
 import '../../features/settings/screens/raise_complaint_screen.dart';
 import '../../features/settings/screens/faq_screen.dart';
+import '../../features/settings/screens/faqs_screen.dart';
 import '../../features/settings/screens/about_screen.dart';
 import '../../features/settings/screens/privacy_policy_screen.dart';
 import '../../features/settings/screens/terms_conditions_screen.dart';
@@ -225,6 +228,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           return AddEditVehicleScreen(vehicle: vehicle);
         },
       ),
+      GoRoute(path: '/rfid-card', builder: (context, state) => const RfidCardScreen()),
+      GoRoute(path: '/privacy-settings', builder: (context, state) => const PrivacySettingsScreen()),
+      GoRoute(path: '/faqs', builder: (context, state) => const FaqsScreen()),
 
       GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
       GoRoute(path: '/language', builder: (context, state) => const LanguageScreen()),

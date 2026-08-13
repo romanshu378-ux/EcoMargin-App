@@ -615,3 +615,337 @@ final vehicleProvider =
     StateNotifierProvider<VehicleNotifier, List<EvVehicle>>((ref) {
   return VehicleNotifier(ref);
 });
+
+class RfidCard {
+  final int? id;
+  final String cardNumber;
+  final String cardUid;
+  final String status;
+  final String linkedVehicle;
+  final String issuedDate;
+  final String lastUsed;
+
+  RfidCard({
+    this.id,
+    required this.cardNumber,
+    required this.cardUid,
+    required this.status,
+    required this.linkedVehicle,
+    required this.issuedDate,
+    required this.lastUsed,
+  });
+
+  factory RfidCard.fromJson(Map<String, dynamic> json) {
+    return RfidCard(
+      id: json['id'],
+      cardNumber: json['cardNumber'] ?? '',
+      cardUid: json['cardUid'] ?? '',
+      status: json['status'] ?? 'ACTIVE',
+      linkedVehicle: json['linkedVehicle'] ?? '',
+      issuedDate: json['issuedDate'] ?? '',
+      lastUsed: json['lastUsed'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'cardNumber': cardNumber,
+      'cardUid': cardUid,
+      'status': status,
+      'linkedVehicle': linkedVehicle,
+      'issuedDate': issuedDate,
+      'lastUsed': lastUsed,
+    };
+  }
+}
+
+class PrivacySettings {
+  final bool locationPermission;
+  final bool locationSharing;
+  final bool nearbyChargerPersonalization;
+  final bool pushNotifications;
+  final bool chargingActivityVisibility;
+  final bool usageAnalytics;
+  final bool personalizedRecommendations;
+
+  PrivacySettings({
+    required this.locationPermission,
+    required this.locationSharing,
+    required this.nearbyChargerPersonalization,
+    required this.pushNotifications,
+    required this.chargingActivityVisibility,
+    required this.usageAnalytics,
+    required this.personalizedRecommendations,
+  });
+
+  factory PrivacySettings.fromJson(Map<String, dynamic> json) {
+    return PrivacySettings(
+      locationPermission: json['locationPermission'] ?? true,
+      locationSharing: json['locationSharing'] ?? true,
+      nearbyChargerPersonalization: json['nearbyChargerPersonalization'] ?? true,
+      pushNotifications: json['pushNotifications'] ?? true,
+      chargingActivityVisibility: json['chargingActivityVisibility'] ?? true,
+      usageAnalytics: json['usageAnalytics'] ?? true,
+      personalizedRecommendations: json['personalizedRecommendations'] ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'locationPermission': locationPermission,
+      'locationSharing': locationSharing,
+      'nearbyChargerPersonalization': nearbyChargerPersonalization,
+      'pushNotifications': pushNotifications,
+      'chargingActivityVisibility': chargingActivityVisibility,
+      'usageAnalytics': usageAnalytics,
+      'personalizedRecommendations': personalizedRecommendations,
+    };
+  }
+
+  PrivacySettings copyWith({
+    bool? locationPermission,
+    bool? locationSharing,
+    bool? nearbyChargerPersonalization,
+    bool? pushNotifications,
+    bool? chargingActivityVisibility,
+    bool? usageAnalytics,
+    bool? personalizedRecommendations,
+  }) {
+    return PrivacySettings(
+      locationPermission: locationPermission ?? this.locationPermission,
+      locationSharing: locationSharing ?? this.locationSharing,
+      nearbyChargerPersonalization: nearbyChargerPersonalization ?? this.nearbyChargerPersonalization,
+      pushNotifications: pushNotifications ?? this.pushNotifications,
+      chargingActivityVisibility: chargingActivityVisibility ?? this.chargingActivityVisibility,
+      usageAnalytics: usageAnalytics ?? this.usageAnalytics,
+      personalizedRecommendations: personalizedRecommendations ?? this.personalizedRecommendations,
+    );
+  }
+}
+
+class RfidNotifier extends StateNotifier<AsyncValue<RfidCard?>> {
+  final Ref ref;
+
+  RfidNotifier(this.ref) : super(const AsyncValue.loading()) {
+    fetchRfidCard();
+  }
+
+  Future<void> fetchRfidCard() async {
+    try {
+      state = const AsyncValue.loading();
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.get('/rfid');
+      if (response.statusCode == 200) {
+        state = AsyncValue.data(RfidCard.fromJson(response.data));
+      } else {
+        state = const AsyncValue.data(null);
+      }
+    } catch (e) {
+      if (e is DioException && e.response?.statusCode == 404) {
+        state = const AsyncValue.data(null);
+      } else {
+        state = AsyncValue.error(e, StackTrace.current);
+      }
+    }
+  }
+
+  Future<void> linkRfidCard(String cardNumber, String cardUid, {String? linkedVehicle}) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.post('/rfid/link', data: {
+        'cardNumber': cardNumber,
+        'cardUid': cardUid,
+        if (linkedVehicle != null) 'linkedVehicle': linkedVehicle,
+      });
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        state = AsyncValue.data(RfidCard.fromJson(response.data));
+      } else {
+        throw Exception('Failed to link RFID card');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> unlinkRfidCard() async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.post('/rfid/unlink');
+      if (response.statusCode == 200) {
+        state = const AsyncValue.data(null);
+      } else {
+        throw Exception('Failed to unlink RFID card');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> blockRfidCard() async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.post('/rfid/block');
+      if (response.statusCode == 200) {
+        state = AsyncValue.data(RfidCard.fromJson(response.data));
+      } else {
+        throw Exception('Failed to block RFID card');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+}
+
+final rfidProvider = StateNotifierProvider<RfidNotifier, AsyncValue<RfidCard?>>((ref) {
+  return RfidNotifier(ref);
+});
+
+class PrivacyNotifier extends StateNotifier<AsyncValue<PrivacySettings>> {
+  final Ref ref;
+  static const String _cacheKey = 'cached_privacy_settings';
+
+  PrivacyNotifier(this.ref) : super(const AsyncValue.loading()) {
+    loadCachedOrFetch();
+  }
+
+  Future<void> loadCachedOrFetch() async {
+    try {
+      state = const AsyncValue.loading();
+      final storageService = ref.read(storageServiceProvider);
+      final cachedData = storageService.getData(_cacheKey);
+      if (cachedData != null && cachedData is Map) {
+        final castedMap = Map<String, dynamic>.from(cachedData);
+        state = AsyncValue.data(PrivacySettings.fromJson(castedMap));
+      }
+      await fetchPrivacySettings();
+    } catch (e) {
+      if (state.hasValue) {
+        // Keep cached
+      } else {
+        state = AsyncValue.error(e, StackTrace.current);
+      }
+    }
+  }
+
+  Future<void> fetchPrivacySettings() async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.get('/privacy');
+      if (response.statusCode == 200) {
+        final settings = PrivacySettings.fromJson(response.data);
+        final storageService = ref.read(storageServiceProvider);
+        await storageService.saveData(_cacheKey, settings.toJson());
+        state = AsyncValue.data(settings);
+      }
+    } catch (e) {
+      if (!state.hasValue) {
+        state = AsyncValue.error(e, StackTrace.current);
+      }
+    }
+  }
+
+  Future<void> updatePrivacySettings(PrivacySettings updated) async {
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.put('/privacy', data: updated.toJson());
+      if (response.statusCode == 200) {
+        final settings = PrivacySettings.fromJson(response.data);
+        final storageService = ref.read(storageServiceProvider);
+        await storageService.saveData(_cacheKey, settings.toJson());
+        state = AsyncValue.data(settings);
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+}
+
+final privacyProvider = StateNotifierProvider<PrivacyNotifier, AsyncValue<PrivacySettings>>((ref) {
+  return PrivacyNotifier(ref);
+});
+
+class FaqItem {
+  final String question;
+  final String answer;
+
+  FaqItem({required this.question, required this.answer});
+}
+
+final faqProvider = FutureProvider<List<FaqItem>>((ref) async {
+  try {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return _getFaqList();
+  } catch (e) {
+    return _getFaqList();
+  }
+});
+
+List<FaqItem> _getFaqList() {
+  return [
+    FaqItem(
+      question: 'How do I find a nearby charging station?',
+      answer: 'Go to the Map tab from the bottom navigation bar. You can search for stations, view their details, check connector availability, and get directions.',
+    ),
+    FaqItem(
+      question: 'How do I start charging?',
+      answer: 'Scan the QR code on the charger or enter the Charger ID manually on the QR Scan screen, select your connector, verify wallet balance, and tap Start Charging.',
+    ),
+    FaqItem(
+      question: 'How do I stop a charging session?',
+      answer: 'Go to the Live Session screen and tap Stop Charging. The session will end, and the total cost will be automatically deducted from your EcoMargin Wallet.',
+    ),
+    FaqItem(
+      question: 'How is charging cost calculated?',
+      answer: 'The cost is calculated based on the per-kWh rate of the selected charger, plus any applicable session fee or taxes. You can see the rate details on the Station Details screen.',
+    ),
+    FaqItem(
+      question: 'How does the EcoMargin Wallet work?',
+      answer: 'The EcoMargin Wallet holds your pre-loaded balance. When you start charging, the system reserves a minimum balance, and once completed, the final amount is deducted from the wallet.',
+    ),
+    FaqItem(
+      question: 'How can I add money to my wallet?',
+      answer: 'Go to the Wallet tab, tap Add Money, enter the desired amount, and complete the payment using credit/debit card, UPI, net banking, or other available payment methods.',
+    ),
+    FaqItem(
+      question: 'What happens if my wallet balance is insufficient?',
+      answer: 'If your wallet balance falls below the minimum required amount (typically 100 INR / \$10), you will not be able to start a charging session. Please top up your wallet.',
+    ),
+    FaqItem(
+      question: 'How does RFID charging work?',
+      answer: 'Once you link an RFID card to your account, you can simply tap the card on any EcoMargin charging station RFID reader to start and stop charging without opening the mobile app.',
+    ),
+    FaqItem(
+      question: 'How do I link an RFID card?',
+      answer: 'Go to Profile -> RFID Card, tap "Link RFID Card", enter the Card Number and Card UID printed on the card, and select a vehicle to link it.',
+    ),
+    FaqItem(
+      question: 'What happens if I lose my RFID card?',
+      answer: 'If you lose your RFID card, immediately go to Profile -> RFID Card and select "Block Card" or "Report Lost Card" to disable it. You can then unlink it and link a new card.',
+    ),
+    FaqItem(
+      question: 'How can I view charging history?',
+      answer: 'Go to Profile -> Charging History to see the list of all past charging sessions, including energy consumed, duration, cost, and receipts.',
+    ),
+    FaqItem(
+      question: 'How do I update my profile?',
+      answer: 'Go to Profile, tap Edit Profile (pencil icon or button), modify your details (Name, Mobile, Date of Birth), and tap Save to update your profile.',
+    ),
+    FaqItem(
+      question: 'How can I change privacy settings?',
+      answer: 'Go to Profile -> Privacy Settings, where you can toggle location permissions, push notifications, charging activity visibility, and usage analytics.',
+    ),
+    FaqItem(
+      question: 'What should I do if a charger is unavailable?',
+      answer: 'If a charger is in use or out of service, search the Map tab for other active stations nearby, or tap the Help & Support button to report the issue.',
+    ),
+    FaqItem(
+      question: 'What should I do if charging fails?',
+      answer: 'If charging fails to start, check that the connector is plugged in correctly, verify your wallet balance, restart the app, or call our 24/7 support hotline.',
+    ),
+    FaqItem(
+      question: 'How can I contact EcoMargin support?',
+      answer: 'Go to App Settings -> Help & Support. You can raise a complaint, email support@ecomargin.com, or call our support team directly.',
+    ),
+  ];
+}
