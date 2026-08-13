@@ -1,10 +1,10 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import '../../../core/providers/core_providers.dart';
+import '../../../core/network/api_client.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -63,6 +63,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       final apiClient = ref.read(apiClientProvider);
 
       if (kDebugMode) {
+        debugPrint('[REGISTER] Checking backend health before registering...');
+      }
+
+      await apiClient.checkHealth(maxRetries: 3, retryDelay: const Duration(seconds: 2));
+
+      if (kDebugMode) {
         debugPrint('[REGISTER] API URL: ${apiClient.dio.options.baseUrl}/auth/register');
         debugPrint('[REGISTER] Request started');
       }
@@ -90,36 +96,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         _showSnackBar('Registration failed. Please try again.');
       }
     } on DioException catch (e) {
-      final statusCode = e.response?.statusCode;
       if (kDebugMode) {
         debugPrint('[REGISTER] Error Type: ${e.type}');
-        debugPrint('[REGISTER] Status Code: $statusCode');
+        debugPrint('[REGISTER] Status Code: ${e.response?.statusCode}');
         debugPrint('[REGISTER] Request URL: ${e.requestOptions.uri}');
         if (e.response?.data != null) {
           debugPrint('[REGISTER] Response Body: ${e.response?.data}');
         }
       }
-
-      if (statusCode != null) {
-        final serverMsg = e.response?.data is Map ? e.response?.data['message'] : null;
-        if (statusCode == 409) {
-          _showSnackBar(serverMsg?.toString() ?? 'Email is already registered. Please login.');
-        } else if (statusCode == 400 || statusCode == 422) {
-          _showSnackBar(serverMsg?.toString() ?? 'Invalid registration details. Password must be at least 8 characters.');
-        } else if (statusCode == 500 || statusCode == 502 || statusCode == 503) {
-          _showSnackBar('Server is temporarily unavailable. Please try again.');
-        } else {
-          _showSnackBar(serverMsg?.toString() ?? 'Registration failed ($statusCode).');
-        }
-      } else if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.sendTimeout ||
-          e.type == DioExceptionType.connectionError ||
-          e.error is SocketException) {
-        _showSnackBar('Unable to connect to server. Please check your internet connection.');
-      } else {
-        _showSnackBar(e.message ?? 'An error occurred while connecting to server.');
-      }
+      final errorMsg = ApiClient.extractErrorMessage(e);
+      _showSnackBar(errorMsg);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('[REGISTER] Error: $e');

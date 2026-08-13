@@ -1,10 +1,10 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import '../../../core/providers/core_providers.dart';
+import '../../../core/network/api_client.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -50,6 +50,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final storageService = ref.read(storageServiceProvider);
 
       if (kDebugMode) {
+        debugPrint('[LOGIN] Checking backend health before authenticating...');
+      }
+
+      await apiClient.checkHealth(maxRetries: 3, retryDelay: const Duration(seconds: 2));
+
+      if (kDebugMode) {
         debugPrint('[LOGIN] API URL: ${apiClient.dio.options.baseUrl}/auth/login');
         debugPrint('[LOGIN] Request started');
       }
@@ -93,46 +99,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _showErrorSnackBar('Server returned unexpected status code: ${response.statusCode}');
       }
     } on DioException catch (e) {
-      final statusCode = e.response?.statusCode;
       if (kDebugMode) {
         debugPrint('[LOGIN] Error Type: ${e.type}');
-        debugPrint('[LOGIN] Status Code: $statusCode');
+        debugPrint('[LOGIN] Status Code: ${e.response?.statusCode}');
         debugPrint('[LOGIN] Request URL: ${e.requestOptions.uri}');
         if (e.response?.data != null) {
           debugPrint('[LOGIN] Response Body: ${e.response?.data}');
         }
       }
-
-      if (statusCode != null) {
-        String? serverMsg;
-        if (e.response?.data is Map) {
-          serverMsg = (e.response?.data as Map)['message']?.toString();
-        }
-
-        if (statusCode == 401) {
-          _showErrorSnackBar(serverMsg ?? 'Invalid email or password');
-        } else if (statusCode == 403) {
-          _showErrorSnackBar(serverMsg ?? 'Access denied');
-        } else if (statusCode == 409) {
-          _showErrorSnackBar(serverMsg ?? 'Account already exists');
-        } else if (statusCode == 422) {
-          _showErrorSnackBar(serverMsg ?? 'Invalid registration/login data');
-        } else if (statusCode == 500) {
-          _showErrorSnackBar(serverMsg ?? 'Server error. Please try again.');
-        } else if (statusCode == 502 || statusCode == 503) {
-          _showErrorSnackBar('Server temporarily unavailable.');
-        } else {
-          _showErrorSnackBar(serverMsg ?? 'Server returned error ($statusCode).');
-        }
-      } else if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.sendTimeout ||
-          e.type == DioExceptionType.connectionError ||
-          e.error is SocketException) {
-        _showErrorSnackBar('Unable to connect to server. Please check your internet connection.');
-      } else {
-        _showErrorSnackBar(e.message ?? 'An error occurred while connecting to server.');
-      }
+      final errorMsg = ApiClient.extractErrorMessage(e);
+      _showErrorSnackBar(errorMsg);
     } on FormatException catch (e) {
       if (kDebugMode) {
         debugPrint('[LOGIN] FormatException: $e');

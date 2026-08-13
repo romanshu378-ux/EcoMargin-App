@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../storage/storage_service.dart';
@@ -7,45 +8,168 @@ class ApiClient {
   final Dio _dio;
   final StorageService _storageService;
 
+  String _generateRequestId() {
+    final random = Random();
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    return List.generate(16, (index) => chars[random.nextInt(chars.length)]).join();
+  }
+
   ApiClient(this._storageService) : _dio = Dio() {
     _dio.options.baseUrl = const String.fromEnvironment('API_URL', defaultValue: _defaultBaseUrl);
-    _dio.options.connectTimeout = const Duration(seconds: 30);
-    _dio.options.receiveTimeout = const Duration(seconds: 30);
+    _dio.options.connectTimeout = const Duration(seconds: 45);
+    _dio.options.receiveTimeout = const Duration(seconds: 45);
     _dio.options.sendTimeout = const Duration(seconds: 30);
 
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          options.headers['X-Request-ID'] = _generateRequestId();
           final token = await _storageService.getToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
           options.headers['Content-Type'] = 'application/json';
           if (kDebugMode) {
-            debugPrint('[LOGIN] API URL: ${options.uri}');
-            debugPrint('[LOGIN] Request started');
+            debugPrint('[API] --> ${options.method} ${options.uri}');
           }
           return handler.next(options);
         },
         onResponse: (response, handler) {
           if (kDebugMode) {
-            debugPrint('[LOGIN] Status: ${response.statusCode}');
+            debugPrint('[API] <-- ${response.statusCode} ${response.requestOptions.uri}');
           }
           return handler.next(response);
         },
-        onError: (DioException e, handler) {
+        onError: (DioException e, handler) async {
           if (kDebugMode) {
-            debugPrint('[LOGIN] Error Type: ${e.type}');
-            debugPrint('[LOGIN] Status: ${e.response?.statusCode}');
-            debugPrint('[LOGIN] URL: ${e.requestOptions.uri}');
-            if (e.response?.data != null) {
-              debugPrint('[LOGIN] Response: ${e.response?.data}');
-            }
+            debugPrint('[API] ERR ${e.type.name} ${e.requestOptions.uri}');
           }
+
+          final statusCode = e.response?.statusCode;
+          final isColdStartError = statusCode == 502 ||
+              statusCode == 503 ||
+              statusCode == 504 ||
+              e.type == DioExceptionType.connectionTimeout ||
+              e.type == DioExceptionType.receiveTimeout;
+
+          final retryCount = (e.requestOptions.extra['retry_count'] as int? ?? 0);
+          final isRetryableMethod = e.requestOptions.method == 'GET' ||
+              e.requestOptions.path.contains('/auth/') ||
+              e.requestOptions.path.contains('health');
+
+          if (isColdStartError && isRetryableMethod && retryCount < 3) {
+            final nextRetry = retryCount + 1;
+            final backoffDelay = Duration(seconds: nextRetry * 3);
+            await Future.delayed(backoffDelay);
+            e.requestOptions.extra['retry_count'] = nextRetry;
+            try {
+              final response = await _dio.fetch(e.requestOptions);
+              return handler.resolve(response);
+            } catch (_) {}
+          }
+
           return handler.next(e);
         },
       ),
     );
+  }
+
+  Future<bool> checkHealth({
+    int maxRetries = 5,
+    Duration retryDelay = const Duration(seconds: 3),
+  }) async {
+    const rootHost = 'https://ecomargin-app.onrender.com';
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        final response = await Dio().get(
+          '$rootHost/health',
+          options: Options(
+            headers: {'Cache-Control': 'no-cache'},
+            sendTimeout: const Duration(seconds: 15),
+            receiveTimeout: const Duration(seconds: 15),
+          ),
+        );
+
+        if (response.statusCode == 200) {
+          return true;
+        }
+      } catch (_) {
+        try {
+          final altResp = await _dio.get(
+            'health',
+            options: Options(
+              sendTimeout: const Duration(seconds: 15),
+              receiveTimeout: const Duration(seconds: 15),
+            ),
+          );
+          if (altResp.statusCode == 200) {
+            return true;
+          }
+        } catch (_) {}
+      }
+
+      if (attempt < maxRetries) {
+        await Future.delayed(retryDelay);
+      }
+    }
+    return false;
+  }
+
+  static String extractErrorMessage(
+    dynamic error, {
+    String defaultMsg = 'An error occurred while connecting to server.',
+  }) {
+    if (error is DioException) {
+      if (error.response?.data != null) {
+        final data = error.response?.data;
+        if (data is Map) {
+          if (data['message'] != null && data['message'].toString().trim().isNotEmpty) {
+            return data['message'].toString();
+          }
+          if (data['error'] != null && data['error'].toString().trim().isNotEmpty) {
+            return data['error'].toString();
+          }
+        } else if (data is String && data.trim().isNotEmpty && !data.contains('<html>')) {
+          return data;
+        }
+      }
+
+      final statusCode = error.response?.statusCode;
+      if (statusCode != null) {
+        switch (statusCode) {
+          case 400:
+            return 'Invalid request details provided.';
+          case 401:
+            return 'Invalid email or password.';
+          case 403:
+            return 'Access denied.';
+          case 404:
+            return 'Requested resource not found.';
+          case 409:
+            return 'Email is already registered. Please login.';
+          case 422:
+            return 'Validation error. Please check your inputs.';
+          case 500:
+            return 'Server internal error. Please try again.';
+          case 502:
+          case 503:
+          case 504:
+            return 'Server is currently starting up. Please try again in a moment.';
+          default:
+            return 'Server returned error ($statusCode).';
+        }
+      }
+
+      if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.receiveTimeout ||
+          error.type == DioExceptionType.sendTimeout) {
+        return 'Server connection timed out. Render backend may be waking up.';
+      }
+
+      return error.message ?? defaultMsg;
+    }
+
+    return error?.toString() ?? defaultMsg;
   }
 
   Dio get dio => _dio;
