@@ -22,12 +22,26 @@ public class ApplicationConfig {
     @Bean
     public UserDetailsService userDetailsService() {
         return username -> {
-            String cleanEmail = (username != null) ? username.trim().toLowerCase() : "";
-            return userRepository.findByEmailIgnoreCase(cleanEmail)
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + cleanEmail));
+            if (username == null || username.isBlank()) {
+                throw new UsernameNotFoundException("Empty username provided");
+            }
+            String cleanInput = username.trim();
+            if (cleanInput.contains("@")) {
+                return userRepository.findByEmailIgnoreCase(cleanInput.toLowerCase())
+                        .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + cleanInput));
+            } else {
+                String phoneFormatted = cleanInput;
+                if (!phoneFormatted.startsWith("+") && phoneFormatted.length() == 10 && phoneFormatted.matches("\\d+")) {
+                    phoneFormatted = "+91" + phoneFormatted;
+                }
+                final String searchPhone = phoneFormatted;
+                return userRepository.findByPhoneNumber(searchPhone)
+                        .or(() -> userRepository.findByPhoneNumber(cleanInput))
+                        .or(() -> userRepository.findByEmailIgnoreCase(cleanInput.toLowerCase()))
+                        .orElseThrow(() -> new UsernameNotFoundException("User not found with identifier: " + cleanInput));
+            }
         };
     }
-
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
