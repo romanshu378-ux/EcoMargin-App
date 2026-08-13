@@ -17,25 +17,28 @@ import java.util.Map;
 public class Setting {
 
     @Id
-    @Column(name = "setting_key", nullable = false, length = 100)
+    @Column(name = "\"key\"", nullable = false, length = 100)
     private String key;
 
-    @Column(name = "setting_value", columnDefinition = "TEXT", nullable = false)
+    @Column(name = "\"value\"", columnDefinition = "TEXT", nullable = false)
     private String value;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata")
     private Map<String, Object> metadata;
 
+    @Builder.Default
     @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    private LocalDateTime updatedAt = LocalDateTime.now();
 
     @PrePersist
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        if (updatedAt == null) {
+            updatedAt = LocalDateTime.now();
+        }
     }
 }

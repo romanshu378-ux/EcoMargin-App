@@ -25,24 +25,24 @@ public class AppConfigController {
         return ResponseEntity.ok(configMap);
     }
 
-    @GetMapping("/faqs")
+    @GetMapping(value = "/faqs", produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> getFaqs() {
         Setting faqSetting = settingRepository.findById("faqs").orElse(null);
         String faqsJson = faqSetting != null ? faqSetting.getValue() : "[]";
-        return ResponseEntity.ok(faqsJson);
+        return ResponseEntity.ok().contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(faqsJson);
     }
 
-    @GetMapping("/offers")
+    @GetMapping(value = "/offers", produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> getOffers() {
         Setting offerSetting = settingRepository.findById("offers_banners").orElse(null);
         String offersJson = offerSetting != null ? offerSetting.getValue() : "[]";
-        return ResponseEntity.ok(offersJson);
+        return ResponseEntity.ok().contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(offersJson);
     }
 
-    @GetMapping("/support")
+    @GetMapping(value = "/support", produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> getSupportInfo() {
         Setting supportSetting = settingRepository.findById("support_info").orElse(null);
         String supportJson = supportSetting != null ? supportSetting.getValue() : "{}";
-        return ResponseEntity.ok(supportJson);
+        return ResponseEntity.ok().contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(supportJson);
     }
 }

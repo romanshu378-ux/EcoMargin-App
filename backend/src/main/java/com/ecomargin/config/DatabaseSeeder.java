@@ -46,87 +46,116 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final ConnectorRepository connectorRepository;
     private final VendorRepository vendorRepository;
     private final SettingRepository settingRepository;
-    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @Value("${app.seed.demo-user:false}")
     private boolean seedDemoUser;
 
     @Override
-    public void run(String... args) throws Exception {
+    public void run(String... args) {
         log.info("=== DATABASE CONNECTED ===");
         log.info("=== RUNNING APPLICATION STARTUP DATABASE SEEDER ===");
         
-        // 0. Ensure safe schema migrations for roles_name_check & jwt_version
         try {
-            jdbcTemplate.execute("ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_name_check;");
+            // 1. Seed Roles (Idempotent: checks existing, creates missing, never deletes or drops)
+            seedRoles();
         } catch (Exception e) {
-            log.warn("Schema migration check for roles_name_check: {}", e.getMessage());
+            log.error("Error during roles seeding: {}", e.getMessage(), e);
         }
 
         try {
-            jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS jwt_version INT NOT NULL DEFAULT 0;");
+            // 2. Seed Users conditionally using double-lookup (email & phone_number)
+            if (seedDemoUser) {
+                seedDemoUsers();
+            } else {
+                log.info("Demo user seeding is DISABLED (app.seed.demo-user=false). Preserving existing database users.");
+            }
         } catch (Exception e) {
-            log.warn("Schema migration check for jwt_version: {}", e.getMessage());
-        }
-        
-        // 1. Seed Roles (Idempotent: checks existing, creates missing, never deletes or drops)
-        Role customerRole = seedRole(RoleType.ROLE_CUSTOMER);
-        Role vendorRole = seedRole(RoleType.ROLE_VENDOR);
-        Role adminRole = seedRole(RoleType.ROLE_ADMIN);
-        Role superAdminRole = seedRole(RoleType.ROLE_SUPER_ADMIN);
-
-        // 2. Seed Users conditionally using double-lookup (email & phone_number)
-        if (seedDemoUser) {
-            log.info("Demo user seeding is ENABLED (app.seed.demo-user=true)");
-            User customerUser = seedUser("romanshu@gmail.com", "password123", "Romanshu", "Sharma", "+919876543210", Collections.singleton(customerRole));
-            User vendorUser = seedUser("vendor@ecomargin.com", "vendor123", "Eco", "Vendor", "+918888888888", Collections.singleton(vendorRole));
-            User adminUser = seedUser("operator@ecomargin.com", "admin123", "System", "Admin", "+919999999991", Collections.singleton(adminRole));
-            User superAdminUser = seedUser("admin@ecomargin.com", "admin123", "Super", "Admin", "+919999999999", Collections.singleton(superAdminRole));
-
-            if (customerUser != null) {
-                Wallet wallet = walletRepository.findByUserId(customerUser.getId())
-                        .orElseGet(() -> walletRepository.save(
-                                Wallet.builder().user(customerUser).balance(BigDecimal.ZERO).currency("INR").build()
-                        ));
-
-                String referenceId = "TXN-ROMANSHU-TOPUP-100";
-                if (transactionRepository.findByReferenceId(referenceId).isEmpty()) {
-                    BigDecimal amount = new BigDecimal("100.00");
-                    BigDecimal prevBalance = wallet.getBalance();
-                    BigDecimal newBalance = prevBalance.add(amount);
-
-                    wallet.setBalance(newBalance);
-                    walletRepository.save(wallet);
-
-                    Transaction transaction = Transaction.builder()
-                            .wallet(wallet)
-                            .amount(amount)
-                            .type("CREDIT")
-                            .status("SUCCESS")
-                            .referenceId(referenceId)
-                            .referenceType("TOPUP")
-                            .balanceBefore(prevBalance)
-                            .balanceAfter(newBalance)
-                            .build();
-                    transactionRepository.save(transaction);
-                }
-            }
-
-            if (vendorUser != null) {
-                vendorRepository.findByUser(vendorUser)
-                        .orElseGet(() -> vendorRepository.save(
-                                Vendor.builder()
-                                        .user(vendorUser)
-                                        .businessName("EcoMargin Default Vendor")
-                                        .status("ACTIVE")
-                                        .build()
-                        ));
-            }
-        } else {
-            log.info("Demo user seeding is DISABLED (app.seed.demo-user=false). Preserving existing database users.");
+            log.error("Error during users seeding: {}", e.getMessage(), e);
         }
 
-        // 3. Seed Default Settings
+        try {
+            // 3. Seed Default Settings (Idempotent: checks key, never overwrites or deletes existing settings)
+            seedDefaultSettings();
+        } catch (Exception e) {
+            log.error("Error during settings seeding: {}", e.getMessage(), e);
+        }
+
+        try {
+            // 4. Seed Stations
+            seedDefaultStations();
+        } catch (Exception e) {
+            log.error("Error during stations seeding: {}", e.getMessage(), e);
+        }
+
+        log.info("=== SEEDER COMPLETED ===");
+        log.info("=== SERVER STARTED ===");
+    }
+
+    private void seedRoles() {
+        seedRole(RoleType.ROLE_CUSTOMER);
+        seedRole(RoleType.ROLE_VENDOR);
+        seedRole(RoleType.ROLE_ADMIN);
+        seedRole(RoleType.ROLE_SUPER_ADMIN);
+    }
+
+    private void seedDemoUsers() {
+        log.info("Demo user seeding is ENABLED (app.seed.demo-user=true)");
+        Role customerRole = roleRepository.findByName(RoleType.ROLE_CUSTOMER).orElse(null);
+        Role vendorRole = roleRepository.findByName(RoleType.ROLE_VENDOR).orElse(null);
+        Role adminRole = roleRepository.findByName(RoleType.ROLE_ADMIN).orElse(null);
+        Role superAdminRole = roleRepository.findByName(RoleType.ROLE_SUPER_ADMIN).orElse(null);
+
+        User customerUser = seedUser("romanshu@gmail.com", "password123", "Romanshu", "Sharma", "+919876543210", 
+                customerRole != null ? Collections.singleton(customerRole) : Collections.emptySet());
+        User vendorUser = seedUser("vendor@ecomargin.com", "vendor123", "Eco", "Vendor", "+918888888888", 
+                vendorRole != null ? Collections.singleton(vendorRole) : Collections.emptySet());
+        User adminUser = seedUser("operator@ecomargin.com", "admin123", "System", "Admin", "+919999999991", 
+                adminRole != null ? Collections.singleton(adminRole) : Collections.emptySet());
+        User superAdminUser = seedUser("admin@ecomargin.com", "admin123", "Super", "Admin", "+919999999999", 
+                superAdminRole != null ? Collections.singleton(superAdminRole) : Collections.emptySet());
+
+        if (customerUser != null) {
+            Wallet wallet = walletRepository.findByUserId(customerUser.getId())
+                    .orElseGet(() -> walletRepository.save(
+                            Wallet.builder().user(customerUser).balance(BigDecimal.ZERO).currency("INR").build()
+                    ));
+
+            String referenceId = "TXN-ROMANSHU-TOPUP-100";
+            if (transactionRepository.findByReferenceId(referenceId).isEmpty()) {
+                BigDecimal amount = new BigDecimal("100.00");
+                BigDecimal prevBalance = wallet.getBalance();
+                BigDecimal newBalance = prevBalance.add(amount);
+
+                wallet.setBalance(newBalance);
+                walletRepository.save(wallet);
+
+                Transaction transaction = Transaction.builder()
+                        .wallet(wallet)
+                        .amount(amount)
+                        .type("CREDIT")
+                        .status("SUCCESS")
+                        .referenceId(referenceId)
+                        .referenceType("TOPUP")
+                        .balanceBefore(prevBalance)
+                        .balanceAfter(newBalance)
+                        .build();
+                transactionRepository.save(transaction);
+            }
+        }
+
+        if (vendorUser != null) {
+            vendorRepository.findByUser(vendorUser)
+                    .orElseGet(() -> vendorRepository.save(
+                            Vendor.builder()
+                                    .user(vendorUser)
+                                    .businessName("EcoMargin Default Vendor")
+                                    .status("ACTIVE")
+                                    .build()
+                    ));
+        }
+    }
+
+    private void seedDefaultSettings() {
         seedSetting("min_wallet_balance_to_start", "50.00", "Minimum wallet balance required to initiate charging");
         seedSetting("default_charging_rate_per_kwh", "15.00", "Default per kWh charging price in INR");
         seedSetting("home_sections", "{\"hero_slider\": true, \"quick_actions\": true, \"wallet_card\": true, \"nearby_stations\": true, \"promo_banner\": true, \"search_section\": true}", "Home screen section visibility configuration");
@@ -135,8 +164,9 @@ public class DatabaseSeeder implements CommandLineRunner {
         seedSetting("charging_session_rules", "{\"max_duration_hours\": 12, \"idle_fee_per_min\": 2.0, \"auto_stop_target_pct\": 100}", "Charging session operational parameters");
         seedSetting("faqs", "[{\"q\": \"How do I start an EV charging session?\", \"a\": \"Simply find a nearby charger on the map, select the connector details, set your target battery limit, and tap Start Charging.\"}, {\"q\": \"How does EcoMargin Wallet billing work?\", \"a\": \"Your wallet balance is automatically debited based on the exact kWh energy consumed at the end of every charging session.\"}, {\"q\": \"What connector types are supported?\", \"a\": \"EcoMargin supports DC Fast Chargers (CCS2, GB/T, CHAdeMO) and AC Chargers (Type 2).\"}]", "Customer FAQs list");
         seedSetting("offers_banners", "[{\"code\": \"ECOGREEN20\", \"title\": \"20% Cashback on First Charging Session\", \"desc\": \"Get up to ₹100 cashback credited into your EcoMargin Wallet.\", \"expiry\": \"Valid till 31 Aug 2026\"}, {\"code\": \"FASTCHARGE50\", \"title\": \"Flat ₹50 OFF on DC Fast Chargers\", \"desc\": \"Applicable on session power > 50 kW.\", \"expiry\": \"Valid till 15 Aug 2026\"}]", "Active promotional offers & coupons");
+    }
 
-        // 4. Seed Stations
+    private void seedDefaultStations() {
         Vendor defaultVendor = vendorRepository.findAll().stream().findFirst().orElse(null);
         if (defaultVendor != null) {
             Station alwarStation = seedStation(
@@ -171,9 +201,6 @@ public class DatabaseSeeder implements CommandLineRunner {
             seedConnector(austinCharger, 1, "CCS2", BigDecimal.valueOf(180.00));
             seedConnector(austinCharger, 2, "CCS2", BigDecimal.valueOf(180.00));
         }
-
-        log.info("=== SEEDER COMPLETED ===");
-        log.info("=== SERVER STARTED ===");
     }
 
     private User seedUser(String email, String rawPassword, String firstName, String lastName, String phoneNumber, Set<Role> roles) {
@@ -231,12 +258,26 @@ public class DatabaseSeeder implements CommandLineRunner {
     }
 
     private void seedSetting(String key, String val, String desc) {
-        if (settingRepository.findById(key).isEmpty()) {
-            settingRepository.save(Setting.builder()
-                    .key(key)
-                    .value(val)
-                    .description(desc)
-                    .build());
+        if (key == null || key.isBlank()) {
+            log.warn("Skipping seedSetting with null or blank key");
+            return;
+        }
+        try {
+            Optional<Setting> existing = settingRepository.findById(key);
+            if (existing.isEmpty()) {
+                Setting setting = Setting.builder()
+                        .key(key)
+                        .value(val)
+                        .description(desc)
+                        .updatedAt(java.time.LocalDateTime.now())
+                        .build();
+                settingRepository.save(setting);
+                log.info("Seeded default setting: key='{}'", key);
+            } else {
+                log.debug("Setting key='{}' already exists. Preserving existing value.", key);
+            }
+        } catch (Exception e) {
+            log.error("Failed to seed setting key='{}': {}", key, e.getMessage(), e);
         }
     }
 
