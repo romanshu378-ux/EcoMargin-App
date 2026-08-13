@@ -133,21 +133,32 @@ public class AuthService {
         }
 
         final String email = request.getEmail().trim().toLowerCase();
+        log.info("[AUTH] Processing authentication attempt for email: {}", email);
 
         Optional<User> userOpt = userRepository.findByEmailIgnoreCase(email);
         if (userOpt.isEmpty()) {
-            log.warn("[AUTH] Password authentication failed");
+            log.warn("[AUTH] Login failed: User account not found for email: {}", email);
             throw new BadCredentialsException("Invalid email or password");
         }
 
         User user = userOpt.get();
+
+        if (user.getDeletedAt() != null) {
+            log.warn("[AUTH] Login failed: Account is deactivated/deleted for email: {}", email);
+            throw new BadCredentialsException("Account has been deactivated.");
+        }
+
+        if (!user.isAccountNonLocked()) {
+            log.warn("[AUTH] Login failed: Account is locked for email: {}", email);
+            throw new BadCredentialsException("Account is locked. Please contact support.");
+        }
 
         if (user.getPassword() != null &&
             !user.getPassword().startsWith("$2a$") &&
             !user.getPassword().startsWith("$2b$") &&
             !user.getPassword().startsWith("$2y$")) {
             if (request.getPassword().equals(user.getPassword())) {
-                log.info("[AUTH] Migrating legacy plain-text password to BCrypt hash");
+                log.info("[AUTH] Migrating legacy plain-text password to BCrypt hash for email: {}", email);
                 user.setPassword(passwordEncoder.encode(request.getPassword()));
                 userRepository.save(user);
             }
@@ -157,13 +168,20 @@ public class AuthService {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(email, request.getPassword())
             );
+        } catch (BadCredentialsException e) {
+            log.warn("[AUTH] Login failed: Incorrect password for email: {}", email);
+            throw new BadCredentialsException("Invalid email or password");
         } catch (AuthenticationException e) {
-            log.warn("[AUTH] Password authentication failed");
+            log.warn("[AUTH] Login failed: Spring Security authentication exception ({}) for email: {}", e.getMessage(), email);
             throw new BadCredentialsException("Invalid email or password");
         }
 
+        log.info("[AUTH] Password verification successful for email: {}", email);
+
         String jwtToken = jwtUtil.generateToken(user);
         RefreshToken refreshToken = createRefreshToken(user);
+
+        log.info("[AUTH] Login successful. Access & refresh tokens generated for user ID: {}, email: {}", user.getId(), email);
 
         return AuthResponse.builder()
                 .accessToken(jwtToken)

@@ -64,6 +64,7 @@ class AuthServiceTest {
                 .email("customer@ecomargin.com")
                 .password("$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG")
                 .isVerified(true)
+                .isAccountNonLocked(true)
                 .build();
     }
 

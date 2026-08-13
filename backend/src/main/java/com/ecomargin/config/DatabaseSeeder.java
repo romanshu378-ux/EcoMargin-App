@@ -49,47 +49,14 @@ public class DatabaseSeeder implements CommandLineRunner {
     public void run(String... args) throws Exception {
         log.info("=== RUNNING APPLICATION STARTUP DATABASE SEEDER ===");
         
-        // 0. Ensure safe schema migration for roles_name_check constraint & jwt_version
-        try {
-            java.util.List<String> constraints = jdbcTemplate.queryForList(
-                "SELECT constraint_name FROM information_schema.table_constraints WHERE LOWER(table_name) = 'roles' AND UPPER(constraint_type) = 'CHECK'",
-                String.class
-            );
-            for (String constraint : constraints) {
-                if (constraint != null) {
-                    log.info("Dropping check constraint on roles table: {}", constraint);
-                    try {
-                        jdbcTemplate.execute("ALTER TABLE roles DROP CONSTRAINT IF EXISTS " + constraint + ";");
-                    } catch (Exception ex) {
-                        log.warn("Could not drop constraint {}: {}", constraint, ex.getMessage());
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Schema migration check for information_schema table_constraints: {}", e.getMessage());
-        }
-
-        try {
-            jdbcTemplate.execute("ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_name_check;");
-            jdbcTemplate.execute("ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_name_check1;");
-            jdbcTemplate.execute("ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_name_check2;");
-        } catch (Exception e) {
-            log.warn("Schema migration check for explicit roles constraint drop: {}", e.getMessage());
-        }
-
-        try {
-            jdbcTemplate.execute("ALTER TABLE roles ADD CONSTRAINT roles_name_check CHECK (name IN ('ROLE_CUSTOMER', 'ROLE_VENDOR', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN'));");
-        } catch (Exception e) {
-            log.warn("Schema migration check for roles_name_check add: {}", e.getMessage());
-        }
-
+        // 0. Ensure safe schema column migration for jwt_version if missing
         try {
             jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS jwt_version INT NOT NULL DEFAULT 0;");
         } catch (Exception e) {
             log.warn("Schema migration check for jwt_version: {}", e.getMessage());
         }
         
-        // 1. Seed Roles
+        // 1. Seed Roles (Idempotent: checks existing, creates missing, never deletes or drops)
         Role customerRole = seedRole(RoleType.ROLE_CUSTOMER);
         Role vendorRole = seedRole(RoleType.ROLE_VENDOR);
         Role adminRole = seedRole(RoleType.ROLE_ADMIN);

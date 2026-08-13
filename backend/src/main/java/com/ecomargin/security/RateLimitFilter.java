@@ -25,9 +25,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
 
-    private static final int DEFAULT_LIMIT = 60; 
-    private static final int SENSITIVE_AUTH_LIMIT = 5;
-    private static final int SENSITIVE_ACTION_LIMIT = 10;
+    private static final int DEFAULT_LIMIT = 120; 
+    private static final int SENSITIVE_AUTH_LIMIT = 30;
+    private static final int SENSITIVE_ACTION_LIMIT = 30;
     
     // Fallback in-memory store
     private final ConcurrentHashMap<String, RequestCounter> inMemoryCache = new ConcurrentHashMap<>();
@@ -47,7 +47,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        String clientIp = request.getRemoteAddr();
+        String clientIp = request.getHeader("X-Forwarded-For");
+        if (clientIp != null && !clientIp.isBlank()) {
+            clientIp = clientIp.split(",")[0].trim();
+        } else {
+            clientIp = request.getHeader("CF-Connecting-IP");
+            if (clientIp == null || clientIp.isBlank()) {
+                clientIp = request.getRemoteAddr();
+            }
+        }
         String path = request.getRequestURI();
         String method = request.getMethod();
         

@@ -47,7 +47,11 @@ class ApiClient {
             }
             debugPrint('[API] Headers: $loggedHeaders');
             if (options.data != null) {
-              debugPrint('[API] Body: ${options.data}');
+              if (options.path.contains('/auth/')) {
+                debugPrint('[API] Body: [AUTH DATA HIDDEN]');
+              } else {
+                debugPrint('[API] Body: ${options.data}');
+              }
             }
           }
           return handler.next(options);

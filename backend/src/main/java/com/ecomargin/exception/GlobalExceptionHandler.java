@@ -74,7 +74,8 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<Map<String, Object>> handleAuthenticationExceptions(Exception ex, HttpServletRequest request) {
         log.warn("[AUTH] Authentication failed: {}", ex.getMessage());
-        return new ResponseEntity<>(buildErrorResponse(request, "UNAUTHORIZED", "Invalid email or password", null), HttpStatus.UNAUTHORIZED);
+        String msg = (ex.getMessage() != null && !ex.getMessage().isBlank()) ? ex.getMessage() : "Invalid email or password";
+        return new ResponseEntity<>(buildErrorResponse(request, "UNAUTHORIZED", msg, null), HttpStatus.UNAUTHORIZED);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

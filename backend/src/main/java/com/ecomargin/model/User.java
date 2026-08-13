@@ -60,7 +60,10 @@ public class User implements UserDetails {
     @EqualsAndHashCode.Exclude
     private byte[] profileImage;
 
-    private boolean isVerified = false;
+    @Builder.Default
+    private boolean isVerified = true;
+
+    @Builder.Default
     private boolean isAccountNonLocked = true;
 
     @ManyToMany(fetch = FetchType.EAGER)
@@ -130,6 +133,6 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return isVerified;
+        return deletedAt == null;
     }
 }
