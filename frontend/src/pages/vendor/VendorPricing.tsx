@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { DollarSign, Percent, Clock, Check } from 'lucide-react';
+import { IndianRupee, Percent, Clock, Check } from 'lucide-react';
 import { useNotificationStore } from '../../store/notificationStore';
 
 export default function VendorPricing() {
   const addNotification = useNotificationStore(state => state.addNotification);
   const [pricing, setPricing] = useState({
-    baseRate: 0.35,
-    idleFee: 0.15,
-    peakRate: 0.45
+    baseRate: 15.00,
+    idleFee: 2.00,
+    peakRate: 18.00
   });
 
   const savePricing = (e: React.FormEvent) => {
@@ -28,23 +28,23 @@ export default function VendorPricing() {
           
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div className="space-y-2">
-              <label className="font-semibold text-gray-500">Standard rate (per kWh)</label>
+              <label className="font-semibold text-gray-500">Standard rate (₹ per kWh)</label>
               <div className="relative">
                 <input 
-                  type="number" step="0.01" 
+                  type="number" step="0.5" 
                   value={pricing.baseRate}
                   onChange={(e) => setPricing(prev => ({ ...prev, baseRate: parseFloat(e.target.value) }))}
                   className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 pl-8 pr-4 py-2.5 rounded-xl outline-none" 
                 />
-                <DollarSign size={14} className="absolute left-3 top-3.5 text-gray-400" />
+                <IndianRupee size={14} className="absolute left-3 top-3.5 text-gray-400" />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="font-semibold text-gray-500">Idle Fee (per minute)</label>
+              <label className="font-semibold text-gray-500">Idle Fee (₹ per minute)</label>
               <div className="relative">
                 <input 
-                  type="number" step="0.01" 
+                  type="number" step="0.5" 
                   value={pricing.idleFee}
                   onChange={(e) => setPricing(prev => ({ ...prev, idleFee: parseFloat(e.target.value) }))}
                   className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 pl-8 pr-4 py-2.5 rounded-xl outline-none" 
@@ -54,10 +54,10 @@ export default function VendorPricing() {
             </div>
 
             <div className="space-y-2">
-              <label className="font-semibold text-gray-500">Peak Tariffs (per kWh)</label>
+              <label className="font-semibold text-gray-500">Peak Tariffs (₹ per kWh)</label>
               <div className="relative">
                 <input 
-                  type="number" step="0.01" 
+                  type="number" step="0.5" 
                   value={pricing.peakRate}
                   onChange={(e) => setPricing(prev => ({ ...prev, peakRate: parseFloat(e.target.value) }))}
                   className="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 pl-8 pr-4 py-2.5 rounded-xl outline-none" 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, Download, TrendingUp, Zap, DollarSign } from 'lucide-react';
+import { BarChart3, Download, TrendingUp, Zap, IndianRupee } from 'lucide-react';
 
 export const ReportsPage: React.FC = () => {
   return (
@@ -17,7 +17,7 @@ export const ReportsPage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
           <h3 className="font-semibold text-white text-sm mb-2">Monthly Revenue</h3>
-          <p className="text-3xl font-bold text-emerald-400">$48,290.00</p>
+          <p className="text-3xl font-bold text-emerald-400">₹48,29,000.00</p>
           <p className="text-xs text-slate-400 mt-1">+18.4% vs last month</p>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">

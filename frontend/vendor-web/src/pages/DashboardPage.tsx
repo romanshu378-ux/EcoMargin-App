@@ -1,12 +1,12 @@
 import React from 'react';
-import { Zap, DollarSign, MapPin, Activity, ArrowUpRight, Wallet } from 'lucide-react';
+import { Zap, IndianRupee, MapPin, Activity, ArrowUpRight, Wallet } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
   const stats = [
-    { label: "Today's Revenue", value: '$1,480.50', change: '+12.5%', icon: DollarSign },
+    { label: "Today's Revenue", value: '₹1,48,050.00', change: '+12.5%', icon: IndianRupee },
     { label: 'Active Chargers', value: '42 / 48 Online', change: '87.5% Uptime', icon: Zap },
     { label: 'Charging Stations', value: '14 Active', change: '3 Hub Locations', icon: MapPin },
-    { label: 'Vendor Wallet', value: '$18,450.00', change: 'Available for Payout', icon: Wallet },
+    { label: 'Vendor Wallet', value: '₹18,45,000.00', change: 'Available for Payout', icon: Wallet },
   ];
 
   return (

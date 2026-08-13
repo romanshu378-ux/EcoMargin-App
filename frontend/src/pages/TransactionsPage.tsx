@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { DollarSign, Wallet, ArrowUpRight, ArrowDownRight, CreditCard } from 'lucide-react';
+import { IndianRupee, Wallet, ArrowUpRight, ArrowDownRight, CreditCard } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -12,10 +12,10 @@ interface Transaction {
 
 export default function TransactionsPage() {
   const [txs] = useState<Transaction[]>([
-    { id: 'TXN102948', user: 'Jane Driver', amount: 24.50, type: 'DEBIT', status: 'SUCCESS', date: '2026-08-07 09:12' },
-    { id: 'TXN102949', user: 'Jane Driver', amount: 50.00, type: 'CREDIT', status: 'SUCCESS', date: '2026-08-07 08:30' },
-    { id: 'TXN102950', user: 'Jane Driver', amount: 15.20, type: 'DEBIT', status: 'SUCCESS', date: '2026-08-06 18:45' },
-    { id: 'TXN102951', user: 'Bob Driver', amount: 8.90, type: 'DEBIT', status: 'FAILED', date: '2026-08-06 11:20' },
+    { id: 'TXN102948', user: 'Jane Driver', amount: 850.00, type: 'DEBIT', status: 'SUCCESS', date: '2026-08-07 09:12' },
+    { id: 'TXN102949', user: 'Jane Driver', amount: 5000.00, type: 'CREDIT', status: 'SUCCESS', date: '2026-08-07 08:30' },
+    { id: 'TXN102950', user: 'Jane Driver', amount: 520.00, type: 'DEBIT', status: 'SUCCESS', date: '2026-08-06 18:45' },
+    { id: 'TXN102951', user: 'Bob Driver', amount: 300.00, type: 'DEBIT', status: 'FAILED', date: '2026-08-06 11:20' },
   ]);
 
   return (
@@ -26,17 +26,17 @@ export default function TransactionsPage() {
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 flex justify-between items-center shadow-sm">
           <div>
             <span className="text-xs font-semibold text-gray-400">Total Net Income</span>
-            <p className="text-2xl font-bold mt-1">$4,821.50</p>
+            <p className="text-2xl font-bold mt-1">₹4,82,150.00</p>
           </div>
           <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-xl">
-            <DollarSign size={20} />
+            <IndianRupee size={20} />
           </div>
         </div>
 
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 flex justify-between items-center shadow-sm">
           <div>
             <span className="text-xs font-semibold text-gray-400">Total Wallet Deposits</span>
-            <p className="text-2xl font-bold mt-1">$10,480.00</p>
+            <p className="text-2xl font-bold mt-1">₹10,48,000.00</p>
           </div>
           <div className="p-3 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl">
             <Wallet size={20} />
@@ -76,7 +76,7 @@ export default function TransactionsPage() {
                   <td className="py-4 font-semibold text-gray-700 dark:text-gray-300">{t.id}</td>
                   <td className="py-4 font-semibold">{t.user}</td>
                   <td className={`py-4 font-bold ${t.type === 'CREDIT' ? 'text-emerald-500' : ''}`}>
-                    {t.type === 'CREDIT' ? '+' : '-'}${t.amount.toFixed(2)}
+                    {t.type === 'CREDIT' ? '+' : '-'}₹{t.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="py-4">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${

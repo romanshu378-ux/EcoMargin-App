@@ -1,10 +1,10 @@
 import React from 'react';
-import { Receipt, DollarSign } from 'lucide-react';
+import { Receipt, IndianRupee } from 'lucide-react';
 
 export const TransactionsPage: React.FC = () => {
   const txs = [
-    { id: 'TX-V901', session: 'SESS-9081', kwh: '42.5 kWh', gross: '$18.70', commission: '-$1.87', net: '$16.83', date: '2026-03-07 10:14' },
-    { id: 'TX-V902', session: 'SESS-9079', kwh: '18.4 kWh', gross: '$8.10', commission: '-$0.81', net: '$7.29', date: '2026-03-07 11:02' },
+    { id: 'TX-V901', session: 'SESS-9081', kwh: '42.5 kWh', gross: '₹637.50', commission: '-₹63.75', net: '₹573.75', date: '2026-03-07 10:14' },
+    { id: 'TX-V902', session: 'SESS-9079', kwh: '18.4 kWh', gross: '₹276.00', commission: '-₹27.60', net: '₹248.40', date: '2026-03-07 11:02' },
   ];
 
   return (

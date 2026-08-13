@@ -3,9 +3,9 @@ import { ShoppingBag, Clock, CheckCircle2, Zap } from 'lucide-react';
 
 export const OrdersPage: React.FC = () => {
   const orders = [
-    { id: 'ORD-8801', user: 'Alex Rivers', station: 'Downtown Hub Fast Charge', duration: '45 mins', kwh: '42.5 kWh', total: '$18.70', status: 'COMPLETED', time: '2026-03-07 10:14' },
-    { id: 'ORD-8802', user: 'Sarah Jenkins', station: 'Metro Airport Hub', duration: '58 mins', kwh: '68.1 kWh', total: '$29.96', status: 'COMPLETED', time: '2026-03-07 09:30' },
-    { id: 'ORD-8803', user: 'David Kim', station: 'Silicon Valley Tech Park', duration: '22 mins', kwh: '18.4 kWh', total: '$8.10', status: 'IN_PROGRESS', time: '2026-03-07 11:02' },
+    { id: 'ORD-8801', user: 'Alex Rivers', station: 'Downtown Hub Fast Charge', duration: '45 mins', kwh: '42.5 kWh', total: '₹637.50', status: 'COMPLETED', time: '2026-03-07 10:14' },
+    { id: 'ORD-8802', user: 'Sarah Jenkins', station: 'Metro Airport Hub', duration: '58 mins', kwh: '68.1 kWh', total: '₹1,021.50', status: 'COMPLETED', time: '2026-03-07 09:30' },
+    { id: 'ORD-8803', user: 'David Kim', station: 'Silicon Valley Tech Park', duration: '22 mins', kwh: '18.4 kWh', total: '₹276.00', status: 'IN_PROGRESS', time: '2026-03-07 11:02' },
   ];
 
   return (

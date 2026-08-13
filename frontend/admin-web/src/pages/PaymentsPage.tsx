@@ -1,11 +1,11 @@
 import React from 'react';
-import { CreditCard, DollarSign, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { CreditCard, IndianRupee, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 
 export const PaymentsPage: React.FC = () => {
   const txs = [
-    { id: 'TX-901', type: 'WALLET_TOPUP', user: 'Alex Rivers', amount: '+$50.00', gateway: 'Stripe', status: 'SUCCESS', date: '2026-03-07 09:12' },
-    { id: 'TX-902', type: 'CHARGING_DEBIT', user: 'Alex Rivers', amount: '-$18.70', gateway: 'Internal Wallet', status: 'SUCCESS', date: '2026-03-07 10:14' },
-    { id: 'TX-903', type: 'CPO_PAYOUT', user: 'ChargeTech Global', amount: '-$4,500.00', gateway: 'Bank Wire', status: 'PROCESSING', date: '2026-03-06 16:00' },
+    { id: 'TX-901', type: 'WALLET_TOPUP', user: 'Alex Rivers', amount: '+₹5,000.00', gateway: 'Razorpay', status: 'SUCCESS', date: '2026-03-07 09:12' },
+    { id: 'TX-902', type: 'CHARGING_DEBIT', user: 'Alex Rivers', amount: '-₹637.50', gateway: 'Internal Wallet', status: 'SUCCESS', date: '2026-03-07 10:14' },
+    { id: 'TX-903', type: 'CPO_PAYOUT', user: 'ChargeTech Global', amount: '-₹4,50,000.00', gateway: 'Bank Wire', status: 'PROCESSING', date: '2026-03-06 16:00' },
   ];
 
   return (

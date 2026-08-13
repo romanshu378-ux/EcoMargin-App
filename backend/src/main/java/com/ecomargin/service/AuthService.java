@@ -110,7 +110,7 @@ public class AuthService {
             Wallet wallet = Wallet.builder()
                     .user(savedUser)
                     .balance(new BigDecimal("100.00"))
-                    .currency("USD")
+                    .currency("INR")
                     .build();
             walletRepository.save(wallet);
         } catch (Exception e) {

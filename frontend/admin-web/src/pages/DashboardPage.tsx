@@ -1,9 +1,9 @@
 import React from 'react';
-import { Users, Building2, MapPin, Zap, DollarSign, Activity, TrendingUp } from 'lucide-react';
+import { Users, Building2, MapPin, Zap, IndianRupee, Activity, TrendingUp } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
   const stats = [
-    { label: 'Total Platform Revenue', value: '$128,450.00', change: '+14.2%', icon: DollarSign, color: 'emerald' },
+    { label: 'Total Platform Revenue', value: '₹12,48,520.00', change: '+14.2%', icon: IndianRupee, color: 'emerald' },
     { label: 'Active Drivers', value: '4,892', change: '+8.1%', icon: Users, color: 'blue' },
     { label: 'CPO Vendors', value: '38', change: '+3', icon: Building2, color: 'purple' },
     { label: 'Charging Stations', value: '142', change: '+12', icon: MapPin, color: 'amber' },
@@ -68,10 +68,10 @@ export const DashboardPage: React.FC = () => {
           <h3 className="font-semibold text-white mb-4">Recent Charging Sessions</h3>
           <div className="space-y-3">
             {[
-              { id: 'SESS-9081', user: 'Alex Rivers', station: 'EcoCharge Downtown Hub', kwh: '42.5 kWh', cost: '$18.70', status: 'Charging' },
-              { id: 'SESS-9080', user: 'Sarah Jenkins', station: 'Metro Express Charging', kwh: '68.1 kWh', cost: '$29.96', status: 'Completed' },
-              { id: 'SESS-9079', user: 'David Kim', station: 'GreenPark Station B2', kwh: '18.4 kWh', cost: '$8.10', status: 'Charging' },
-              { id: 'SESS-9078', user: 'Emily Vance', station: 'Airport Fast Charger #4', kwh: '55.0 kWh', cost: '$24.20', status: 'Completed' },
+              { id: 'SESS-9081', user: 'Alex Rivers', station: 'EcoCharge Downtown Hub', kwh: '42.5 kWh', cost: '₹637.50', status: 'Charging' },
+              { id: 'SESS-9080', user: 'Sarah Jenkins', station: 'Metro Express Charging', kwh: '68.1 kWh', cost: '₹1,021.50', status: 'Completed' },
+              { id: 'SESS-9079', user: 'David Kim', station: 'GreenPark Station B2', kwh: '18.4 kWh', cost: '₹276.00', status: 'Charging' },
+              { id: 'SESS-9078', user: 'Emily Vance', station: 'Airport Fast Charger #4', kwh: '55.0 kWh', cost: '₹825.00', status: 'Completed' },
             ].map((sess) => (
               <div key={sess.id} className="flex items-center justify-between p-3.5 bg-slate-950/60 rounded-xl border border-slate-800/80 text-xs">
                 <div>

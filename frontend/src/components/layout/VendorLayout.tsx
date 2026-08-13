@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { 
-  LayoutDashboard, BatteryCharging, DollarSign, ShieldAlert,
+  LayoutDashboard, BatteryCharging, IndianRupee, ShieldAlert,
   LifeBuoy, Settings, Bell, Sun, Moon, Menu, X 
 } from 'lucide-react';
 import { useThemeStore } from '../../store/themeStore';
@@ -10,7 +10,7 @@ import { useNotificationStore } from '../../store/notificationStore';
 const vendorNavItems = [
   { path: '/vendor', label: 'CPO Dashboard', icon: LayoutDashboard },
   { path: '/vendor/chargers', label: 'My Chargers', icon: BatteryCharging },
-  { path: '/vendor/pricing', label: 'Pricing Models', icon: DollarSign },
+  { path: '/vendor/pricing', label: 'Pricing Models', icon: IndianRupee },
   { path: '/vendor/diagnostics', label: 'Diagnostics & Firmware', icon: ShieldAlert },
   { path: '/vendor/support', label: 'Support Tickets', icon: LifeBuoy },
 ];

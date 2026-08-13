@@ -1,16 +1,16 @@
 import React from 'react';
-import { DollarSign, Zap, Clock, Radio, ArrowUpRight, ArrowDownRight, RefreshCcw } from 'lucide-react';
+import { IndianRupee, Zap, Clock, Radio, ArrowUpRight, ArrowDownRight, RefreshCcw } from 'lucide-react';
 
 const stats = [
-  { label: 'Today Revenue', value: '$840.00', change: '+8.1%', trend: 'up', icon: DollarSign },
+  { label: 'Today Revenue', value: '₹84,000.00', change: '+8.1%', trend: 'up', icon: IndianRupee },
   { label: 'Energy Transferred', value: '1.2 MWh', change: '+12.4%', trend: 'up', icon: Zap },
   { label: 'Avg Session Duration', value: '45 mins', change: '-4.2%', trend: 'down', icon: Clock },
   { label: 'Online Chargers', value: '3 / 3 Active', change: '100%', trend: 'up', icon: Radio },
 ];
 
 const mockSessions = [
-  { id: 'SESS-203', charger: 'TX_AUS_DWTN_01', connector: 'CCS2 (1)', user: 'Jane Driver', energy: '24.2 kWh', cost: '$8.47', status: 'Charging' },
-  { id: 'SESS-202', charger: 'TX_AUS_DWTN_02', connector: 'CCS2 (1)', user: 'John Driver', energy: '48.9 kWh', cost: '$17.11', status: 'Completed' },
+  { id: 'SESS-203', charger: 'TX_AUS_DWTN_01', connector: 'CCS2 (1)', user: 'Jane Driver', energy: '24.2 kWh', cost: '₹363.00', status: 'Charging' },
+  { id: 'SESS-202', charger: 'TX_AUS_DWTN_02', connector: 'CCS2 (1)', user: 'John Driver', energy: '48.9 kWh', cost: '₹733.50', status: 'Completed' },
 ];
 
 export default function VendorDashboard() {

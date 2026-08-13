@@ -1,11 +1,11 @@
 import React from 'react';
 import { 
-  DollarSign, Activity, Battery, Radio, ArrowUpRight, ArrowDownRight, 
+  IndianRupee, Activity, Battery, Radio, ArrowUpRight, ArrowDownRight, 
   MapPin, CheckCircle, AlertTriangle 
 } from 'lucide-react';
 
 const stats = [
-  { label: 'Weekly Revenue', value: '$12,482.00', change: '+14.2%', trend: 'up', icon: DollarSign },
+  { label: 'Weekly Revenue', value: '₹12,48,520.00', change: '+14.2%', trend: 'up', icon: IndianRupee },
   { label: 'Active Sessions', value: '42 Charging', change: '+8.3%', trend: 'up', icon: Activity },
   { label: 'Network Power', value: '380.5 kW', change: '-2.1%', trend: 'down', icon: Battery },
   { label: 'Active Chargers', value: '18 / 20 Online', change: '90%', trend: 'up', icon: Radio },
