@@ -49,7 +49,13 @@ public class DatabaseSeeder implements CommandLineRunner {
     public void run(String... args) throws Exception {
         log.info("=== RUNNING APPLICATION STARTUP DATABASE SEEDER ===");
         
-        // 0. Ensure safe schema column migration for jwt_version if missing
+        // 0. Ensure safe schema migrations for roles_name_check & jwt_version
+        try {
+            jdbcTemplate.execute("ALTER TABLE roles DROP CONSTRAINT IF EXISTS roles_name_check;");
+        } catch (Exception e) {
+            log.warn("Schema migration check for roles_name_check: {}", e.getMessage());
+        }
+
         try {
             jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS jwt_version INT NOT NULL DEFAULT 0;");
         } catch (Exception e) {
