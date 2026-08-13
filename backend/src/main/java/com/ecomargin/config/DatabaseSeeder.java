@@ -40,10 +40,18 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final ChargerRepository chargerRepository;
     private final ConnectorRepository connectorRepository;
     private final VendorRepository vendorRepository;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @Override
     public void run(String... args) throws Exception {
         log.info("=== RUNNING APPLICATION STARTUP DATABASE SEEDER ===");
+        
+        // 0. Ensure safe schema migration for jwt_version
+        try {
+            jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS jwt_version INT NOT NULL DEFAULT 0;");
+        } catch (Exception e) {
+            log.warn("Schema migration check for jwt_version: {}", e.getMessage());
+        }
         
         // 1. Seed Customer Role
         Role customerRole = roleRepository.findByName(RoleType.ROLE_CUSTOMER)
