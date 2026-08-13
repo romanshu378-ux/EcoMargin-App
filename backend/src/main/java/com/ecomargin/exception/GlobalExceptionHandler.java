@@ -97,17 +97,48 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(body, HttpStatus.FORBIDDEN);
     }
 
-    @ExceptionHandler({org.springframework.dao.DataAccessException.class, java.sql.SQLException.class})
-    public ResponseEntity<Map<String, Object>> handleDatabaseExceptions(Exception ex) {
-        log.error("[AUTH ERROR] Database connection failure: {}", ex.getMessage());
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolationException(org.springframework.dao.DataIntegrityViolationException ex) {
+        log.warn("[DATABASE] Data integrity violation: {}", ex.getMessage());
 
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", LocalDateTime.now());
-        body.put("status", HttpStatus.SERVICE_UNAVAILABLE.value());
-        body.put("error", "Service Unavailable");
-        body.put("message", "Database service is temporarily unavailable. Please try again.");
+        body.put("status", HttpStatus.CONFLICT.value());
+        body.put("error", "Conflict");
+        body.put("message", "The provided information (phone number or email) conflicts with an existing account.");
 
-        return new ResponseEntity<>(body, HttpStatus.SERVICE_UNAVAILABLE);
+        return new ResponseEntity<>(body, HttpStatus.CONFLICT);
+    }
+
+    @ExceptionHandler({org.springframework.dao.DataAccessException.class, java.sql.SQLException.class})
+    public ResponseEntity<Map<String, Object>> handleDatabaseExceptions(Exception ex) {
+        log.error("[DATABASE ERROR] Database failure: ", ex);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+
+        boolean isConnectionIssue = false;
+        String msg = ex.getMessage() != null ? ex.getMessage() : "";
+        if (ex instanceof org.springframework.dao.DataAccessResourceFailureException 
+                || ex instanceof org.springframework.transaction.CannotCreateTransactionException
+                || msg.contains("Connection refused")
+                || msg.contains("connection timeout")
+                || msg.contains("Connection timed out")
+                || msg.contains("Cannot get JDBC Connection")) {
+            isConnectionIssue = true;
+        }
+
+        if (isConnectionIssue) {
+            body.put("status", HttpStatus.SERVICE_UNAVAILABLE.value());
+            body.put("error", "Service Unavailable");
+            body.put("message", "Database service is temporarily unavailable. Please try again.");
+            return new ResponseEntity<>(body, HttpStatus.SERVICE_UNAVAILABLE);
+        } else {
+            body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+            body.put("error", "Internal Server Error");
+            body.put("message", "Database error: " + ex.getMessage());
+            return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     @ExceptionHandler(Exception.class)

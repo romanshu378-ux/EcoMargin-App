@@ -49,7 +49,11 @@ public class User implements UserDetails {
     private String profileImageUrl;
 
     @Lob
+    @Basic(fetch = FetchType.LAZY)
     @Column(name = "profile_image", columnDefinition = "bytea")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private byte[] profileImage;
 
     private boolean isVerified = false;

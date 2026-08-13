@@ -60,7 +60,15 @@ public class ProfileController {
 
         // Phone/Mobile Number
         if (body.containsKey("phoneNumber")) {
-            user.setPhoneNumber((String) body.get("phoneNumber"));
+            String newPhone = (String) body.get("phoneNumber");
+            if (newPhone != null && !newPhone.isBlank() && !newPhone.equals(user.getPhoneNumber())) {
+                Optional<User> existingUser = userRepository.findByPhoneNumber(newPhone.trim());
+                if (existingUser.isPresent() && !existingUser.get().getId().equals(user.getId())) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT)
+                            .body(Map.of("message", "Phone number is already registered to another account."));
+                }
+                user.setPhoneNumber(newPhone.trim());
+            }
         }
 
         // Date of Birth
@@ -115,12 +123,12 @@ public class ProfileController {
 
     @GetMapping("/photo/{userId}")
     public ResponseEntity<byte[]> getPhoto(@PathVariable Long userId) {
-        Optional<User> userOpt = userRepository.findById(userId);
-        if (userOpt.isEmpty() || userOpt.get().getProfileImage() == null || userOpt.get().getProfileImage().length == 0) {
+        Optional<byte[]> imageOpt = userRepository.findProfileImageByUserId(userId);
+        if (imageOpt.isEmpty() || imageOpt.get() == null || imageOpt.get().length == 0) {
             return ResponseEntity.notFound().build();
         }
         
-        byte[] imageBytes = userOpt.get().getProfileImage();
+        byte[] imageBytes = imageOpt.get();
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_JPEG)
                 .body(imageBytes);
