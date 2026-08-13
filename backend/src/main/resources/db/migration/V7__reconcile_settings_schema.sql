@@ -1,67 +1,130 @@
 -- PostgreSQL Migration: V7__reconcile_settings_schema.sql
 -- Safely reconcile settings table to use 'setting_key' as the canonical primary key column.
--- Non-destructive, idempotent, and safe for production Render environment.
+-- Target / Defensive / Non-destructive / Deterministic / Production-ready.
 
 DO $$
+DECLARE
+    v_dup_count INT := 0;
+    v_null_count INT := 0;
+    v_fk_count INT := 0;
+    v_pk_constraint_name TEXT;
 BEGIN
     ----------------------------------------------------------------------------
-    -- 1. Ensure 'setting_key' column exists
+    -- A. Verify that settings table exists
+    ----------------------------------------------------------------------------
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'settings' AND table_schema = 'public'
+    ) THEN
+        RAISE NOTICE 'V7 Migration: settings table does not exist. Skipping reconciliation.';
+        RETURN;
+    END IF;
+
+    ----------------------------------------------------------------------------
+    -- B & D. Ensure 'setting_key' column exists
     ----------------------------------------------------------------------------
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'settings' AND column_name = 'setting_key'
+        WHERE table_name = 'settings' AND column_name = 'setting_key' AND table_schema = 'public'
     ) THEN
         ALTER TABLE settings ADD COLUMN setting_key VARCHAR(100);
         RAISE NOTICE 'V7 Migration: Added setting_key column to settings table.';
     END IF;
 
     ----------------------------------------------------------------------------
-    -- 2. Data Migration: Copy data from legacy 'key' to 'setting_key' if 'key' exists
+    -- C & E. If legacy 'key' column exists, copy data to setting_key where null
     ----------------------------------------------------------------------------
     IF EXISTS (
         SELECT 1 FROM information_schema.columns 
-        WHERE table_name = 'settings' AND column_name = 'key'
+        WHERE table_name = 'settings' AND column_name = 'key' AND table_schema = 'public'
     ) THEN
-        -- Copy 'key' to 'setting_key' where setting_key is NULL
         UPDATE settings 
-        SET setting_key = key 
-        WHERE setting_key IS NULL AND key IS NOT NULL;
+        SET setting_key = "key"
+        WHERE setting_key IS NULL AND "key" IS NOT NULL;
 
-        RAISE NOTICE 'V7 Migration: Synchronized legacy key values to setting_key.';
-
-        -- Drop primary key and unique constraints on legacy 'key' column
-        DECLARE
-            r RECORD;
-        BEGIN
-            FOR r IN (
-                SELECT constraint_name 
-                FROM information_schema.table_constraints 
-                WHERE table_name = 'settings' 
-                  AND constraint_type IN ('PRIMARY KEY', 'UNIQUE')
-            ) LOOP
-                EXECUTE 'ALTER TABLE settings DROP CONSTRAINT IF EXISTS ' || quote_ident(r.constraint_name) || ' CASCADE;';
-            END LOOP;
-        END;
-
-        -- Drop NOT NULL constraint on legacy 'key' column and drop column
-        ALTER TABLE settings ALTER COLUMN "key" DROP NOT NULL;
-        ALTER TABLE settings DROP COLUMN IF EXISTS "key";
-        RAISE NOTICE 'V7 Migration: Dropped legacy key column from settings table.';
+        RAISE NOTICE 'V7 Migration: Copied data from legacy key to setting_key.';
     END IF;
 
     ----------------------------------------------------------------------------
-    -- 3. Ensure 'setting_key' is NOT NULL and is PRIMARY KEY
+    -- F & G. Data Integrity Validation — Assert no NULL or duplicate setting_key
     ----------------------------------------------------------------------------
-    -- Ensure setting_key has NOT NULL constraint
+    -- Check for NULL setting_key values
+    SELECT COUNT(*) INTO v_null_count 
+    FROM settings 
+    WHERE setting_key IS NULL;
+
+    IF v_null_count > 0 THEN
+        RAISE EXCEPTION 'V7 Migration Aborted! Found % row(s) with NULL setting_key in settings table. Data cleanup required before migration.', v_null_count;
+    END IF;
+
+    -- Check for duplicate setting_key values
+    SELECT COUNT(*) INTO v_dup_count FROM (
+        SELECT setting_key 
+        FROM settings 
+        GROUP BY setting_key 
+        HAVING COUNT(*) > 1
+    ) dups;
+
+    IF v_dup_count > 0 THEN
+        RAISE EXCEPTION 'V7 Migration Aborted! Found % duplicate setting_key value(s) in settings table. Deduplication required before migration.', v_dup_count;
+    END IF;
+
+    -- Check if any Foreign Key constraint references settings table
+    SELECT COUNT(*) INTO v_fk_count
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.constraint_column_usage ccu
+      ON ccu.constraint_name = tc.constraint_name
+    WHERE tc.constraint_type = 'FOREIGN KEY'
+      AND ccu.table_name = 'settings';
+
+    IF v_fk_count > 0 THEN
+        RAISE EXCEPTION 'V7 Migration Aborted! Found % foreign key(s) referencing settings table. Manual inspection required.', v_fk_count;
+    END IF;
+
+    ----------------------------------------------------------------------------
+    -- H. Drop ONLY the specific Primary Key constraint on settings.key (if present)
+    ----------------------------------------------------------------------------
+    SELECT tc.constraint_name INTO v_pk_constraint_name
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.key_column_usage kcu
+      ON tc.constraint_name = kcu.constraint_name
+    WHERE tc.table_name = 'settings'
+      AND tc.constraint_type = 'PRIMARY KEY'
+      AND kcu.column_name = 'key';
+
+    IF v_pk_constraint_name IS NOT NULL THEN
+        EXECUTE 'ALTER TABLE settings DROP CONSTRAINT ' || quote_ident(v_pk_constraint_name);
+        RAISE NOTICE 'V7 Migration: Dropped legacy primary key constraint % from settings.key.', v_pk_constraint_name;
+    END IF;
+
+    ----------------------------------------------------------------------------
+    -- I & J. Set setting_key NOT NULL and add Primary Key on setting_key
+    ----------------------------------------------------------------------------
     ALTER TABLE settings ALTER COLUMN setting_key SET NOT NULL;
 
-    -- Add Primary Key constraint on setting_key if not present
     IF NOT EXISTS (
-        SELECT 1 FROM information_schema.table_constraints 
-        WHERE table_name = 'settings' AND constraint_type = 'PRIMARY KEY'
+        SELECT 1 
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+          ON tc.constraint_name = kcu.constraint_name
+        WHERE tc.table_name = 'settings'
+          AND tc.constraint_type = 'PRIMARY KEY'
+          AND kcu.column_name = 'setting_key'
     ) THEN
         ALTER TABLE settings ADD CONSTRAINT settings_pkey PRIMARY KEY (setting_key);
         RAISE NOTICE 'V7 Migration: Established setting_key as PRIMARY KEY on settings table.';
     END IF;
 
+    ----------------------------------------------------------------------------
+    -- K. Remove legacy 'key' column ONLY if it exists and setting_key is active
+    ----------------------------------------------------------------------------
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'settings' AND column_name = 'key' AND table_schema = 'public'
+    ) THEN
+        ALTER TABLE settings DROP COLUMN "key";
+        RAISE NOTICE 'V7 Migration: Dropped legacy key column from settings table.';
+    END IF;
+
+    RAISE NOTICE 'V7 Migration Completed Successfully: settings table now uses setting_key as primary key.';
 END $$;
