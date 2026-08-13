@@ -15,12 +15,6 @@ class ProfileScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Driver Profile'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () => context.push('/edit-profile'),
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
