@@ -18,4 +18,4 @@ EXPOSE 8081 10000
 
 ENV PORT=10000
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Xms128m", "-Xmx384m", "-jar", "app.jar"]
