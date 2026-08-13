@@ -16,10 +16,20 @@ import java.util.Map;
 @Builder
 public class Setting {
 
+    /**
+     * Maps to the "setting_key" column in the production PostgreSQL settings table.
+     * The production schema uses setting_key as the primary key (created by Hibernate ddl-auto
+     * before V1 migration was applied). All new installs via V7 migration also use setting_key.
+     * Do NOT use @Column(name = "\"key\"") — that causes null constraint violations in PostgreSQL.
+     */
     @Id
-    @Column(name = "\"key\"", nullable = false, length = 100)
+    @Column(name = "setting_key", nullable = false, length = 100)
     private String key;
 
+    /**
+     * Maps to the "value" column in the settings table. Quoted to prevent H2 from treating
+     * "value" as a reserved keyword. Both PostgreSQL and H2 (in PostgreSQL mode) accept "value".
+     */
     @Column(name = "\"value\"", columnDefinition = "TEXT", nullable = false)
     private String value;
 
