@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping({"/api/v1/charging", "/api/v1/charging-sessions"})
 @RequiredArgsConstructor
+@org.springframework.transaction.annotation.Transactional
 public class ChargingController {
 
     private final ChargingSessionRepository chargingSessionRepository;

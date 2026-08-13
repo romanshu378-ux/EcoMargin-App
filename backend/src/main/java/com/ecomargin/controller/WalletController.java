@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/v1/wallet")
 @RequiredArgsConstructor
+@org.springframework.transaction.annotation.Transactional
 public class WalletController {
 
     private final WalletRepository walletRepository;

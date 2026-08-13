@@ -25,6 +25,7 @@ public class StationController {
 
     private final StationRepository stationRepository;
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @Operation(summary = "Search stations with pagination and filtering", description = "Allows multi-criteria filters including vendor ID, name search, and operational status")
     @ApiResponse(responseCode = "200", description = "Successfully retrieved list of stations")
     @GetMapping
@@ -39,23 +40,53 @@ public class StationController {
                 .and(StationSpecification.hasNameLike(search));
 
         Page<Station> stations = stationRepository.findAll(spec, pageable);
+        stations.getContent().forEach(station -> {
+            if (station.getChargers() != null) {
+                station.getChargers().forEach(charger -> {
+                    if (charger.getConnectors() != null) {
+                        charger.getConnectors().size();
+                    }
+                });
+            }
+        });
         return ResponseEntity.ok(stations);
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @Operation(summary = "Get nearby stations")
     @ApiResponse(responseCode = "200", description = "Successfully retrieved list of nearby stations")
     @GetMapping("/nearby")
     public ResponseEntity<List<Station>> getNearbyStations() {
-        return ResponseEntity.ok(stationRepository.findAll());
+        List<Station> stations = stationRepository.findAll();
+        stations.forEach(station -> {
+            if (station.getChargers() != null) {
+                station.getChargers().forEach(charger -> {
+                    if (charger.getConnectors() != null) {
+                        charger.getConnectors().size();
+                    }
+                });
+            }
+        });
+        return ResponseEntity.ok(stations);
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @Operation(summary = "Get a single station details by ID")
     @ApiResponse(responseCode = "200", description = "Station found")
     @ApiResponse(responseCode = "404", description = "Station not found")
     @GetMapping("/{id:\\d+}")
     public ResponseEntity<Station> getStationById(@PathVariable Long id) {
         return stationRepository.findById(id)
-                .map(ResponseEntity::ok)
+                .map(station -> {
+                    if (station.getChargers() != null) {
+                        station.getChargers().forEach(charger -> {
+                            if (charger.getConnectors() != null) {
+                                charger.getConnectors().size();
+                            }
+                        });
+                    }
+                    return ResponseEntity.ok(station);
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 

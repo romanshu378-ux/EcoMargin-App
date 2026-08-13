@@ -6,7 +6,12 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "privacy_settings")
+@Table(
+    name = "privacy_settings",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_privacy_settings_user_id", columnNames = {"user_id"})
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -19,7 +24,7 @@ public class PrivacySettings {
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", unique = true, nullable = false)
+    @JoinColumn(name = "user_id", nullable = false)
     @JsonIgnore
     private User user;
 

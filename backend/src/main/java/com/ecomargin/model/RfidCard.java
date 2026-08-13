@@ -7,7 +7,14 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "rfid_cards")
+@Table(
+    name = "rfid_cards",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_rfid_cards_user_id", columnNames = {"user_id"}),
+        @UniqueConstraint(name = "uk_rfid_cards_card_number", columnNames = {"card_number"}),
+        @UniqueConstraint(name = "uk_rfid_cards_card_uid", columnNames = {"card_uid"})
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,14 +27,14 @@ public class RfidCard {
     private Long id;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", unique = true, nullable = false)
+    @JoinColumn(name = "user_id", nullable = false)
     @JsonIgnore
     private User user;
 
-    @Column(name = "card_number", unique = true, nullable = false)
+    @Column(name = "card_number", nullable = false)
     private String cardNumber;
 
-    @Column(name = "card_uid", unique = true, nullable = false)
+    @Column(name = "card_uid", nullable = false)
     private String cardUid;
 
     @Column(nullable = false)
