@@ -10,9 +10,7 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: false
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
 
 ocpp:
   heartbeat-interval: ${OCPP_HEARTBEAT_INTERVAL:60}
