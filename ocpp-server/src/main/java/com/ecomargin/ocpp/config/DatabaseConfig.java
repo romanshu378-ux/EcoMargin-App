@@ -70,12 +70,11 @@ public class DatabaseConfig {
                     String path = uri.getPath();
                     String query = uri.getQuery();
 
+                    // Extract credentials embedded in DATABASE_URL URI
                     if (uri.getUserInfo() != null) {
                         String[] userInfo = uri.getUserInfo().split(":", 2);
-                        if (!StringUtils.hasText(username)) {
-                            username = userInfo[0];
-                        }
-                        if (!StringUtils.hasText(password) && userInfo.length > 1) {
+                        username = userInfo[0];
+                        if (userInfo.length > 1) {
                             password = userInfo[1];
                         }
                     }
@@ -92,6 +91,8 @@ public class DatabaseConfig {
                     }
 
                     config.setJdbcUrl(jdbcUrl.toString());
+                    org.slf4j.LoggerFactory.getLogger(DatabaseConfig.class)
+                            .info("[DATABASE-CONFIG] Connecting to PostgreSQL at host={}, db={}, user={}", host, path, username);
                 } catch (URISyntaxException e) {
                     String jdbcUrl = rawUrl;
                     if (!jdbcUrl.startsWith("jdbc:")) {
