@@ -5,7 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -24,6 +24,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
+
+    @Value("${app.redis.enabled:${ENABLE_REDIS:${SPRING_REDIS_ENABLED:false}}}")
+    private boolean isRedisEnabled;
 
     private static final int DEFAULT_LIMIT = 120; 
     private static final int SENSITIVE_AUTH_LIMIT = 30;
@@ -76,7 +79,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         boolean isLimited = false;
 
-        if (redisTemplate != null) {
+        if (isRedisEnabled && redisTemplate != null) {
             try {
                 Long requests = redisTemplate.opsForValue().increment(redisKey);
                 if (requests != null && requests == 1) {
@@ -86,7 +89,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                     isLimited = true;
                 }
             } catch (Exception e) {
-                // Redis down, fallback to memory
+                // Redis error fallback to memory
                 isLimited = isRateLimitedInMemory(redisKey, maxRequests);
             }
         } else {
