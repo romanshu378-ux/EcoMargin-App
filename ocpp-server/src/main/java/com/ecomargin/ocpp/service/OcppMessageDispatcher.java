@@ -35,6 +35,7 @@ public class OcppMessageDispatcher {
     private final StationRepository stationRepository;
     private final OcppLiveEventBroadcaster liveEventBroadcaster;
     private final OcppJsonParser ocppJsonParser;
+    private final MainBackendEventPublisher mainBackendEventPublisher;
 
     @Value("${ocpp.heartbeat-interval:60}")
     private int heartbeatInterval;
@@ -119,6 +120,13 @@ public class OcppMessageDispatcher {
 
         log.info("[OCPP-BOOT] BootNotification accepted for chargePointId={}, model={}", chargePointId, model);
 
+        mainBackendEventPublisher.publishEvent("BOOT", chargePointId, Map.of(
+                "vendor", vendor,
+                "model", model,
+                "firmwareVersion", firmware,
+                "status", "AVAILABLE"
+        ));
+
         Map<String, Object> response = new HashMap<>();
         response.put("status", "Accepted");
         response.put("currentTime", Instant.now().toString());
@@ -128,6 +136,9 @@ public class OcppMessageDispatcher {
 
     private Map<String, Object> handleHeartbeat(String chargePointId, JsonNode payload) {
         log.debug("[OCPP-HEARTBEAT] Heartbeat received from chargePointId={}", chargePointId);
+        mainBackendEventPublisher.publishEvent("HEARTBEAT", chargePointId, Map.of(
+                "status", "ONLINE"
+        ));
         Map<String, Object> response = new HashMap<>();
         response.put("currentTime", Instant.now().toString());
         return response;
@@ -160,6 +171,12 @@ public class OcppMessageDispatcher {
 
             // Broadcast status update
             liveEventBroadcaster.broadcastConnectorStatus(chargePointId, connectorIndex, mapStatus);
+
+            mainBackendEventPublisher.publishEvent("STATUS_CHANGE", chargePointId, Map.of(
+                    "connectorIndex", connectorIndex,
+                    "status", mapStatus,
+                    "ocppStatus", statusStr
+            ));
         }
 
         log.info("[OCPP-STATUS] StatusNotification for chargePointId={}, connector={}, status={}", chargePointId, connectorIndex, statusStr);
@@ -251,6 +268,15 @@ public class OcppMessageDispatcher {
         }
 
         log.info("[OCPP-START] StartTransaction created for chargePointId={}, ocppTxId={}", chargePointId, ocppTxId);
+
+        mainBackendEventPublisher.publishEvent("START_TRANSACTION", chargePointId, Map.of(
+                "connectorIndex", connectorIndex,
+                "ocppTransactionId", ocppTxId,
+                "sessionId", session.getId(),
+                "userId", session.getUser() != null ? session.getUser().getId() : 0,
+                "idTag", idTag,
+                "status", "CHARGING"
+        ));
 
         Map<String, Object> idTagInfo = Map.of("status", "Accepted");
         Map<String, Object> response = new HashMap<>();
@@ -354,6 +380,19 @@ public class OcppMessageDispatcher {
 
             log.info("[OCPP-METER] MeterValues updated: session_id={}, energyKwh={}, powerKw={}, cost={}",
                     session.getId(), energyKwh, currentPowerKw, liveCost);
+
+            mainBackendEventPublisher.publishEvent("METER_VALUES", chargePointId, Map.of(
+                    "sessionId", session.getId(),
+                    "connectorIndex", connectorIndex,
+                    "ocppTransactionId", session.getOcppTransactionId() != null ? session.getOcppTransactionId() : "",
+                    "kwh", energyKwh,
+                    "kw", currentPowerKw,
+                    "soc", socPercentage,
+                    "cost", liveCost,
+                    "voltage", 400.0,
+                    "current", 106.25,
+                    "userId", session.getUser() != null ? session.getUser().getId() : 0
+            ));
         }
 
         return Collections.emptyMap();
@@ -434,6 +473,16 @@ public class OcppMessageDispatcher {
             );
 
             log.info("[OCPP-STOP] StopTransaction completed: session_id={}, finalCost={}", session.getId(), finalCost);
+
+            mainBackendEventPublisher.publishEvent("STOP_TRANSACTION", chargePointId, Map.of(
+                    "sessionId", session.getId(),
+                    "ocppTransactionId", session.getOcppTransactionId() != null ? session.getOcppTransactionId() : "",
+                    "finalKwh", finalEnergy.doubleValue(),
+                    "finalCost", finalCost.doubleValue(),
+                    "reason", reason,
+                    "status", "COMPLETED",
+                    "userId", session.getUser() != null ? session.getUser().getId() : 0
+            ));
         }
 
         Map<String, Object> idTagInfo = Map.of("status", "Accepted");

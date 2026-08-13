@@ -47,6 +47,7 @@ public class SecurityConfig {
                     "/actuator/health",
                     "/actuator/**",
                     "/ocpp/**",
+                    "/api/v1/ocpp/internal/**",
                     "/ws/**",
                     "/v2/api-docs",
                     "/v3/api-docs",

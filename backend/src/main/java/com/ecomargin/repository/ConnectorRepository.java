@@ -10,5 +10,6 @@ import java.util.Optional;
 @Repository
 public interface ConnectorRepository extends JpaRepository<Connector, Long> {
     Optional<Connector> findByChargerAndConnectorIndex(Charger charger, Integer connectorIndex);
+    java.util.List<Connector> findByCharger(Charger charger);
 }
 
