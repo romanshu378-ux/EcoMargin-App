@@ -48,7 +48,6 @@ public class User implements UserDetails {
     private String emergencyContactNumber;
     private String profileImageUrl;
 
-    @Lob
     @Basic(fetch = FetchType.LAZY)
     @Column(name = "profile_image", columnDefinition = "bytea")
     @com.fasterxml.jackson.annotation.JsonIgnore
