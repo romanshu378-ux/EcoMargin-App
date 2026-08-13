@@ -77,7 +77,18 @@ public class WalletController {
         }
 
         User user = getAuthenticatedUser();
-        Wallet wallet = getOrCreateWallet(user);
+        
+        // Apply pessimistic row-level lock to prevent concurrent topup/debit race conditions
+        Wallet wallet = walletRepository.findByUserIdForUpdate(user.getId())
+                .orElseGet(() -> {
+                    Wallet w = Wallet.builder()
+                            .user(user)
+                            .balance(BigDecimal.ZERO)
+                            .currency("INR")
+                            .build();
+                    return walletRepository.save(w);
+                });
+                
         BigDecimal balanceBefore = wallet.getBalance();
         BigDecimal balanceAfter = balanceBefore.add(amount);
         wallet.setBalance(balanceAfter);

@@ -69,15 +69,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = response.data;
         String? token;
+        String? refreshToken;
 
         if (data is Map<String, dynamic>) {
           token = data['accessToken'] as String? ??
               data['token'] as String? ??
               data['jwt'] as String?;
+          refreshToken = data['refreshToken'] as String?;
         }
 
         if (token != null && token.isNotEmpty) {
           await storageService.saveToken(token);
+          if (refreshToken != null && refreshToken.isNotEmpty) {
+            await storageService.saveRefreshToken(refreshToken);
+          }
           ref.read(authStateProvider.notifier).state = true;
 
           if (mounted) {

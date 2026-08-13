@@ -81,7 +81,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                                     }
                                     
                                     if (response.statusCode == 200) {
-                                      await storageService.deleteToken();
+                                      await storageService.clearAllTokens();
                                       ref.read(authStateProvider.notifier).state = false;
                                       if (context.mounted) {
                                         context.go('/login');

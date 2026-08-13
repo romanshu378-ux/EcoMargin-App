@@ -184,7 +184,7 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
 
   void _startPolling() {
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       await checkActiveSession();
     });
   }

@@ -23,5 +23,16 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
         return ResponseEntity.ok(authService.authenticate(request));
     }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@RequestBody java.util.Map<String, String> request) {
+        return ResponseEntity.ok(authService.refreshToken(request.get("refreshToken")));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestBody java.util.Map<String, String> request) {
+        authService.logout(request.get("refreshToken"));
+        return ResponseEntity.ok(java.util.Map.of("success", true, "message", "Logged out successfully"));
+    }
 }
 

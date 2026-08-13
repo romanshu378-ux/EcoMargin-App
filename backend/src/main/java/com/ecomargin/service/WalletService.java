@@ -44,9 +44,18 @@ public class WalletService {
         Wallet wallet = walletRepository.findByUserIdForUpdate(userId)
                 .orElseThrow(() -> new RuntimeException("Wallet not found for userId: " + userId));
 
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Debit amount must be strictly positive: " + amount);
+        }
+
         // 4. Validate sufficient wallet balance (optional check: if balance is too low, we still deduct the final bill but log it)
         BigDecimal balanceBefore = wallet.getBalance();
         BigDecimal balanceAfter = balanceBefore.subtract(amount);
+
+        if (balanceAfter.compareTo(BigDecimal.ZERO) < 0) {
+            log.error("[WALLET] Prevented negative balance! userId: {}, balanceBefore: {}, amount: {}", userId, balanceBefore, amount);
+            throw new IllegalArgumentException("Insufficient wallet balance for this charging debit.");
+        }
 
         wallet.setBalance(balanceAfter);
         walletRepository.save(wallet);

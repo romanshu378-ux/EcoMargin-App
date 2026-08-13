@@ -6,6 +6,7 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
+import com.ecomargin.model.User;
 import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
@@ -31,7 +32,11 @@ public class JwtUtil {
     }
 
     public String generateToken(UserDetails userDetails) {
-        return generateToken(new HashMap<>(), userDetails);
+        Map<String, Object> claims = new HashMap<>();
+        if (userDetails instanceof User) {
+            claims.put("version", ((User) userDetails).getJwtVersion());
+        }
+        return generateToken(claims, userDetails);
     }
 
     public String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
@@ -51,6 +56,13 @@ public class JwtUtil {
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
+        if (userDetails instanceof User) {
+            User user = (User) userDetails;
+            Integer tokenVersion = extractClaim(token, claims -> claims.get("version", Integer.class));
+            if (tokenVersion != null && !tokenVersion.equals(user.getJwtVersion())) {
+                return false;
+            }
+        }
         return (username.equals(userDetails.getUsername())) && !isTokenExpired(token);
     }
 

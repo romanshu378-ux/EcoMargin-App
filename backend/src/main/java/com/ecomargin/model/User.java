@@ -27,8 +27,13 @@ public class User implements UserDetails {
     @Column(unique = true, nullable = false)
     private String email;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @Column(nullable = true) // Nullable because of Google Login / OTP
     private String password;
+
+    @Column(name = "jwt_version", nullable = false)
+    @Builder.Default
+    private Integer jwtVersion = 0;
 
     private String firstName;
     private String lastName;

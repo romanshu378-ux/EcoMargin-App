@@ -44,6 +44,9 @@ class AuthServiceTest {
     private JwtUtil jwtUtil;
 
     @Mock
+    private com.ecomargin.repository.RefreshTokenRepository refreshTokenRepository;
+
+    @Mock
     private AuthenticationManager authenticationManager;
 
     @Mock
@@ -114,6 +117,7 @@ class AuthServiceTest {
 
         when(userRepository.findByEmailIgnoreCase("customer@ecomargin.com")).thenReturn(Optional.of(sampleUser));
         when(jwtUtil.generateToken(sampleUser)).thenReturn("jwt.token.string");
+        when(refreshTokenRepository.save(any())).thenAnswer(invocation -> com.ecomargin.model.RefreshToken.builder().token("mock-refresh-token").build());
 
         AuthResponse response = authService.authenticate(request);
 

@@ -117,7 +117,7 @@ class ProfileScreen extends ConsumerWidget {
                   leading: const Icon(Icons.logout, color: Colors.red),
                   title: const Text('Sign Out', style: TextStyle(color: Colors.red)),
                   onTap: () async {
-                    await ref.read(storageServiceProvider).deleteToken();
+                    await ref.read(storageServiceProvider).clearAllTokens();
                     ref.read(authStateProvider.notifier).state = false;
                     if (context.mounted) {
                       context.go('/login');

@@ -1,5 +1,6 @@
 package com.ecomargin.exception;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,8 +23,27 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private Map<String, Object> buildErrorResponse(HttpServletRequest request, String code, String message, Object details) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("success", false);
+        body.put("code", code);
+        body.put("message", message);
+        body.put("timestamp", LocalDateTime.now().toString());
+        
+        String requestId = (String) request.getAttribute("requestId");
+        if (requestId == null) {
+            requestId = request.getHeader("X-Request-ID");
+        }
+        body.put("requestId", requestId);
+        
+        if (details != null) {
+            body.put("details", details);
+        }
+        return body;
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
+    public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex, HttpServletRequest request) {
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach((error) -> {
             String fieldName = ((FieldError) error).getField();
@@ -31,39 +51,19 @@ public class GlobalExceptionHandler {
             errors.put(fieldName, errorMessage);
         });
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", LocalDateTime.now());
-        body.put("status", HttpStatus.BAD_REQUEST.value());
-        body.put("error", "Validation Failed");
-        body.put("details", errors);
-
-        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(buildErrorResponse(request, "VALIDATION_FAILED", "Invalid request parameters", errors), HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", LocalDateTime.now());
-        body.put("status", HttpStatus.BAD_REQUEST.value());
-        body.put("error", "Bad Request");
-        body.put("message", ex.getMessage());
-
-        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+    public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException ex, HttpServletRequest request) {
+        return new ResponseEntity<>(buildErrorResponse(request, "BAD_REQUEST", ex.getMessage(), null), HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(UserAlreadyExistsException.class)
-    public ResponseEntity<Map<String, Object>> handleUserAlreadyExistsException(UserAlreadyExistsException ex) {
+    public ResponseEntity<Map<String, Object>> handleUserAlreadyExistsException(UserAlreadyExistsException ex, HttpServletRequest request) {
         log.warn("[AUTH] Registration conflict: {}", ex.getMessage());
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", LocalDateTime.now());
-        body.put("status", HttpStatus.CONFLICT.value());
-        body.put("error", "Conflict");
-        body.put("message", ex.getMessage());
-
-        return new ResponseEntity<>(body, HttpStatus.CONFLICT);
+        return new ResponseEntity<>(buildErrorResponse(request, "CONFLICT", ex.getMessage(), null), HttpStatus.CONFLICT);
     }
-
 
     @ExceptionHandler({
         BadCredentialsException.class,
@@ -72,50 +72,26 @@ public class GlobalExceptionHandler {
         LockedException.class,
         AuthenticationException.class
     })
-    public ResponseEntity<Map<String, Object>> handleAuthenticationExceptions(Exception ex) {
+    public ResponseEntity<Map<String, Object>> handleAuthenticationExceptions(Exception ex, HttpServletRequest request) {
         log.warn("[AUTH] Authentication failed: {}", ex.getMessage());
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", LocalDateTime.now());
-        body.put("status", HttpStatus.UNAUTHORIZED.value());
-        body.put("error", "Unauthorized");
-        body.put("message", "Invalid email or password");
-
-        return new ResponseEntity<>(body, HttpStatus.UNAUTHORIZED);
+        return new ResponseEntity<>(buildErrorResponse(request, "UNAUTHORIZED", "Invalid email or password", null), HttpStatus.UNAUTHORIZED);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<Map<String, Object>> handleAccessDeniedException(AccessDeniedException ex) {
+    public ResponseEntity<Map<String, Object>> handleAccessDeniedException(AccessDeniedException ex, HttpServletRequest request) {
         log.warn("[AUTH] Access denied: {}", ex.getMessage());
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", LocalDateTime.now());
-        body.put("status", HttpStatus.FORBIDDEN.value());
-        body.put("error", "Forbidden");
-        body.put("message", "Access is denied");
-
-        return new ResponseEntity<>(body, HttpStatus.FORBIDDEN);
+        return new ResponseEntity<>(buildErrorResponse(request, "FORBIDDEN", "Access is denied", null), HttpStatus.FORBIDDEN);
     }
 
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
-    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolationException(org.springframework.dao.DataIntegrityViolationException ex) {
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolationException(org.springframework.dao.DataIntegrityViolationException ex, HttpServletRequest request) {
         log.warn("[DATABASE] Data integrity violation: {}", ex.getMessage());
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", LocalDateTime.now());
-        body.put("status", HttpStatus.CONFLICT.value());
-        body.put("error", "Conflict");
-        body.put("message", "The provided information (phone number or email) conflicts with an existing account.");
-
-        return new ResponseEntity<>(body, HttpStatus.CONFLICT);
+        return new ResponseEntity<>(buildErrorResponse(request, "CONFLICT", "The provided information conflicts with an existing account or record.", null), HttpStatus.CONFLICT);
     }
 
     @ExceptionHandler({org.springframework.dao.DataAccessException.class, java.sql.SQLException.class})
-    public ResponseEntity<Map<String, Object>> handleDatabaseExceptions(Exception ex) {
+    public ResponseEntity<Map<String, Object>> handleDatabaseExceptions(Exception ex, HttpServletRequest request) {
         log.error("[DATABASE ERROR] Database failure: ", ex);
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", LocalDateTime.now());
 
         boolean isConnectionIssue = false;
         String msg = ex.getMessage() != null ? ex.getMessage() : "";
@@ -129,41 +105,15 @@ public class GlobalExceptionHandler {
         }
 
         if (isConnectionIssue) {
-            body.put("status", HttpStatus.SERVICE_UNAVAILABLE.value());
-            body.put("error", "Service Unavailable");
-            body.put("message", "Database service is temporarily unavailable. Please try again.");
-            return new ResponseEntity<>(body, HttpStatus.SERVICE_UNAVAILABLE);
+            return new ResponseEntity<>(buildErrorResponse(request, "SERVICE_UNAVAILABLE", "Service is temporarily unavailable. Please try again.", null), HttpStatus.SERVICE_UNAVAILABLE);
         } else {
-            body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-            body.put("error", "Internal Server Error");
-            body.put("message", "Database error: " + ex.getMessage());
-            return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity<>(buildErrorResponse(request, "INTERNAL_SERVER_ERROR", "An unexpected error occurred. Please try again later.", null), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleAllOtherExceptions(Exception ex) {
-        log.error("[AUTH ERROR] Unexpected internal exception: ({}: {})", ex.getClass().getName(), ex.getMessage(), ex);
-
-        String detailMsg = ex.getMessage();
-        if (detailMsg == null || detailMsg.isBlank()) {
-            Throwable root = ex;
-            while (root.getCause() != null && root.getCause() != root) {
-                root = root.getCause();
-            }
-            detailMsg = root.getMessage() != null && !root.getMessage().isBlank()
-                    ? root.getMessage()
-                    : ex.getClass().getSimpleName();
-        }
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", LocalDateTime.now());
-        body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-        body.put("error", "Internal Server Error");
-        body.put("message", detailMsg);
-
-        return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
+    public ResponseEntity<Map<String, Object>> handleAllOtherExceptions(Exception ex, HttpServletRequest request) {
+        log.error("[SYSTEM ERROR] Unexpected internal exception: ({}: {})", ex.getClass().getName(), ex.getMessage(), ex);
+        return new ResponseEntity<>(buildErrorResponse(request, "INTERNAL_SERVER_ERROR", "An unexpected error occurred. Please try again later.", null), HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
-
-

@@ -27,19 +27,21 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final AuthenticationProvider authenticationProvider;
+    private final com.ecomargin.security.RateLimitFilter rateLimitFilter;
+    private final com.ecomargin.security.RequestIdFilter requestIdFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            // CSRF is disabled because we use stateless JWTs without cookies, eliminating CSRF vectors
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
                 .requestMatchers(HttpMethod.GET, "/health", "/api/v1/health", "/actuator/health").permitAll()
                 .requestMatchers(
                     "/api/v1/profile/photo/**",
-                    "/api/v1/auth/**",
                     "/health",
                     "/api/v1/health",
                     "/actuator/health",
@@ -57,6 +59,9 @@ public class SecurityConfig {
                     "/webjars/**",
                     "/swagger-ui.html"
                 ).permitAll()
+                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/v1/operator/**").hasAnyRole("STATION_OPERATOR", "ADMIN")
+                .requestMatchers("/api/v1/support/**").hasAnyRole("SUPPORT", "ADMIN")
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session
@@ -64,9 +69,13 @@ public class SecurityConfig {
             )
             .headers(headers -> headers
                 .frameOptions(frame -> frame.deny())
+                .xssProtection(xss -> xss.disable())
+                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; frame-ancestors 'none'; sandbox"))
             )
             .authenticationProvider(authenticationProvider)
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(requestIdFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(rateLimitFilter, com.ecomargin.security.RequestIdFilter.class)
+            .addFilterAfter(jwtAuthFilter, com.ecomargin.security.RateLimitFilter.class);
 
         return http.build();
     }

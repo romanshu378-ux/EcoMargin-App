@@ -1,0 +1,36 @@
+server:
+  port: ${PORT:8081}
+
+spring:
+  application:
+    name: ocpp-server
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:ocppdevdb;DB_CLOSE_DELAY=-1}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:sa}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.h2.Driver}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 20000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+ocpp:
+  heartbeat-interval: ${OCPP_HEARTBEAT_INTERVAL:60}
+  main-backend-url: ${MAIN_BACKEND_URL:https://ecomargin-app.onrender.com}
+  internal-api-secret: ${INTERNAL_API_SECRET:ecomargin-internal-secret-key-2026}
+  rate-limit-per-minute: ${RATE_LIMIT_PER_MINUTE:120}
+
+logging:
+  level:
+    root: INFO
+    com.ecomargin.ocpp: DEBUG

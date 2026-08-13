@@ -126,11 +126,20 @@ public class RfidCardController {
         return ResponseEntity.ok(mapCardToMap(card));
     }
 
+    private String maskIdentifier(String value) {
+        if (value == null) return "";
+        int len = value.length();
+        if (len <= 4) {
+            return "****";
+        }
+        return "XXXX-XXXX-" + value.substring(len - 4);
+    }
+
     private Map<String, Object> mapCardToMap(RfidCard card) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", card.getId());
-        map.put("cardNumber", card.getCardNumber());
-        map.put("cardUid", card.getCardUid());
+        map.put("cardNumber", maskIdentifier(card.getCardNumber()));
+        map.put("cardUid", maskIdentifier(card.getCardUid()));
         map.put("status", card.getStatus());
         map.put("linkedVehicle", card.getLinkedVehicle() != null ? card.getLinkedVehicle() : "");
         map.put("issuedDate", card.getIssuedDate() != null ? card.getIssuedDate().toString() : "");

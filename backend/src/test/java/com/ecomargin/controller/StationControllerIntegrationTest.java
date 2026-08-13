@@ -84,7 +84,7 @@ class StationControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidPayload))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("Validation Failed"))
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
                 .andExpect(jsonPath("$.details.name").exists())
                 .andExpect(jsonPath("$.details.latitude").exists());
     }

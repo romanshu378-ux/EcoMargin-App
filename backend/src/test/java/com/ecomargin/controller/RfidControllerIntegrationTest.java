@@ -73,8 +73,8 @@ class RfidControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.cardNumber").value("1234-5678-9012-3456"))
-                .andExpect(jsonPath("$.cardUid").value("AA:BB:CC:DD"))
+                .andExpect(jsonPath("$.cardNumber").value("XXXX-XXXX-3456"))
+                .andExpect(jsonPath("$.cardUid").value("XXXX-XXXX-C:DD"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
     }
 

@@ -24,6 +24,7 @@ import java.util.Optional;
 public class ProfileController {
 
     private final UserRepository userRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     private User getAuthenticatedUser() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -39,6 +40,27 @@ public class ProfileController {
     public ResponseEntity<?> getProfile() {
         User user = getAuthenticatedUser();
         return ResponseEntity.ok(mapUserToProfileMap(user));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> body) {
+        User user = getAuthenticatedUser();
+        String oldPassword = body.get("oldPassword");
+        String newPassword = body.get("newPassword");
+
+        if (oldPassword == null || newPassword == null || newPassword.length() < 8) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid passwords provided. New password must be at least 8 characters."));
+        }
+
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Old password does not match."));
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setJwtVersion(user.getJwtVersion() + 1);
+        userRepository.save(user);
+        
+        return ResponseEntity.ok(Map.of("message", "Password changed successfully. Please log in again."));
     }
 
     @PutMapping
@@ -96,8 +118,18 @@ public class ProfileController {
     @PostMapping("/photo")
     public ResponseEntity<?> uploadPhoto(@RequestParam("file") MultipartFile file) {
         User user = getAuthenticatedUser();
+        
+        String contentType = file.getContentType();
+        if (contentType == null || (!contentType.equals("image/jpeg") && !contentType.equals("image/png") && !contentType.equals("image/webp"))) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Only JPEG, PNG, and WebP images are allowed."));
+        }
+        
         try {
             byte[] bytes = file.getBytes();
+            if (bytes.length > 5 * 1024 * 1024) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Image size exceeds 5MB limit."));
+            }
+            
             user.setProfileImage(bytes);
             user.setProfileImageUrl("/api/v1/profile/photo/" + user.getId());
             userRepository.save(user);
