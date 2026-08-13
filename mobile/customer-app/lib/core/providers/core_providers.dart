@@ -431,11 +431,12 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile>> {
       final response = await apiClient.dio.put('/profile', data: updatedProfile.toJson());
       if (response.statusCode == 200) {
         state = AsyncValue.data(UserProfile.fromJson(response.data));
+        await fetchProfile(); // Refresh profile state directly from backend
       } else {
         throw Exception('Failed to update profile');
       }
     } catch (e) {
-      throw Exception(e.toString());
+      rethrow;
     }
   }
 

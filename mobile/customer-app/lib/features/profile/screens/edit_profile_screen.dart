@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:dio/dio.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../core/config/app_config.dart';
 
@@ -256,9 +257,51 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        final errorMsg = e.toString().replaceAll('Exception:', '').trim();
+        String userFriendlyMsg = 'Something went wrong while updating your profile.';
+        
+        if (e is DioException) {
+          final statusCode = e.response?.statusCode;
+          if (statusCode == 503) {
+            userFriendlyMsg = 'Service is temporarily unavailable. Please try again.';
+          } else if (statusCode == 400) {
+            userFriendlyMsg = 'Please check the information you entered.';
+          } else if (statusCode == 401) {
+            userFriendlyMsg = 'Your session has expired. Please log in again.';
+          } else if (statusCode == 409) {
+            userFriendlyMsg = 'These details are already in use.';
+          } else if (statusCode == 500) {
+            userFriendlyMsg = 'Something went wrong while updating your profile.';
+          } else if (e.type == DioExceptionType.connectionTimeout ||
+                     e.type == DioExceptionType.receiveTimeout ||
+                     e.type == DioExceptionType.sendTimeout ||
+                     e.type == DioExceptionType.connectionError) {
+            userFriendlyMsg = 'Service is temporarily unavailable. Please try again.';
+          }
+        } else {
+          final errStr = e.toString();
+          if (errStr.contains('503')) {
+            userFriendlyMsg = 'Service is temporarily unavailable. Please try again.';
+          } else if (errStr.contains('400')) {
+            userFriendlyMsg = 'Please check the information you entered.';
+          } else if (errStr.contains('401')) {
+            userFriendlyMsg = 'Your session has expired. Please log in again.';
+          } else if (errStr.contains('409')) {
+            userFriendlyMsg = 'These details are already in use.';
+          } else if (errStr.contains('500')) {
+            userFriendlyMsg = 'Something went wrong while updating your profile.';
+          }
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMsg.isNotEmpty ? errorMsg : 'Failed to update profile.'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(userFriendlyMsg),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _saveChanges,
+            ),
+          ),
         );
       }
     } finally {

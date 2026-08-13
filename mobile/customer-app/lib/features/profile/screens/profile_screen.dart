@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../core/config/app_config.dart';
 
@@ -38,7 +39,7 @@ class ProfileScreen extends ConsumerWidget {
                 Center(
                   child: CircleAvatar(
                     radius: 50,
-                    backgroundColor: const Color(0xFF16A34A).withOpacity(0.1),
+                    backgroundColor: const Color(0x1A16A34A),
                     backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
                     child: avatarUrl == null
                         ? const Icon(Icons.person, size: 50, color: Color(0xFF16A34A))
@@ -114,19 +115,48 @@ class ProfileScreen extends ConsumerWidget {
           loading: () => const Center(
             child: CircularProgressIndicator(color: Color(0xFF16A34A)),
           ),
-          error: (err, st) => Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('Failed to load profile: $err', style: const TextStyle(color: Colors.red)),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => ref.read(profileProvider.notifier).fetchProfile(),
-                  child: const Text('Retry'),
+          error: (err, st) {
+            String message = "Unable to load your profile. Please try again later.";
+            if (err is DioException) {
+              if (err.type == DioExceptionType.connectionTimeout ||
+                  err.type == DioExceptionType.receiveTimeout ||
+                  err.type == DioExceptionType.sendTimeout ||
+                  err.type == DioExceptionType.connectionError) {
+                message = "Unable to load your profile. Please check your connection and try again.";
+              } else if (err.response?.statusCode == 401 || err.response?.statusCode == 403) {
+                message = "Your session has expired. Please log in again.";
+              } else if (err.response?.statusCode != null && err.response!.statusCode! >= 500) {
+                message = "Server error occurred. Please try again later.";
+              }
+            }
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.cloud_off, size: 64, color: Colors.grey),
+                    const SizedBox(height: 16),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16, color: Colors.red),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () => ref.read(profileProvider.notifier).fetchProfile(),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF16A34A),
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
