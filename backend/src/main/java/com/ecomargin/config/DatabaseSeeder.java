@@ -21,12 +21,15 @@ import com.ecomargin.repository.VendorRepository;
 import com.ecomargin.repository.SettingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.Collections;
+import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 @Component
@@ -45,8 +48,12 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final SettingRepository settingRepository;
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
+    @Value("${app.seed.demo-user:false}")
+    private boolean seedDemoUser;
+
     @Override
     public void run(String... args) throws Exception {
+        log.info("=== DATABASE CONNECTED ===");
         log.info("=== RUNNING APPLICATION STARTUP DATABASE SEEDER ===");
         
         // 0. Ensure safe schema migrations for roles_name_check & jwt_version
@@ -68,110 +75,58 @@ public class DatabaseSeeder implements CommandLineRunner {
         Role adminRole = seedRole(RoleType.ROLE_ADMIN);
         Role superAdminRole = seedRole(RoleType.ROLE_SUPER_ADMIN);
 
-        // 2. Seed Users
-        // Customer User
-        String customerEmail = "romanshu@gmail.com";
-        User user = userRepository.findByEmailIgnoreCase(customerEmail)
-                .orElseGet(() -> userRepository.save(
-                        User.builder()
-                                .email(customerEmail)
-                                .password(passwordEncoder.encode("password123"))
-                                .firstName("Romanshu")
-                                .lastName("Sharma")
-                                .phoneNumber("+919876543210")
-                                .isVerified(true)
-                                .isAccountNonLocked(true)
-                                .roles(Collections.singleton(customerRole))
-                                .build()
-                ));
+        // 2. Seed Users conditionally using double-lookup (email & phone_number)
+        if (seedDemoUser) {
+            log.info("Demo user seeding is ENABLED (app.seed.demo-user=true)");
+            User customerUser = seedUser("romanshu@gmail.com", "password123", "Romanshu", "Sharma", "+919876543210", Collections.singleton(customerRole));
+            User vendorUser = seedUser("vendor@ecomargin.com", "vendor123", "Eco", "Vendor", "+918888888888", Collections.singleton(vendorRole));
+            User adminUser = seedUser("operator@ecomargin.com", "admin123", "System", "Admin", "+919999999991", Collections.singleton(adminRole));
+            User superAdminUser = seedUser("admin@ecomargin.com", "admin123", "Super", "Admin", "+919999999999", Collections.singleton(superAdminRole));
 
-        // Vendor User
-        String vendorEmail = "vendor@ecomargin.com";
-        User vendorUser = userRepository.findByEmailIgnoreCase(vendorEmail)
-                .orElseGet(() -> userRepository.save(
-                        User.builder()
-                                .email(vendorEmail)
-                                .password(passwordEncoder.encode("vendor123"))
-                                .firstName("Eco")
-                                .lastName("Vendor")
-                                .phoneNumber("+918888888888")
-                                .isVerified(true)
-                                .isAccountNonLocked(true)
-                                .roles(Collections.singleton(vendorRole))
-                                .build()
-                ));
+            if (customerUser != null) {
+                Wallet wallet = walletRepository.findByUserId(customerUser.getId())
+                        .orElseGet(() -> walletRepository.save(
+                                Wallet.builder().user(customerUser).balance(BigDecimal.ZERO).currency("INR").build()
+                        ));
 
-        Vendor defaultVendor = vendorRepository.findByUser(vendorUser)
-                .orElseGet(() -> vendorRepository.save(
-                        Vendor.builder()
-                                .user(vendorUser)
-                                .businessName("EcoMargin Default Vendor")
-                                .status("ACTIVE")
-                                .build()
-                ));
+                String referenceId = "TXN-ROMANSHU-TOPUP-100";
+                if (transactionRepository.findByReferenceId(referenceId).isEmpty()) {
+                    BigDecimal amount = new BigDecimal("100.00");
+                    BigDecimal prevBalance = wallet.getBalance();
+                    BigDecimal newBalance = prevBalance.add(amount);
 
-        // Admin User
-        String adminEmail = "operator@ecomargin.com";
-        userRepository.findByEmailIgnoreCase(adminEmail)
-                .orElseGet(() -> userRepository.save(
-                        User.builder()
-                                .email(adminEmail)
-                                .password(passwordEncoder.encode("admin123"))
-                                .firstName("System")
-                                .lastName("Admin")
-                                .phoneNumber("+919999999991")
-                                .isVerified(true)
-                                .isAccountNonLocked(true)
-                                .roles(Collections.singleton(adminRole))
-                                .build()
-                ));
+                    wallet.setBalance(newBalance);
+                    walletRepository.save(wallet);
 
-        // Super Admin User
-        String superAdminEmail = "admin@ecomargin.com";
-        userRepository.findByEmailIgnoreCase(superAdminEmail)
-                .orElseGet(() -> userRepository.save(
-                        User.builder()
-                                .email(superAdminEmail)
-                                .password(passwordEncoder.encode("admin123"))
-                                .firstName("Super")
-                                .lastName("Admin")
-                                .phoneNumber("+919999999999")
-                                .isVerified(true)
-                                .isAccountNonLocked(true)
-                                .roles(Collections.singleton(superAdminRole))
-                                .build()
-                ));
+                    Transaction transaction = Transaction.builder()
+                            .wallet(wallet)
+                            .amount(amount)
+                            .type("CREDIT")
+                            .status("SUCCESS")
+                            .referenceId(referenceId)
+                            .referenceType("TOPUP")
+                            .balanceBefore(prevBalance)
+                            .balanceAfter(newBalance)
+                            .build();
+                    transactionRepository.save(transaction);
+                }
+            }
 
-        // 3. Seed Wallet & top up ₹100.00
-        Wallet wallet = walletRepository.findByUserId(user.getId())
-                .orElseGet(() -> walletRepository.save(
-                        Wallet.builder().user(user).balance(BigDecimal.ZERO).currency("INR").build()
-                ));
-
-        String referenceId = "TXN-ROMANSHU-TOPUP-100";
-        if (transactionRepository.findByReferenceId(referenceId).isEmpty()) {
-            BigDecimal amount = new BigDecimal("100.00");
-            BigDecimal prevBalance = wallet.getBalance();
-            BigDecimal newBalance = prevBalance.add(amount);
-            
-            wallet.setBalance(newBalance);
-            walletRepository.save(wallet);
-
-            Transaction transaction = Transaction.builder()
-                    .wallet(wallet)
-                    .amount(amount)
-                    .type("CREDIT")
-                    .status("SUCCESS")
-                    .referenceId(referenceId)
-                    .referenceType("TOPUP")
-                    .balanceBefore(prevBalance)
-                    .balanceAfter(newBalance)
-                    .build();
-            transactionRepository.save(transaction);
-            log.info("Startup Seeder: Successfully topped up romanshu@gmail.com with ₹100.00");
+            if (vendorUser != null) {
+                vendorRepository.findByUser(vendorUser)
+                        .orElseGet(() -> vendorRepository.save(
+                                Vendor.builder()
+                                        .user(vendorUser)
+                                        .businessName("EcoMargin Default Vendor")
+                                        .status("ACTIVE")
+                                        .build()
+                        ));
+            }
+        } else {
+            log.info("Demo user seeding is DISABLED (app.seed.demo-user=false). Preserving existing database users.");
         }
 
-        // 4. Seed Default Settings
+        // 3. Seed Default Settings
         seedSetting("min_wallet_balance_to_start", "50.00", "Minimum wallet balance required to initiate charging");
         seedSetting("default_charging_rate_per_kwh", "15.00", "Default per kWh charging price in INR");
         seedSetting("home_sections", "{\"hero_slider\": true, \"quick_actions\": true, \"wallet_card\": true, \"nearby_stations\": true, \"promo_banner\": true, \"search_section\": true}", "Home screen section visibility configuration");
@@ -181,42 +136,84 @@ public class DatabaseSeeder implements CommandLineRunner {
         seedSetting("faqs", "[{\"q\": \"How do I start an EV charging session?\", \"a\": \"Simply find a nearby charger on the map, select the connector details, set your target battery limit, and tap Start Charging.\"}, {\"q\": \"How does EcoMargin Wallet billing work?\", \"a\": \"Your wallet balance is automatically debited based on the exact kWh energy consumed at the end of every charging session.\"}, {\"q\": \"What connector types are supported?\", \"a\": \"EcoMargin supports DC Fast Chargers (CCS2, GB/T, CHAdeMO) and AC Chargers (Type 2).\"}]", "Customer FAQs list");
         seedSetting("offers_banners", "[{\"code\": \"ECOGREEN20\", \"title\": \"20% Cashback on First Charging Session\", \"desc\": \"Get up to ₹100 cashback credited into your EcoMargin Wallet.\", \"expiry\": \"Valid till 31 Aug 2026\"}, {\"code\": \"FASTCHARGE50\", \"title\": \"Flat ₹50 OFF on DC Fast Chargers\", \"desc\": \"Applicable on session power > 50 kW.\", \"expiry\": \"Valid till 15 Aug 2026\"}]", "Active promotional offers & coupons");
 
-        // 5. Seed Stations
-        log.info("Seeding default charging stations, chargers, and connectors...");
+        // 4. Seed Stations
+        Vendor defaultVendor = vendorRepository.findAll().stream().findFirst().orElse(null);
+        if (defaultVendor != null) {
+            Station alwarStation = seedStation(
+                    "Alwar Charging Hub",
+                    new BigDecimal("27.568400"),
+                    new BigDecimal("76.626400"),
+                    "Dholidub, Near Ram Mandir, Alwar, Rajasthan 301001",
+                    defaultVendor
+            );
+            Charger alwarCharger = seedCharger(alwarStation, "IN_ALW_01", "Tritium RT50", "Tritium");
+            seedConnector(alwarCharger, 1, "CCS2", BigDecimal.valueOf(50.00));
+            seedConnector(alwarCharger, 2, "CHADEMO", BigDecimal.valueOf(50.00));
 
-        Station alwarStation = seedStation(
-                "Alwar Charging Hub",
-                new BigDecimal("27.568400"),
-                new BigDecimal("76.626400"),
-                "Dholidub, Near Ram Mandir, Alwar, Rajasthan 301001",
-                defaultVendor
-        );
-        Charger alwarCharger = seedCharger(alwarStation, "IN_ALW_01", "Tritium RT50", "Tritium");
-        seedConnector(alwarCharger, 1, "CCS2", BigDecimal.valueOf(50.00));
-        seedConnector(alwarCharger, 2, "CHADEMO", BigDecimal.valueOf(50.00));
+            Station jaipurStation = seedStation(
+                    "Jaipur EV Charging Hub",
+                    new BigDecimal("26.915000"),
+                    new BigDecimal("75.792000"),
+                    "Tonk Road, Sector 62, Jaipur, Rajasthan 302018",
+                    defaultVendor
+            );
+            Charger jaipurCharger = seedCharger(jaipurStation, "IN_JAI_01", "ABB Terra 184", "ABB");
+            seedConnector(jaipurCharger, 1, "CCS2", BigDecimal.valueOf(180.00));
 
-        Station jaipurStation = seedStation(
-                "Jaipur EV Charging Hub",
-                new BigDecimal("26.915000"),
-                new BigDecimal("75.792000"),
-                "Tonk Road, Sector 62, Jaipur, Rajasthan 302018",
-                defaultVendor
-        );
-        Charger jaipurCharger = seedCharger(jaipurStation, "IN_JAI_01", "ABB Terra 184", "ABB");
-        seedConnector(jaipurCharger, 1, "CCS2", BigDecimal.valueOf(180.00));
+            Station austinStation = seedStation(
+                    "Austin Downtown Hub",
+                    new BigDecimal("30.267153"),
+                    new BigDecimal("-97.743062"),
+                    "120 E 6th St, Austin, TX 78701",
+                    defaultVendor
+            );
+            Charger austinCharger = seedCharger(austinStation, "TX_AUS_DWTN_01", "ABB Terra 184", "ABB");
+            seedConnector(austinCharger, 1, "CCS2", BigDecimal.valueOf(180.00));
+            seedConnector(austinCharger, 2, "CCS2", BigDecimal.valueOf(180.00));
+        }
 
-        Station austinStation = seedStation(
-                "Austin Downtown Hub",
-                new BigDecimal("30.267153"),
-                new BigDecimal("-97.743062"),
-                "120 E 6th St, Austin, TX 78701",
-                defaultVendor
-        );
-        Charger austinCharger = seedCharger(austinStation, "TX_AUS_DWTN_01", "ABB Terra 184", "ABB");
-        seedConnector(austinCharger, 1, "CCS2", BigDecimal.valueOf(180.00));
-        seedConnector(austinCharger, 2, "CCS2", BigDecimal.valueOf(180.00));
+        log.info("=== SEEDER COMPLETED ===");
+        log.info("=== SERVER STARTED ===");
+    }
 
-        log.info("Successfully completed database seeding.");
+    private User seedUser(String email, String rawPassword, String firstName, String lastName, String phoneNumber, Set<Role> roles) {
+        String cleanEmail = email.trim().toLowerCase();
+        String cleanPhone = (phoneNumber != null && !phoneNumber.isBlank()) ? phoneNumber.trim() : null;
+
+        // 1. Check by email
+        Optional<User> byEmail = userRepository.findByEmailIgnoreCase(cleanEmail);
+        if (byEmail.isPresent()) {
+            return byEmail.get();
+        }
+
+        // 2. Check by phone number
+        if (cleanPhone != null) {
+            Optional<User> byPhone = userRepository.findByPhoneNumber(cleanPhone);
+            if (byPhone.isPresent()) {
+                return byPhone.get();
+            }
+        }
+
+        // 3. Create missing seed user
+        try {
+            User newUser = User.builder()
+                    .email(cleanEmail)
+                    .password(passwordEncoder.encode(rawPassword))
+                    .firstName(firstName)
+                    .lastName(lastName)
+                    .phoneNumber(cleanPhone)
+                    .isVerified(true)
+                    .isAccountNonLocked(true)
+                    .roles(roles)
+                    .jwtVersion(0)
+                    .build();
+            return userRepository.save(newUser);
+        } catch (Exception e) {
+            log.warn("Seed user creation skipped for email {} / phone {}: {}", cleanEmail, cleanPhone, e.getMessage());
+            return userRepository.findByEmailIgnoreCase(cleanEmail)
+                    .or(() -> cleanPhone != null ? userRepository.findByPhoneNumber(cleanPhone) : Optional.empty())
+                    .orElse(null);
+        }
     }
 
     private Role seedRole(RoleType name) {

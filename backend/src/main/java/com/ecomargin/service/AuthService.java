@@ -62,8 +62,23 @@ public class AuthService {
         final String cleanEmail = request.getEmail().trim().toLowerCase();
 
         if (userRepository.findByEmailIgnoreCase(cleanEmail).isPresent()) {
-            log.warn("[AUTH] Registration rejected - email already exists: {}", cleanEmail);
-            throw new UserAlreadyExistsException("Email is already registered.");
+            log.warn("[AUTH] Registration rejected - email already exists");
+            throw new UserAlreadyExistsException("An account with this email or phone number already exists.");
+        }
+
+        String rawPhone = request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()
+                ? request.getPhoneNumber()
+                : request.getPhone();
+        String cleanPhone = null;
+        if (rawPhone != null && !rawPhone.isBlank()) {
+            cleanPhone = rawPhone.trim();
+            if (!cleanPhone.startsWith("+") && cleanPhone.length() == 10 && cleanPhone.matches("\\d+")) {
+                cleanPhone = "+91" + cleanPhone;
+            }
+            if (userRepository.findByPhoneNumber(cleanPhone).isPresent() || userRepository.findByPhoneNumber(rawPhone.trim()).isPresent()) {
+                log.warn("[AUTH] Registration rejected - phone number already exists");
+                throw new UserAlreadyExistsException("An account with this email or phone number already exists.");
+            }
         }
 
         String rawName = request.getName() != null && !request.getName().isBlank()
@@ -78,10 +93,6 @@ public class AuthService {
             lastName = parts.length > 1 ? parts[1] : "";
         }
 
-        String rawPhone = request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()
-                ? request.getPhoneNumber()
-                : request.getPhone();
-
         Set<Role> roles = new HashSet<>();
         Role customerRole = roleRepository.findByName(RoleType.ROLE_CUSTOMER)
                 .orElseGet(() -> {
@@ -90,14 +101,12 @@ public class AuthService {
                 });
         roles.add(customerRole);
 
-        String phoneVal = (rawPhone != null && !rawPhone.isBlank()) ? rawPhone.trim() : null;
-
         User user = User.builder()
                 .email(cleanEmail)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .firstName(firstName != null && !firstName.isBlank() ? firstName : "Customer")
                 .lastName(lastName != null ? lastName : "")
-                .phoneNumber(phoneVal)
+                .phoneNumber(cleanPhone)
                 .isVerified(true)
                 .isAccountNonLocked(true)
                 .roles(roles)
@@ -132,24 +141,36 @@ public class AuthService {
             throw new IllegalArgumentException("Email and password are required.");
         }
 
-        final String email = request.getEmail().trim().toLowerCase();
-        log.info("[AUTH] Processing authentication attempt for email: {}", email);
+        final String input = request.getEmail().trim();
+        log.info("[AUTH] Processing authentication attempt");
 
-        Optional<User> userOpt = userRepository.findByEmailIgnoreCase(email);
-        if (userOpt.isEmpty()) {
-            log.warn("[AUTH] Login failed: User account not found for email: {}", email);
+        User user = null;
+
+        if (input.contains("@")) {
+            user = userRepository.findByEmailIgnoreCase(input.toLowerCase()).orElse(null);
+        } else {
+            String phoneFormatted = input;
+            if (!phoneFormatted.startsWith("+") && phoneFormatted.length() == 10 && phoneFormatted.matches("\\d+")) {
+                phoneFormatted = "+91" + phoneFormatted;
+            }
+            user = userRepository.findByPhoneNumber(phoneFormatted)
+                    .or(() -> userRepository.findByPhoneNumber(input))
+                    .or(() -> userRepository.findByEmailIgnoreCase(input.toLowerCase()))
+                    .orElse(null);
+        }
+
+        if (user == null) {
+            log.warn("[AUTH] Login failed: User account not found");
             throw new BadCredentialsException("Invalid email or password");
         }
 
-        User user = userOpt.get();
-
         if (user.getDeletedAt() != null) {
-            log.warn("[AUTH] Login failed: Account is deactivated/deleted for email: {}", email);
+            log.warn("[AUTH] Login failed: Account is deactivated/deleted");
             throw new BadCredentialsException("Account has been deactivated.");
         }
 
         if (!user.isAccountNonLocked()) {
-            log.warn("[AUTH] Login failed: Account is locked for email: {}", email);
+            log.warn("[AUTH] Login failed: Account is locked");
             throw new BadCredentialsException("Account is locked. Please contact support.");
         }
 
@@ -158,30 +179,31 @@ public class AuthService {
             !user.getPassword().startsWith("$2b$") &&
             !user.getPassword().startsWith("$2y$")) {
             if (request.getPassword().equals(user.getPassword())) {
-                log.info("[AUTH] Migrating legacy plain-text password to BCrypt hash for email: {}", email);
+                log.info("[AUTH] Migrating legacy plain-text password to BCrypt hash for user ID: {}", user.getId());
                 user.setPassword(passwordEncoder.encode(request.getPassword()));
                 userRepository.save(user);
             }
         }
 
-        try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(email, request.getPassword())
-            );
-        } catch (BadCredentialsException e) {
-            log.warn("[AUTH] Login failed: Incorrect password for email: {}", email);
-            throw new BadCredentialsException("Invalid email or password");
-        } catch (AuthenticationException e) {
-            log.warn("[AUTH] Login failed: Spring Security authentication exception ({}) for email: {}", e.getMessage(), email);
+        if (user.getPassword() == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            log.warn("[AUTH] Login failed: Password mismatch for user ID: {}", user.getId());
             throw new BadCredentialsException("Invalid email or password");
         }
 
-        log.info("[AUTH] Password verification successful for email: {}", email);
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(user.getEmail(), request.getPassword())
+            );
+        } catch (AuthenticationException e) {
+            log.warn("[AUTH] Spring Security authentication fallback check: {}", e.getMessage());
+        }
+
+        log.info("[AUTH] Password verification successful for user ID: {}", user.getId());
 
         String jwtToken = jwtUtil.generateToken(user);
         RefreshToken refreshToken = createRefreshToken(user);
 
-        log.info("[AUTH] Login successful. Access & refresh tokens generated for user ID: {}, email: {}", user.getId(), email);
+        log.info("[AUTH] Login successful. Access & refresh tokens generated for user ID: {}", user.getId());
 
         return AuthResponse.builder()
                 .accessToken(jwtToken)
@@ -206,7 +228,6 @@ public class AuthService {
                         throw new BadCredentialsException("Refresh token was expired. Please make a new signin request");
                     }
                     
-                    // Rotate the token
                     token.setUsed(true);
                     refreshTokenRepository.save(token);
                     

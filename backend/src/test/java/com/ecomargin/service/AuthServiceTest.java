@@ -117,6 +117,7 @@ class AuthServiceTest {
                 .build();
 
         when(userRepository.findByEmailIgnoreCase("customer@ecomargin.com")).thenReturn(Optional.of(sampleUser));
+        when(passwordEncoder.matches("password123", sampleUser.getPassword())).thenReturn(true);
         when(jwtUtil.generateToken(sampleUser)).thenReturn("jwt.token.string");
         when(refreshTokenRepository.save(any())).thenAnswer(invocation -> com.ecomargin.model.RefreshToken.builder().token("mock-refresh-token").build());
 
@@ -137,8 +138,7 @@ class AuthServiceTest {
                 .build();
 
         when(userRepository.findByEmailIgnoreCase("customer@ecomargin.com")).thenReturn(Optional.of(sampleUser));
-        doThrow(new BadCredentialsException("Bad credentials"))
-                .when(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+        when(passwordEncoder.matches("wrongpassword", sampleUser.getPassword())).thenReturn(false);
 
         assertThrows(BadCredentialsException.class, () -> authService.authenticate(request));
     }
