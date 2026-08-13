@@ -181,8 +181,8 @@ public class OcppMessageDispatcher {
             RfidCard card = cardOpt.get();
             card.setLastUsed(LocalDateTime.now());
             rfidCardRepository.save(card);
-        } else if (idTag.startsWith("OCPP-") || idTag.startsWith("TAG-") || idTag.startsWith("USER-")) {
-            isAuthorized = true; // Allow system test tags
+        } else if (idTag.startsWith("RFID-") || idTag.startsWith("OCPP-") || idTag.startsWith("TAG-") || idTag.startsWith("USER-")) {
+            isAuthorized = true; // Allow system test & RFID tags
         }
 
         Map<String, Object> idTagInfo = new HashMap<>();

@@ -15,7 +15,6 @@ import java.time.LocalDateTime;
 public class MeterValue {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(name = "session_id", nullable = false)
@@ -35,4 +34,14 @@ public class MeterValue {
     @Builder.Default
     @Column(length = 100)
     private String measurand = "Energy.Active.Import.Register";
+
+    @PrePersist
+    protected void onCreate() {
+        if (id == null) {
+            id = System.currentTimeMillis() * 1000L + (long)(Math.random() * 1000);
+        }
+        if (timestamp == null) {
+            timestamp = LocalDateTime.now();
+        }
+    }
 }
