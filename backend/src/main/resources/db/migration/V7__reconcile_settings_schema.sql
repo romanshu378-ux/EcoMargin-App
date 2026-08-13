@@ -1,5 +1,6 @@
 -- PostgreSQL Migration: V7__reconcile_settings_schema.sql
--- Safely reconcile settings table to use 'setting_key' as the canonical primary key column.
+-- Safely reconcile settings table to use 'setting_key' as the canonical primary key column
+-- and 'setting_value' as the canonical value column.
 -- Target / Defensive / Non-destructive / Deterministic / Production-ready.
 
 DO $$
@@ -21,7 +22,7 @@ BEGIN
     END IF;
 
     ----------------------------------------------------------------------------
-    -- B & D. Ensure 'setting_key' column exists
+    -- B. Ensure 'setting_key' column exists
     ----------------------------------------------------------------------------
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns 
@@ -31,9 +32,7 @@ BEGIN
         RAISE NOTICE 'V7 Migration: Added setting_key column to settings table.';
     END IF;
 
-    ----------------------------------------------------------------------------
-    -- C & E. If legacy 'key' column exists, copy data to setting_key where null
-    ----------------------------------------------------------------------------
+    -- If legacy 'key' column exists, copy data to setting_key where null
     IF EXISTS (
         SELECT 1 FROM information_schema.columns 
         WHERE table_name = 'settings' AND column_name = 'key' AND table_schema = 'public'
@@ -46,7 +45,31 @@ BEGIN
     END IF;
 
     ----------------------------------------------------------------------------
-    -- F & G. Data Integrity Validation — Assert no NULL or duplicate setting_key
+    -- C. Ensure 'setting_value' column exists
+    ----------------------------------------------------------------------------
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'settings' AND column_name = 'setting_value' AND table_schema = 'public'
+    ) THEN
+        ALTER TABLE settings ADD COLUMN setting_value TEXT;
+        RAISE NOTICE 'V7 Migration: Added setting_value column to settings table.';
+    END IF;
+
+    -- If legacy 'value' column exists, copy data to setting_value where null
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'settings' AND column_name = 'value' AND table_schema = 'public'
+    ) THEN
+        UPDATE settings 
+        SET setting_value = "value"
+        WHERE setting_value IS NULL AND "value" IS NOT NULL;
+
+        ALTER TABLE settings DROP COLUMN "value";
+        RAISE NOTICE 'V7 Migration: Copied data from legacy value to setting_value and dropped value column.';
+    END IF;
+
+    ----------------------------------------------------------------------------
+    -- D. Data Integrity Validation — Assert no NULL or duplicate setting_key
     ----------------------------------------------------------------------------
     -- Check for NULL setting_key values
     SELECT COUNT(*) INTO v_null_count 
@@ -82,7 +105,7 @@ BEGIN
     END IF;
 
     ----------------------------------------------------------------------------
-    -- H. Drop ONLY the specific Primary Key constraint on settings.key (if present)
+    -- E. Drop ONLY the specific Primary Key constraint on settings.key (if present)
     ----------------------------------------------------------------------------
     SELECT tc.constraint_name INTO v_pk_constraint_name
     FROM information_schema.table_constraints tc
@@ -98,9 +121,10 @@ BEGIN
     END IF;
 
     ----------------------------------------------------------------------------
-    -- I & J. Set setting_key NOT NULL and add Primary Key on setting_key
+    -- F. Set setting_key & setting_value NOT NULL and add Primary Key on setting_key
     ----------------------------------------------------------------------------
     ALTER TABLE settings ALTER COLUMN setting_key SET NOT NULL;
+    ALTER TABLE settings ALTER COLUMN setting_value SET NOT NULL;
 
     IF NOT EXISTS (
         SELECT 1 
@@ -116,7 +140,7 @@ BEGIN
     END IF;
 
     ----------------------------------------------------------------------------
-    -- K. Remove legacy 'key' column ONLY if it exists and setting_key is active
+    -- G. Remove legacy 'key' column ONLY if it exists and setting_key is active
     ----------------------------------------------------------------------------
     IF EXISTS (
         SELECT 1 FROM information_schema.columns 
@@ -126,5 +150,5 @@ BEGIN
         RAISE NOTICE 'V7 Migration: Dropped legacy key column from settings table.';
     END IF;
 
-    RAISE NOTICE 'V7 Migration Completed Successfully: settings table now uses setting_key as primary key.';
+    RAISE NOTICE 'V7 Migration Completed Successfully: settings table now uses setting_key as primary key and setting_value as value column.';
 END $$;

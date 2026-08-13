@@ -289,7 +289,7 @@ CREATE TABLE support_tickets (
 
 CREATE TABLE settings (
     setting_key VARCHAR(100) PRIMARY KEY,
-    value TEXT NOT NULL,
+    setting_value TEXT NOT NULL,
     description TEXT,
     metadata JSONB, -- For configurations with complex structural requirements
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL

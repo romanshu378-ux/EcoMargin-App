@@ -94,7 +94,7 @@ INSERT INTO connectors (charger_id, connector_index, type, status, max_power_kw)
 --------------------------------------------------------------------------------
 -- 6. System Settings
 --------------------------------------------------------------------------------
-INSERT INTO settings (setting_key, value, description) VALUES
+INSERT INTO settings (setting_key, setting_value, description) VALUES
 ('default_charging_rate_per_kwh', '0.35', 'Standard charge per kWh in USD when not overridden by station settings'),
 ('idle_fee_per_minute', '0.15', 'Fee assessed per minute after charging completes and EV is still plugged in'),
 ('booking_timeout_minutes', '15', 'Time standard booking reserves a connector before auto-release'),

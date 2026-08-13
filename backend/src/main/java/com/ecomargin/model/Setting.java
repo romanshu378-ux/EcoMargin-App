@@ -27,10 +27,9 @@ public class Setting {
     private String key;
 
     /**
-     * Maps to the "value" column in the settings table. Quoted to prevent H2 from treating
-     * "value" as a reserved keyword. Both PostgreSQL and H2 (in PostgreSQL mode) accept "value".
+     * Maps to the "setting_value" column in the settings table.
      */
-    @Column(name = "\"value\"", columnDefinition = "TEXT", nullable = false)
+    @Column(name = "setting_value", nullable = false, columnDefinition = "TEXT")
     private String value;
 
     @Column(name = "description", columnDefinition = "TEXT")
