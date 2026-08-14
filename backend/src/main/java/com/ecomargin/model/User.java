@@ -61,9 +61,11 @@ public class User implements UserDetails {
     private byte[] profileImage;
 
     @Builder.Default
+    @Column(name = "is_verified", nullable = false)
     private boolean isVerified = true;
 
     @Builder.Default
+    @Column(name = "is_account_non_locked", nullable = false)
     private boolean isAccountNonLocked = true;
 
     @ManyToMany(fetch = FetchType.EAGER)
