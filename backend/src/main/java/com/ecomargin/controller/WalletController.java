@@ -45,7 +45,7 @@ public class WalletController {
                 .orElseGet(() -> {
                     Wallet wallet = Wallet.builder()
                             .user(user)
-                            .balance(new BigDecimal("256.50"))
+                            .balance(BigDecimal.ZERO)
                             .currency("INR")
                             .build();
                     return walletRepository.save(wallet);
