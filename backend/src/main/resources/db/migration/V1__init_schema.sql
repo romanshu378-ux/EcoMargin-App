@@ -34,23 +34,13 @@ CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     email VARCHAR(255) NOT NULL,
     password VARCHAR(255),
-    jwt_version INT DEFAULT 0 NOT NULL,
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     phone_number VARCHAR(20),
     google_id VARCHAR(255),
-    date_of_birth DATE,
-    gender VARCHAR(50),
-    address TEXT,
-    city VARCHAR(100),
-    state VARCHAR(100),
-    pin_code VARCHAR(20),
-    emergency_contact_name VARCHAR(100),
-    emergency_contact_number VARCHAR(20),
-    profile_image_url TEXT,
-    profile_image BYTEA,
-    is_verified BOOLEAN DEFAULT TRUE NOT NULL,
-    is_account_non_locked BOOLEAN DEFAULT TRUE NOT NULL,
+    is_verified BOOLEAN DEFAULT FALSE NOT NULL,
+    is_locked BOOLEAN DEFAULT FALSE NOT NULL,
+    jwt_version INT DEFAULT 0 NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted_at TIMESTAMP WITH TIME ZONE -- Soft delete support
@@ -170,10 +160,6 @@ CREATE TABLE charging_sessions (
     end_time TIMESTAMP WITH TIME ZONE,
     total_energy_kwh NUMERIC(8, 3) DEFAULT 0.000,
     total_cost NUMERIC(10, 2) DEFAULT 0.00,
-    ocpp_transaction_id VARCHAR(255),
-    meter_start_wh NUMERIC(12, 3) DEFAULT 0.000,
-    meter_stop_wh NUMERIC(12, 3) DEFAULT 0.000,
-    stop_reason VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -200,22 +186,6 @@ CREATE TABLE payments (
     gateway_status VARCHAR(50) NOT NULL,
     gateway_transaction_id VARCHAR(255) UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
-
-CREATE TABLE vehicles (
-    id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    registration_number VARCHAR(100) NOT NULL,
-    brand VARCHAR(100) NOT NULL,
-    model VARCHAR(100) NOT NULL,
-    variant VARCHAR(100),
-    type VARCHAR(50),
-    battery_capacity_kwh NUMERIC(5, 2),
-    connector_type VARCHAR(50),
-    nickname VARCHAR(100),
-    is_default BOOLEAN DEFAULT FALSE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 --------------------------------------------------------------------------------
@@ -319,7 +289,7 @@ CREATE TABLE support_tickets (
 
 CREATE TABLE settings (
     setting_key VARCHAR(100) PRIMARY KEY,
-    setting_value TEXT NOT NULL,
+    value TEXT NOT NULL,
     description TEXT,
     metadata JSONB, -- For configurations with complex structural requirements
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL

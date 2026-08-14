@@ -46,11 +46,11 @@ WHERE r.name = 'ROLE_CUSTOMER' AND p.name IN ('READ_STATIONS', 'START_CHARGING',
 -- Admin: admin@ecomargin.com
 -- Vendor: vendor@ecomargin.com
 -- Customer: customer@ecomargin.com / driver@ecomargin.com
-INSERT INTO users (email, password, first_name, last_name, phone_number, is_verified, is_account_non_locked) VALUES
-('admin@ecomargin.com', '$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG', 'Platform', 'Admin', '+15550100', TRUE, TRUE),
-('vendor@ecomargin.com', '$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG', 'John', 'CPO', '+15550101', TRUE, TRUE),
-('customer@ecomargin.com', '$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG', 'Jane', 'Driver', '+15550102', TRUE, TRUE),
-('driver@ecomargin.com', '$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG', 'Driver', 'User', '+15550103', TRUE, TRUE);
+INSERT INTO users (email, password, first_name, last_name, phone_number, is_verified, is_locked) VALUES
+('admin@ecomargin.com', '$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG', 'Platform', 'Admin', '+15550100', TRUE, FALSE),
+('vendor@ecomargin.com', '$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG', 'John', 'CPO', '+15550101', TRUE, FALSE),
+('customer@ecomargin.com', '$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG', 'Jane', 'Driver', '+15550102', TRUE, FALSE),
+('driver@ecomargin.com', '$2a$12$R.S4wN6M2Xq8vK/h7F0.Qe.Hvx7K4U5tQ3BswY00sN1b8lO.Wd7iG', 'Driver', 'User', '+15550103', TRUE, FALSE);
 
 -- Assign User Roles
 INSERT INTO user_roles (user_id, role_id) VALUES
@@ -94,7 +94,7 @@ INSERT INTO connectors (charger_id, connector_index, type, status, max_power_kw)
 --------------------------------------------------------------------------------
 -- 6. System Settings
 --------------------------------------------------------------------------------
-INSERT INTO settings (setting_key, setting_value, description) VALUES
+INSERT INTO settings (setting_key, value, description) VALUES
 ('default_charging_rate_per_kwh', '0.35', 'Standard charge per kWh in USD when not overridden by station settings'),
 ('idle_fee_per_minute', '0.15', 'Fee assessed per minute after charging completes and EV is still plugged in'),
 ('booking_timeout_minutes', '15', 'Time standard booking reserves a connector before auto-release'),
