@@ -18,7 +18,7 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
-    baseline-version: '6'
+    baseline-version: '0'
     locations: classpath:db/migration
 
 management:
@@ -146,7 +146,7 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
-    baseline-version: '6'
+    baseline-version: '0'
     locations: classpath:db/migration
 
 app:
