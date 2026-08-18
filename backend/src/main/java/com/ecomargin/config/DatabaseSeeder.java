@@ -26,13 +26,18 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -65,6 +70,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     );
 
     @Override
+    @Transactional
     public void run(String... args) {
         log.info("=== DATABASE CONNECTED ===");
         log.info("=== RUNNING APPLICATION STARTUP DATABASE SEEDER ===");
@@ -89,8 +95,9 @@ public class DatabaseSeeder implements CommandLineRunner {
         }
 
         // 3. Seed Default Settings (Idempotent — never overwrites existing production settings)
+        Map<String, Setting> settingsMap;
         try {
-            seedDefaultSettings();
+            settingsMap = seedDefaultSettings();
         } catch (Exception e) {
             log.error("[SEEDER FATAL] Settings seeding failed: {}", e.getMessage(), e);
             throw new IllegalStateException("Application startup failed during settings seeding: " + e.getMessage(), e);
@@ -104,7 +111,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         }
 
         // 5. Mandatory Startup Validation — Fail startup if any of the 8 required settings are missing
-        validateRequiredSettings();
+        validateRequiredSettings(settingsMap);
 
         log.info("=== SEEDER STATUS: SUCCESS ===");
         log.info("=== ALL 8 REQUIRED SETTINGS VERIFIED IN DATABASE ===");
@@ -227,37 +234,44 @@ public class DatabaseSeeder implements CommandLineRunner {
     // Throws exception if required settings cannot be created
     // -------------------------------------------------------------------------
 
-    private void seedDefaultSettings() {
-        seedSetting("min_wallet_balance_to_start", "50.00",
+    private Map<String, Setting> seedDefaultSettings() {
+        Map<String, Setting> existingMap = settingRepository.findAllById(REQUIRED_SETTINGS)
+                .stream()
+                .filter(s -> s.getKey() != null)
+                .collect(Collectors.toMap(Setting::getKey, Function.identity(), (s1, s2) -> s1));
+
+        seedSettingIfMissing(existingMap, "min_wallet_balance_to_start", "50.00",
                 "Minimum wallet balance required to initiate charging");
-        seedSetting("default_charging_rate_per_kwh", "15.00",
+        seedSettingIfMissing(existingMap, "default_charging_rate_per_kwh", "15.00",
                 "Default per kWh charging price in INR");
-        seedSetting("home_sections",
+        seedSettingIfMissing(existingMap, "home_sections",
                 "{\"hero_slider\": true, \"quick_actions\": true, \"wallet_card\": true, \"nearby_stations\": true, \"promo_banner\": true, \"search_section\": true}",
                 "Home screen section visibility configuration");
-        seedSetting("support_info",
+        seedSettingIfMissing(existingMap, "support_info",
                 "{\"phone\": \"1800-123-4567\", \"email\": \"support@ecomargin.com\", \"hours\": \"24/7 Helpline\"}",
                 "Support helpline contact information");
-        seedSetting("app_maintenance",
+        seedSettingIfMissing(existingMap, "app_maintenance",
                 "{\"enabled\": false, \"message\": \"EcoMargin is currently undergoing scheduled maintenance. Please check back shortly.\"}",
                 "Global app maintenance flag");
-        seedSetting("charging_session_rules",
+        seedSettingIfMissing(existingMap, "charging_session_rules",
                 "{\"max_duration_hours\": 12, \"idle_fee_per_min\": 2.0, \"auto_stop_target_pct\": 100}",
                 "Charging session operational parameters");
-        seedSetting("faqs",
+        seedSettingIfMissing(existingMap, "faqs",
                 "[{\"q\": \"How do I start an EV charging session?\", \"a\": \"Simply find a nearby charger on the map, select the connector details, set your target battery limit, and tap Start Charging.\"}, {\"q\": \"How does EcoMargin Wallet billing work?\", \"a\": \"Your wallet balance is automatically debited based on the exact kWh energy consumed at the end of every charging session.\"}, {\"q\": \"What connector types are supported?\", \"a\": \"EcoMargin supports DC Fast Chargers (CCS2, GB/T, CHAdeMO) and AC Chargers (Type 2).\"}]",
                 "Customer FAQs list");
-        seedSetting("offers_banners",
+        seedSettingIfMissing(existingMap, "offers_banners",
                 "[{\"code\": \"ECOGREEN20\", \"title\": \"20% Cashback on First Charging Session\", \"desc\": \"Get up to ₹100 cashback credited into your EcoMargin Wallet.\", \"expiry\": \"Valid till 31 Aug 2026\"}, {\"code\": \"FASTCHARGE50\", \"title\": \"Flat ₹50 OFF on DC Fast Chargers\", \"desc\": \"Applicable on session power > 50 kW.\", \"expiry\": \"Valid till 15 Aug 2026\"}]",
                 "Active promotional offers & coupons");
+
+        return existingMap;
     }
 
     /**
-     * Inserts a single default setting only if it does not already exist.
+     * Inserts a single default setting only if it does not already exist in the provided map.
      * Preserves existing production setting values. Never uses null setting_key.
      * Throws IllegalStateException if setting fails to insert.
      */
-    private void seedSetting(String key, String val, String desc) {
+    private void seedSettingIfMissing(Map<String, Setting> settingsMap, String key, String val, String desc) {
         if (key == null || key.isBlank()) {
             throw new IllegalArgumentException("Cannot seed setting with null or blank setting_key");
         }
@@ -265,14 +279,15 @@ public class DatabaseSeeder implements CommandLineRunner {
             throw new IllegalArgumentException("Cannot seed setting key='" + key + "' with null value");
         }
         try {
-            if (settingRepository.findById(key).isEmpty()) {
+            if (!settingsMap.containsKey(key)) {
                 Setting setting = Setting.builder()
                         .key(key)            // written to column setting_key per entity mapping
                         .value(val)
                         .description(desc)
                         .updatedAt(LocalDateTime.now())
                         .build();
-                settingRepository.save(setting);
+                Setting saved = settingRepository.save(setting);
+                settingsMap.put(key, saved);
                 log.info("[SEEDER] Inserted default setting: setting_key='{}'", key);
             } else {
                 log.debug("[SEEDER] Setting setting_key='{}' already exists — preserving existing value.", key);
@@ -284,15 +299,15 @@ public class DatabaseSeeder implements CommandLineRunner {
     }
 
     /**
-     * Validates that all 8 required settings exist in the database.
+     * Validates that all 8 required settings exist in the in-memory map or database.
      * Throws IllegalStateException to halt application startup if any setting is missing.
      */
-    public void validateRequiredSettings() {
+    public void validateRequiredSettings(Map<String, Setting> settingsMap) {
         List<String> missingKeys = new ArrayList<>();
 
         for (String reqKey : REQUIRED_SETTINGS) {
-            Optional<Setting> opt = settingRepository.findById(reqKey);
-            if (opt.isEmpty() || opt.get().getKey() == null || opt.get().getValue() == null) {
+            Setting setting = (settingsMap != null) ? settingsMap.get(reqKey) : settingRepository.findById(reqKey).orElse(null);
+            if (setting == null || setting.getKey() == null || setting.getValue() == null) {
                 missingKeys.add(reqKey);
                 log.error("[FATAL STARTUP ERROR] Required setting_key='{}' is missing or invalid in database!", reqKey);
             }
@@ -303,6 +318,14 @@ public class DatabaseSeeder implements CommandLineRunner {
             log.error("[FATAL STARTUP ERROR] {}", errorMsg);
             throw new IllegalStateException(errorMsg);
         }
+    }
+
+    public void validateRequiredSettings() {
+        Map<String, Setting> map = settingRepository.findAllById(REQUIRED_SETTINGS)
+                .stream()
+                .filter(s -> s.getKey() != null)
+                .collect(Collectors.toMap(Setting::getKey, Function.identity(), (s1, s2) -> s1));
+        validateRequiredSettings(map);
     }
 
     // -------------------------------------------------------------------------
