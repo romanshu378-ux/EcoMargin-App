@@ -15,22 +15,27 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.repository.Repository;
-import org.springframework.security.web.SecurityFilterChain;
 
+import java.lang.management.ClassLoadingMXBean;
+import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
+import java.lang.management.OperatingSystemMXBean;
+import java.lang.management.ThreadMXBean;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * TEMPORARY STARTUP DIAGNOSTIC
- * Deduplicated, millisecond-accurate timing logger across all Spring Boot deployment lifecycle stages.
+ * Millisecond-accurate timing logger with JVM CPU, Thread State, GC, System Load & Memory profiling.
  */
 @Slf4j
 @Configuration
 public class StartupTimingDiagnostic implements BeanPostProcessor {
 
     private final long startTimeMs = ManagementFactory.getRuntimeMXBean().getStartTime();
+    private final Thread mainThread = Thread.currentThread();
     private final Map<String, Long> beanStartTimes = new ConcurrentHashMap<>();
     private final AtomicInteger repositoryCount = new AtomicInteger(0);
     private long firstRepoStartMs = -1;
@@ -40,6 +45,45 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
         return System.currentTimeMillis() - startTimeMs;
     }
 
+    private void logJvmStats(String stage) {
+        long elapsedMs = getElapsed();
+        ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
+        long cpuTimeMs = threadBean.isThreadCpuTimeSupported() ? threadBean.getThreadCpuTime(mainThread.getId()) / 1_000_000L : -1;
+        
+        MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
+        long heapUsedMb = memoryBean.getHeapMemoryUsage().getUsed() / (1024 * 1024);
+        long heapMaxMb = memoryBean.getHeapMemoryUsage().getMax() / (1024 * 1024);
+        
+        ClassLoadingMXBean classBean = ManagementFactory.getClassLoadingMXBean();
+        int loadedClassCount = classBean.getLoadedClassCount();
+        
+        long totalGcCount = 0;
+        long totalGcTimeMs = 0;
+        for (GarbageCollectorMXBean gcBean : ManagementFactory.getGarbageCollectorMXBeans()) {
+            long count = gcBean.getCollectionCount();
+            long time = gcBean.getCollectionTime();
+            if (count > 0) totalGcCount += count;
+            if (time > 0) totalGcTimeMs += time;
+        }
+
+        double processCpuLoadPct = -1;
+        double systemCpuLoadPct = -1;
+        try {
+            OperatingSystemMXBean osBean = ManagementFactory.getOperatingSystemMXBean();
+            if (osBean instanceof com.sun.management.OperatingSystemMXBean sunOsBean) {
+                processCpuLoadPct = sunOsBean.getProcessCpuLoad() * 100.0;
+                systemCpuLoadPct = sunOsBean.getCpuLoad() * 100.0;
+            }
+        } catch (Throwable ignored) {
+            // Non-sun JVM fallback
+        }
+        
+        log.info("[JVM-DIAGNOSTIC] Stage='{}' elapsed={}ms | MainThreadState={} | MainThreadCpuTime={}ms | ProcessCpu={}% | SystemCpu={}% | HeapUsed={}MB/{}MB | LoadedClasses={} | TotalGcCount={} | TotalGcTime={}ms",
+                stage, elapsedMs, mainThread.getState(), cpuTimeMs,
+                String.format("%.1f", processCpuLoadPct), String.format("%.1f", systemCpuLoadPct),
+                heapUsedMb, heapMaxMb, loadedClassCount, totalGcCount, totalGcTimeMs);
+    }
+
     @Override
     public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
         long now = getElapsed();
@@ -47,10 +91,13 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
 
         if ("entityManagerFactory".equals(beanName)) {
             log.info("[TIMING] EntityManagerFactory initialization START elapsed={}ms", now);
+            logJvmStats("EntityManagerFactory-START");
         } else if ("dataSource".equals(beanName)) {
             log.info("[TIMING] Hikari DataSource initialization START elapsed={}ms", now);
+            logJvmStats("Hikari-START");
         } else if ("securityFilterChain".equals(beanName)) {
             log.info("[TIMING] SecurityFilterChain initialization START elapsed={}ms", now);
+            logJvmStats("SecurityFilterChain-START");
         } else if ("redisConnectionFactory".equals(beanName) || "stringRedisTemplate".equals(beanName)) {
             log.info("[TIMING] Redis Component '{}' initialization START elapsed={}ms", beanName, now);
         } else if (bean instanceof Repository || beanName.endsWith("Repository")) {
@@ -58,6 +105,7 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
             if (firstRepoStartMs < 0) {
                 firstRepoStartMs = now;
                 log.info("[TIMING] Repository Proxy Initialization START elapsed={}ms (First Repo: {})", now, beanName);
+                logJvmStats("Repositories-START");
             }
         }
         return bean;
@@ -71,6 +119,7 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
 
         if ("entityManagerFactory".equals(beanName)) {
             log.info("[TIMING] EntityManagerFactory initialization COMPLETE elapsed={}ms (Duration: {}ms)", now, duration);
+            logJvmStats("EntityManagerFactory-COMPLETE");
         } else if ("securityFilterChain".equals(beanName)) {
             log.info("[TIMING] SecurityFilterChain initialization COMPLETE elapsed={}ms (Duration: {}ms)", now, duration);
         } else if ("redisConnectionFactory".equals(beanName) || "stringRedisTemplate".equals(beanName)) {
@@ -98,8 +147,10 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
             public void handle(Event event, Context context) {
                 if (event == Event.BEFORE_MIGRATE) {
                     log.info("[TIMING] Flyway migration START elapsed={}ms", getElapsed());
+                    logJvmStats("Flyway-START");
                 } else if (event == Event.AFTER_MIGRATE) {
                     log.info("[TIMING] Flyway migration COMPLETE elapsed={}ms", getElapsed());
+                    logJvmStats("Flyway-COMPLETE");
                 }
             }
 
@@ -114,6 +165,7 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
     public void onContextRefreshed(ContextRefreshedEvent event) {
         long now = getElapsed();
         log.info("[TIMING] Context refresh COMPLETE elapsed={}ms", now);
+        logJvmStats("ContextRefreshed");
         if (firstRepoStartMs > 0 && lastRepoEndMs > 0) {
             log.info("[TIMING] Total Repository Initialization: {} repos processed in {}ms (From {}ms to {}ms)",
                     repositoryCount.get(), (lastRepoEndMs - firstRepoStartMs), firstRepoStartMs, lastRepoEndMs);
@@ -124,10 +176,12 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
     public void onWebServerInitialized(WebServerInitializedEvent event) {
         log.info("[TIMING] Tomcat HTTP Connector BOUND on port {} elapsed={}ms",
                 event.getWebServer().getPort(), getElapsed());
+        logJvmStats("Tomcat-Bound");
     }
 
     @EventListener
     public void onApplicationReady(ApplicationReadyEvent event) {
         log.info("[TIMING] ApplicationReadyEvent elapsed={}ms (TOTAL STARTUP TIME)", getElapsed());
+        logJvmStats("ApplicationReady");
     }
 }
