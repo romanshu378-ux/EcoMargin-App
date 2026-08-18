@@ -14,18 +14,27 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.data.repository.Repository;
+import org.springframework.security.web.SecurityFilterChain;
 
 import java.lang.management.ManagementFactory;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * TEMPORARY STARTUP DIAGNOSTIC
- * Measures exact millisecond timestamps across all Spring Boot deployment lifecycle stages.
+ * Deduplicated, millisecond-accurate timing logger across all Spring Boot deployment lifecycle stages.
  */
 @Slf4j
 @Configuration
 public class StartupTimingDiagnostic implements BeanPostProcessor {
 
     private final long startTimeMs = ManagementFactory.getRuntimeMXBean().getStartTime();
+    private final Map<String, Long> beanStartTimes = new ConcurrentHashMap<>();
+    private final AtomicInteger repositoryCount = new AtomicInteger(0);
+    private long firstRepoStartMs = -1;
+    private long lastRepoEndMs = -1;
 
     private long getElapsed() {
         return System.currentTimeMillis() - startTimeMs;
@@ -33,20 +42,41 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
 
     @Override
     public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
-        if ("dataSource".equals(beanName) || beanName.toLowerCase().contains("hikari")) {
-            log.info("[TIMING] Hikari start elapsed={}ms", getElapsed());
-        } else if ("entityManagerFactory".equals(beanName) || beanName.toLowerCase().contains("entitymanagerfactory")) {
-            log.info("[TIMING] EntityManagerFactory initialization start elapsed={}ms", getElapsed());
-        } else if (beanName.toLowerCase().contains("tomcat") || beanName.toLowerCase().contains("servletwebserverfactory")) {
-            log.info("[TIMING] Tomcat initialization elapsed={}ms", getElapsed());
+        long now = getElapsed();
+        beanStartTimes.put(beanName, now);
+
+        if ("entityManagerFactory".equals(beanName)) {
+            log.info("[TIMING] EntityManagerFactory initialization START elapsed={}ms", now);
+        } else if ("dataSource".equals(beanName)) {
+            log.info("[TIMING] Hikari DataSource initialization START elapsed={}ms", now);
+        } else if ("securityFilterChain".equals(beanName)) {
+            log.info("[TIMING] SecurityFilterChain initialization START elapsed={}ms", now);
+        } else if ("redisConnectionFactory".equals(beanName) || "stringRedisTemplate".equals(beanName)) {
+            log.info("[TIMING] Redis Component '{}' initialization START elapsed={}ms", beanName, now);
+        } else if (bean instanceof Repository || beanName.endsWith("Repository")) {
+            int count = repositoryCount.incrementAndGet();
+            if (firstRepoStartMs < 0) {
+                firstRepoStartMs = now;
+                log.info("[TIMING] Repository Proxy Initialization START elapsed={}ms (First Repo: {})", now, beanName);
+            }
         }
         return bean;
     }
 
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
-        if ("entityManagerFactory".equals(beanName) || beanName.toLowerCase().contains("entitymanagerfactory")) {
-            log.info("[TIMING] EntityManagerFactory initialization completion elapsed={}ms", getElapsed());
+        long now = getElapsed();
+        Long startMs = beanStartTimes.remove(beanName);
+        long duration = (startMs != null) ? (now - startMs) : 0;
+
+        if ("entityManagerFactory".equals(beanName)) {
+            log.info("[TIMING] EntityManagerFactory initialization COMPLETE elapsed={}ms (Duration: {}ms)", now, duration);
+        } else if ("securityFilterChain".equals(beanName)) {
+            log.info("[TIMING] SecurityFilterChain initialization COMPLETE elapsed={}ms (Duration: {}ms)", now, duration);
+        } else if ("redisConnectionFactory".equals(beanName) || "stringRedisTemplate".equals(beanName)) {
+            log.info("[TIMING] Redis Component '{}' initialization COMPLETE elapsed={}ms (Duration: {}ms)", beanName, now, duration);
+        } else if (bean instanceof Repository || beanName.endsWith("Repository")) {
+            lastRepoEndMs = now;
         }
         return bean;
     }
@@ -67,9 +97,9 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
             @Override
             public void handle(Event event, Context context) {
                 if (event == Event.BEFORE_MIGRATE) {
-                    log.info("[TIMING] Flyway migration start elapsed={}ms", getElapsed());
+                    log.info("[TIMING] Flyway migration START elapsed={}ms", getElapsed());
                 } else if (event == Event.AFTER_MIGRATE) {
-                    log.info("[TIMING] Flyway migration completion elapsed={}ms", getElapsed());
+                    log.info("[TIMING] Flyway migration COMPLETE elapsed={}ms", getElapsed());
                 }
             }
 
@@ -82,17 +112,22 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
 
     @EventListener
     public void onContextRefreshed(ContextRefreshedEvent event) {
-        log.info("[TIMING] Context refresh completion elapsed={}ms", getElapsed());
+        long now = getElapsed();
+        log.info("[TIMING] Context refresh COMPLETE elapsed={}ms", now);
+        if (firstRepoStartMs > 0 && lastRepoEndMs > 0) {
+            log.info("[TIMING] Total Repository Initialization: {} repos processed in {}ms (From {}ms to {}ms)",
+                    repositoryCount.get(), (lastRepoEndMs - firstRepoStartMs), firstRepoStartMs, lastRepoEndMs);
+        }
     }
 
     @EventListener
     public void onWebServerInitialized(WebServerInitializedEvent event) {
-        log.info("[TIMING] Tomcat actually started / connector bound on port {} elapsed={}ms",
+        log.info("[TIMING] Tomcat HTTP Connector BOUND on port {} elapsed={}ms",
                 event.getWebServer().getPort(), getElapsed());
     }
 
     @EventListener
     public void onApplicationReady(ApplicationReadyEvent event) {
-        log.info("[TIMING] ApplicationReadyEvent elapsed={}ms (Total Startup Time)", getElapsed());
+        log.info("[TIMING] ApplicationReadyEvent elapsed={}ms (TOTAL STARTUP TIME)", getElapsed());
     }
 }
