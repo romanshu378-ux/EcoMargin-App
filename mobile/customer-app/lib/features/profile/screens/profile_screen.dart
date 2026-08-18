@@ -74,6 +74,13 @@ class ProfileScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
                 const Divider(),
                 ListTile(
+                  leading: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF16A34A)),
+                  title: const Text('My Wallet'),
+                  subtitle: const Text('Balance, top-up & transactions', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () => context.push('/wallet'),
+                ),
+                ListTile(
                   leading: const Icon(Icons.electric_car, color: Color(0xFF16A34A)),
                   title: const Text('My Vehicles'),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 16),

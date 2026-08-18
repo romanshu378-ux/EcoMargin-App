@@ -4,8 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/home_providers.dart';
 import '../../../core/providers/app_config_provider.dart';
+import '../../../core/providers/core_providers.dart';
+import '../../../core/utils/connector_status.dart';
 import '../widgets/app_header.dart';
-import '../widgets/hero_banner_slider.dart';
 import '../widgets/search_section_widget.dart';
 import '../widgets/quick_actions_widget.dart';
 import '../widgets/wallet_card_widget.dart';
@@ -19,10 +20,29 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
-  int _currentIndex = 0;
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(walletBalanceAsyncProvider);
+      ref.read(stationsProvider.notifier).fetchStations();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +123,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: RefreshIndicator(
           color: const Color(0xFF16A34A),
           onRefresh: () async {
+            ref.invalidate(walletBalanceAsyncProvider);
             await ref.read(stationsProvider.notifier).fetchStations();
             await ref.read(appConfigProvider.notifier).fetchAppConfig();
           },
@@ -142,17 +163,193 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              const SliverToBoxAdapter(child: SizedBox(height: 14)),
 
-              // 3. Hero Banner (Admin Configurable)
-              if (appConfig.heroSliderEnabled) ...[
-                SliverToBoxAdapter(
-                  child: HeroBannerSlider(
-                    onFindStationsPressed: () => context.go('/map'),
-                  ),
+              // 3. Featured Wallet Balance Card (Replaces Hero Banner)
+              SliverToBoxAdapter(
+                child: WalletCardWidget(
+                  onAddMoneyPressed: () async {
+                    await context.push('/add-money');
+                    ref.invalidate(walletBalanceAsyncProvider);
+                  },
+                  onTransactionHistoryPressed: () async {
+                    await context.push('/transactions');
+                    ref.invalidate(walletBalanceAsyncProvider);
+                  },
                 ),
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              ),
+
+              // Persistent Active Charging Status Card
+              if (ref.watch(chargingSessionProvider).isCharging) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 14)),
+                Builder(
+                  builder: (context) {
+                    final session = ref.watch(chargingSessionProvider);
+                    final walletBal = ref.watch(walletBalanceProvider);
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+                    final durationMins = session.durationSeconds ~/ 60;
+                    final isLowBalance = walletBal < 50.0;
+                    final timeAgo = session.lastUpdated != null
+                        ? '${DateTime.now().difference(session.lastUpdated!).inSeconds}s ago'
+                        : 'Just now';
+
+                    return SliverToBoxAdapter(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: isDark
+                                ? [const Color(0xFF0F291E), const Color(0xFF064E3B)]
+                                : [const Color(0xFFF0FDF4), const Color(0xFFDCFCE7)],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFF16A34A), width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF16A34A).withOpacity(0.15),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.bolt_rounded, color: Color(0xFF16A34A), size: 22),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '⚡ Charging Now',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: isDark ? Colors.white : const Color(0xFF15803D),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                 Builder(
+                                  builder: (context) {
+                                    final statusInfo = ConnectorStatusInfo.fromRaw(session.status);
+                                    final isFaulted = statusInfo.status == ConnectorStatus.faulted;
+                                    final badgeText = session.hasConnectionError
+                                        ? 'Connection lost. Reconnecting...'
+                                        : statusInfo.label;
+                                    final badgeColor = isFaulted ? Colors.red : statusInfo.color;
+
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: badgeColor.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        badgeText,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: badgeColor,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    session.stationName.isNotEmpty ? session.stationName : 'EcoMargin Charging Hub',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  'Last updated $timeAgo',
+                                  style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '${session.percentage.toInt()}% SOC',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                                ),
+                                Text(
+                                  '${session.kwhDelivered.toStringAsFixed(2)} kWh',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  '$durationMins min',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  '₹${session.totalCost.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Wallet: ₹${walletBal.toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isLowBalance ? Colors.orange.shade800 : const Color(0xFF64748B),
+                                  ),
+                                ),
+                                if (isLowBalance)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      '⚠️ Low wallet balance',
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.orange),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 44,
+                              child: ElevatedButton.icon(
+                                onPressed: () => context.push('/live-charging'),
+                                icon: const Icon(Icons.flash_on_rounded, size: 18, color: Colors.white),
+                                label: const Text('View Charging', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF16A34A),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ],
+
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
               // 4. Search Section (Admin Configurable)
               if (appConfig.searchSectionEnabled) ...[
@@ -298,24 +495,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         const SnackBar(content: Text('Opening Charging History')),
                       );
                     },
-                    onWallet: () => context.go('/wallet'),
+                    onWallet: () async {
+                      await context.push('/wallet');
+                      ref.invalidate(walletBalanceAsyncProvider);
+                    },
                   ),
                 ),
                 const SliverToBoxAdapter(child: SizedBox(height: 20)),
               ],
 
-              // 7. Wallet Card (Admin Configurable)
-              if (appConfig.walletCardEnabled) ...[
-                SliverToBoxAdapter(
-                  child: WalletCardWidget(
-                    onAddMoneyPressed: () => context.go('/wallet'),
-                    onViewWalletPressed: () => context.go('/wallet'),
-                  ),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 20)),
-              ],
-
-              // 8. Promotional Banner (Admin Configurable)
+              // 7. Promotional Banner (Admin Configurable)
               if (appConfig.promoBannerEnabled) ...[
                 const SliverToBoxAdapter(
                   child: PromoBannerWidget(),
@@ -324,53 +513,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
             ],
           ),
-        ),
-      ),
-
-      // Bottom Navigation Bar
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF0F172A) : Colors.white,
-          border: Border(
-            top: BorderSide(
-              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
-              width: 1,
-            ),
-          ),
-        ),
-        child: NavigationBar(
-          selectedIndex: _currentIndex,
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          indicatorColor: const Color(0xFF16A34A).withOpacity(0.12),
-          onDestinationSelected: (index) {
-            setState(() => _currentIndex = index);
-            if (index == 1) context.go('/map');
-            if (index == 2) context.go('/scan');
-            if (index == 3) context.go('/profile');
-          },
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded, color: Color(0xFF16A34A)),
-              label: 'Home',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.map_outlined),
-              selectedIcon: Icon(Icons.map_rounded, color: Color(0xFF16A34A)),
-              label: 'Map',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.calendar_today_outlined),
-              selectedIcon: Icon(Icons.calendar_today_rounded, color: Color(0xFF16A34A)),
-              label: 'Bookings',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded),
-              selectedIcon: Icon(Icons.person_rounded, color: Color(0xFF16A34A)),
-              label: 'Profile',
-            ),
-          ],
         ),
       ),
     );

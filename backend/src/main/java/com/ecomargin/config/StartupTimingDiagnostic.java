@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * TEMPORARY STARTUP DIAGNOSTIC
- * Millisecond-accurate timing logger with JVM CPU, Thread State, GC, System Load & Memory profiling.
+ * Millisecond-accurate timing logger with JVM CPU, Thread State, GC, & Background Thread Sampler.
  */
 @Slf4j
 @Configuration
@@ -40,6 +40,43 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
     private final AtomicInteger repositoryCount = new AtomicInteger(0);
     private long firstRepoStartMs = -1;
     private long lastRepoEndMs = -1;
+    private volatile boolean samplingActive = true;
+
+    public StartupTimingDiagnostic() {
+        Thread samplerThread = new Thread(() -> {
+            String lastLoggedKey = "";
+            while (samplingActive) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                if (!samplingActive) break;
+
+                try {
+                    Thread.State state = mainThread.getState();
+                    if (state != Thread.State.RUNNABLE) {
+                        StackTraceElement[] stack = mainThread.getStackTrace();
+                        if (stack != null && stack.length > 0) {
+                            String topFrame = stack[0].getClassName() + "." + stack[0].getMethodName() + ":" + stack[0].getLineNumber();
+                            String callingFrame = (stack.length > 1) ? stack[1].getClassName() + "." + stack[1].getMethodName() + ":" + stack[1].getLineNumber() : "";
+                            String currentKey = state + "|" + topFrame;
+                            if (!currentKey.equals(lastLoggedKey)) {
+                                lastLoggedKey = currentKey;
+                                log.info("[THREAD-WAIT-DIAGNOSTIC] elapsed={}ms | MainThreadState={} | TopFrame={} | CallingFrame={}",
+                                        getElapsed(), state, topFrame, callingFrame);
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        }, "diagnostic-thread-sampler");
+        samplerThread.setDaemon(true);
+        samplerThread.setPriority(Thread.MIN_PRIORITY);
+        samplerThread.start();
+    }
 
     private long getElapsed() {
         return System.currentTimeMillis() - startTimeMs;
@@ -75,7 +112,6 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
                 systemCpuLoadPct = sunOsBean.getCpuLoad() * 100.0;
             }
         } catch (Throwable ignored) {
-            // Non-sun JVM fallback
         }
         
         log.info("[JVM-DIAGNOSTIC] Stage='{}' elapsed={}ms | MainThreadState={} | MainThreadCpuTime={}ms | ProcessCpu={}% | SystemCpu={}% | HeapUsed={}MB/{}MB | LoadedClasses={} | TotalGcCount={} | TotalGcTime={}ms",
@@ -181,6 +217,7 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
 
     @EventListener
     public void onApplicationReady(ApplicationReadyEvent event) {
+        samplingActive = false;
         log.info("[TIMING] ApplicationReadyEvent elapsed={}ms (TOTAL STARTUP TIME)", getElapsed());
         logJvmStats("ApplicationReady");
     }

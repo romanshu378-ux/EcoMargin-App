@@ -15,36 +15,59 @@ class ApiClient {
   }
 
   ApiClient(this._storageService) : _dio = Dio() {
-    _dio.options.baseUrl = const String.fromEnvironment('API_URL', defaultValue: _defaultBaseUrl);
-    _dio.options.connectTimeout = const Duration(seconds: 45);
-    _dio.options.receiveTimeout = const Duration(seconds: 45);
-    _dio.options.sendTimeout = const Duration(seconds: 30);
+    _dio.options.baseUrl = AppConfig.baseUrl;
+    _dio.options.connectTimeout = const Duration(seconds: 15);
+    _dio.options.receiveTimeout = const Duration(seconds: 15);
+    _dio.options.sendTimeout = const Duration(seconds: 15);
 
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
+          var path = options.path;
+          if (path.startsWith('/') && !path.startsWith('http')) {
+            options.path = path.substring(1);
+          }
+          if (!options.baseUrl.endsWith('/')) {
+            options.baseUrl = '${options.baseUrl}/';
+          }
+
           options.headers['X-Request-ID'] = _generateRequestId();
+
           final token = await _storageService.getToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
           options.headers['Content-Type'] = 'application/json';
           if (kDebugMode) {
-            debugPrint('[API] --> ${options.method} ${options.uri}');
+            debugPrint('[API REQUEST] ${options.method} ${options.uri}');
+            final loggedHeaders = Map<String, dynamic>.from(options.headers);
+            if (loggedHeaders.containsKey('Authorization')) {
+              loggedHeaders['Authorization'] = 'Bearer [HIDDEN]';
+            }
+            debugPrint('[API] Headers: $loggedHeaders');
+            if (options.data != null) {
+              if (options.path.contains('/auth/')) {
+                debugPrint('[API] Body: [AUTH DATA HIDDEN]');
+              } else {
+                debugPrint('[API] Body: ${options.data}');
+              }
+            }
           }
           return handler.next(options);
         },
         onResponse: (response, handler) {
           if (kDebugMode) {
-            debugPrint('[API] <-- ${response.statusCode} ${response.requestOptions.uri}');
+            debugPrint('[API RESPONSE] ${response.statusCode} ${response.requestOptions.uri}');
           }
           return handler.next(response);
         },
         onError: (DioException e, handler) async {
           if (kDebugMode) {
-            debugPrint('[API] ERR ${e.type.name} ${e.requestOptions.uri}');
+            debugPrint('[API ERROR] ${e.type.name} ${e.requestOptions.uri}');
+            debugPrint('[API ERROR MSG] ${e.response?.statusCode} ${e.message}');
           }
 
+          // Automatic cold-start retry for 502/503/504 or network timeout (1 retry max)
           final statusCode = e.response?.statusCode;
           final isColdStartError = statusCode == 502 ||
               statusCode == 503 ||
@@ -57,11 +80,13 @@ class ApiClient {
               e.requestOptions.path.contains('/auth/') ||
               e.requestOptions.path.contains('health');
 
-          if (isColdStartError && isRetryableMethod && retryCount < 3) {
-            final nextRetry = retryCount + 1;
-            final backoffDelay = Duration(seconds: nextRetry * 3);
+          if (isColdStartError && isRetryableMethod && retryCount < 1) {
+            const backoffDelay = Duration(seconds: 2);
+            if (kDebugMode) {
+              debugPrint('[API] Retrying request (1/1) after 2s due to cold start / timeout...');
+            }
             await Future.delayed(backoffDelay);
-            e.requestOptions.extra['retry_count'] = nextRetry;
+            e.requestOptions.extra['retry_count'] = 1;
             try {
               final response = await _dio.fetch(e.requestOptions);
               return handler.resolve(response);

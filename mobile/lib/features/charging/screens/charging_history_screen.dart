@@ -51,12 +51,29 @@ class ChargingHistoryScreen extends StatelessWidget {
                 child: Icon(Icons.bolt, color: Colors.white),
               ),
               title: Text(item['station']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('${item['date']!}\n${item['energy']!} • ${item['duration']!}'),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item['date']!),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Text(item['energy']!, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        const Text(' • '),
+                        Text(item['duration']!, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
               trailing: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(item['cost']!, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
+                  const SizedBox(height: 4),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(

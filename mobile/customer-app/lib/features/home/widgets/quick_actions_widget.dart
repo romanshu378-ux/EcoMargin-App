@@ -20,9 +20,9 @@ class QuickActionsWidget extends StatelessWidget {
 
     final actions = [
       {
-        'title': 'Scan QR',
-        'icon': Icons.qr_code_scanner_rounded,
-        'onTap': onScanQr,
+        'title': 'Find\nChargers',
+        'icon': Icons.ev_station_rounded,
+        'onTap': onFavorites,
       },
       {
         'title': 'Favorites',

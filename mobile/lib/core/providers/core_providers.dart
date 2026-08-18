@@ -37,23 +37,31 @@ class ChargingSessionState {
   final double percentage; // 0-100
   final double kwhDelivered;
   final double currentPowerKw;
+  final double? voltage;
+  final double? current;
   final int durationSeconds;
   final double totalCost;
   final bool hasConnectionError;
+  final DateTime? startTime;
+  final DateTime? lastUpdated;
 
   ChargingSessionState({
-    required this.isCharging,
+    this.isCharging = false,
     this.sessionId,
-    required this.status,
-    required this.stationName,
-    required this.chargerId,
-    required this.connectorType,
-    required this.percentage,
-    required this.kwhDelivered,
-    required this.currentPowerKw,
-    required this.durationSeconds,
-    required this.totalCost,
+    this.status = 'COMPLETED',
+    this.stationName = 'EcoMargin Charging Hub',
+    this.chargerId = '',
+    this.connectorType = '',
+    this.percentage = 0.0,
+    this.kwhDelivered = 0.0,
+    this.currentPowerKw = 0.0,
+    this.voltage,
+    this.current,
+    this.durationSeconds = 0,
+    this.totalCost = 0.0,
     this.hasConnectionError = false,
+    this.startTime,
+    this.lastUpdated,
   });
 
   ChargingSessionState copyWith({
@@ -66,9 +74,13 @@ class ChargingSessionState {
     double? percentage,
     double? kwhDelivered,
     double? currentPowerKw,
+    double? voltage,
+    double? current,
     int? durationSeconds,
     double? totalCost,
     bool? hasConnectionError,
+    DateTime? startTime,
+    DateTime? lastUpdated,
   }) {
     return ChargingSessionState(
       isCharging: isCharging ?? this.isCharging,
@@ -80,62 +92,48 @@ class ChargingSessionState {
       percentage: percentage ?? this.percentage,
       kwhDelivered: kwhDelivered ?? this.kwhDelivered,
       currentPowerKw: currentPowerKw ?? this.currentPowerKw,
+      voltage: voltage ?? this.voltage,
+      current: current ?? this.current,
       durationSeconds: durationSeconds ?? this.durationSeconds,
       totalCost: totalCost ?? this.totalCost,
       hasConnectionError: hasConnectionError ?? this.hasConnectionError,
+      startTime: startTime ?? this.startTime,
+      lastUpdated: lastUpdated ?? this.lastUpdated,
     );
   }
 }
 
-class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
+class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> with WidgetsBindingObserver {
   final Ref ref;
   Timer? _timer;
   bool _isStarting = false;
-  DateTime? _lastSyncTime;
+  bool _isAppPaused = false;
 
-  ChargingSessionNotifier(this.ref)
-      : super(ChargingSessionState(
-          isCharging: false,
-          status: 'COMPLETED',
-          stationName: 'EcoMargin Charging Hub',
-          chargerId: '',
-          connectorType: '',
-          percentage: 0.0,
-          kwhDelivered: 0.0,
-          currentPowerKw: 0.0,
-          durationSeconds: 0,
-          totalCost: 0.0,
-        )) {
-    syncWithBackend();
+  ChargingSessionNotifier(this.ref) : super(ChargingSessionState()) {
+    WidgetsBinding.instance.addObserver(this);
+    checkActiveSession();
   }
 
-  Future<void> syncWithBackend() async {
-    final now = DateTime.now();
-    if (_lastSyncTime != null && now.difference(_lastSyncTime!) < const Duration(seconds: 3)) {
-      return;
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _isAppPaused = true;
+      _timer?.cancel();
+    } else if (state == AppLifecycleState.resumed) {
+      _isAppPaused = false;
+      checkActiveSession();
     }
-    _lastSyncTime = now;
-    try {
-      await fetchWalletBalance();
-    } catch (_) {}
-    try {
-      await checkActiveSession();
-    } catch (_) {}
   }
 
   Future<void> fetchWalletBalance() async {
-    final apiClient = ref.read(apiClientProvider);
-    final response = await apiClient.dio.get('/wallet/balance');
-    if (response.statusCode == 200 && response.data != null) {
-      final bal = double.tryParse(response.data['balance']?.toString() ?? '0') ?? 0.0;
-      ref.read(walletBalanceProvider.notifier).state = bal;
-    } else {
-      throw DioException(
-        requestOptions: response.requestOptions,
-        response: response,
-        type: DioExceptionType.badResponse,
-      );
-    }
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.dio.get('/wallet/balance');
+      if (response.statusCode == 200 && response.data != null) {
+        final bal = double.tryParse(response.data['balance']?.toString() ?? '0') ?? 0.0;
+        ref.read(walletBalanceProvider.notifier).state = bal;
+      }
+    } catch (_) {}
   }
 
   Future<void> checkActiveSession() async {
@@ -144,16 +142,59 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
       final response = await apiClient.dio.get('/charging-sessions/active');
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
-        final status = data['status'] ?? 'CHARGING';
-        final isActive = status == 'ACTIVE' || status == 'STARTING' || status == 'PREPARING' || status == 'CHARGING' || status == 'FINISHING';
+        final status = (data['status'] ?? 'CHARGING').toString().toUpperCase();
         
-        if (!isActive) {
-          _timer?.cancel();
+        final isActive = status == 'ACTIVE' ||
+                         status == 'STARTING' ||
+                         status == 'PREPARING' ||
+                         status == 'CHARGING' ||
+                         status == 'STOPPING';
+
+        final sessId = data['sessionId']?.toString();
+        if (sessId != null) {
+          final storage = ref.read(storageServiceProvider);
+          await storage.saveData('active_session_id', sessId);
+        }
+
+        double? volt;
+        if (data['voltage'] != null) {
+          volt = double.tryParse(data['voltage'].toString());
+        } else if (data['voltageV'] != null) {
+          volt = double.tryParse(data['voltageV'].toString());
+        }
+
+        double? curr;
+        if (data['current'] != null) {
+          curr = double.tryParse(data['current'].toString());
+        } else if (data['currentA'] != null) {
+          curr = double.tryParse(data['currentA'].toString());
+        }
+
+        DateTime? parsedStart;
+        if (data['startTime'] != null) {
+          parsedStart = DateTime.tryParse(data['startTime'].toString());
+        }
+
+        int durationSecs = 0;
+        if (data['durationSeconds'] != null) {
+          durationSecs = int.tryParse(data['durationSeconds'].toString()) ?? 0;
+        } else if (parsedStart != null) {
+          durationSecs = DateTime.now().difference(parsedStart).inSeconds;
+        }
+
+        // Live wallet balance sync from backend
+        if (data['walletBalance'] != null) {
+          final wBal = double.tryParse(data['walletBalance'].toString());
+          if (wBal != null) {
+            ref.read(walletBalanceProvider.notifier).state = wBal;
+          }
+        } else {
+          fetchWalletBalance();
         }
 
         state = ChargingSessionState(
           isCharging: isActive,
-          sessionId: data['sessionId']?.toString(),
+          sessionId: sessId,
           status: status,
           stationName: data['stationName'] ?? 'EcoMargin Charging Hub',
           chargerId: data['chargerId'] ?? '',
@@ -161,20 +202,32 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
           percentage: double.tryParse(data['percentage']?.toString() ?? '0') ?? 0.0,
           kwhDelivered: double.tryParse(data['kwhDelivered']?.toString() ?? '0') ?? 0.0,
           currentPowerKw: double.tryParse(data['currentPowerKw']?.toString() ?? '0') ?? 0.0,
-          durationSeconds: int.tryParse(data['durationSeconds']?.toString() ?? '0') ?? 0,
+          voltage: volt,
+          current: curr,
+          durationSeconds: durationSecs,
           totalCost: double.tryParse(data['totalCost']?.toString() ?? '0') ?? 0.0,
           hasConnectionError: false,
+          startTime: parsedStart,
+          lastUpdated: DateTime.now(),
         );
-        if (state.isCharging) {
+
+        if (isActive && !_isAppPaused) {
           _startPolling();
+        } else {
+          _timer?.cancel();
         }
       } else {
         _timer?.cancel();
+        final storage = ref.read(storageServiceProvider);
+        await storage.saveData('active_session_id', null);
         state = state.copyWith(isCharging: false, hasConnectionError: false);
       }
     } catch (_) {
       if (state.isCharging) {
         state = state.copyWith(hasConnectionError: true);
+        if (!_isAppPaused) {
+          _startPolling();
+        }
       } else {
         _timer?.cancel();
         state = state.copyWith(isCharging: false, hasConnectionError: false);
@@ -184,7 +237,12 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
 
   void _startPolling() {
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+    if (_isAppPaused) return;
+    _timer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      if (_isAppPaused) {
+        _timer?.cancel();
+        return;
+      }
       await checkActiveSession();
     });
   }
@@ -205,10 +263,16 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
       );
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
-        final status = data['status'] ?? 'CHARGING';
+        final status = (data['status'] ?? 'CHARGING').toString().toUpperCase();
+        final sessId = data['sessionId']?.toString();
+        if (sessId != null) {
+          final storage = ref.read(storageServiceProvider);
+          await storage.saveData('active_session_id', sessId);
+        }
+
         state = ChargingSessionState(
           isCharging: true,
-          sessionId: data['sessionId']?.toString(),
+          sessionId: sessId,
           status: status,
           stationName: data['stationName'] ?? stationName ?? 'EcoMargin Charging Hub',
           chargerId: data['chargerId'] ?? chargerId ?? '',
@@ -223,13 +287,10 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
         await fetchWalletBalance();
         _startPolling();
       } else {
-        // Non-200 response: mark connection error so caller can check
         state = state.copyWith(hasConnectionError: true);
       }
     } catch (e) {
-      // Do NOT rethrow bare DioException – surface as hasConnectionError
       state = state.copyWith(isCharging: false, hasConnectionError: true);
-      // Re-throw so StartChargingScreen can display a message
       rethrow;
     } finally {
       _isStarting = false;
@@ -245,6 +306,9 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data;
         _timer?.cancel();
+        final storage = ref.read(storageServiceProvider);
+        await storage.saveData('active_session_id', null);
+
         state = ChargingSessionState(
           isCharging: false,
           sessionId: data['sessionId']?.toString() ?? activeSessionId,
@@ -260,7 +324,6 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
           hasConnectionError: false,
         );
         
-        // Dynamic balance sync
         final walletBal = double.tryParse(data['walletBalance']?.toString() ?? '0') ?? 0.0;
         ref.read(walletBalanceProvider.notifier).state = walletBal;
 
@@ -269,6 +332,8 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
       }
     } catch (_) {
       _timer?.cancel();
+      final storage = ref.read(storageServiceProvider);
+      await storage.saveData('active_session_id', null);
       state = state.copyWith(isCharging: false, hasConnectionError: false);
       ref.invalidate(walletTransactionsProvider);
       ref.invalidate(chargingHistoryProvider);
@@ -295,6 +360,7 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
   }
@@ -303,6 +369,17 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> {
 final chargingSessionProvider =
     StateNotifierProvider<ChargingSessionNotifier, ChargingSessionState>((ref) {
   return ChargingSessionNotifier(ref);
+});
+
+final walletBalanceAsyncProvider = FutureProvider.autoDispose<double>((ref) async {
+  final apiClient = ref.watch(apiClientProvider);
+  final response = await apiClient.dio.get('/wallet/balance');
+  if (response.statusCode == 200 && response.data != null) {
+    final bal = double.tryParse(response.data['balance']?.toString() ?? '0') ?? 0.0;
+    ref.read(walletBalanceProvider.notifier).state = bal;
+    return bal;
+  }
+  throw Exception('Failed to load wallet balance');
 });
 
 final walletTransactionsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {

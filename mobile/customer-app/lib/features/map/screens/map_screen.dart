@@ -100,6 +100,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     try {
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 8),
       );
       final newPos = LatLng(position.latitude, position.longitude);
 

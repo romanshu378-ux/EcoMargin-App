@@ -59,9 +59,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
       GoRoute(path: '/forgot-password', builder: (context, state) => const ForgotPasswordScreen()),
 
-      GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+      ShellRoute(
+        builder: (context, state, child) {
+          return NavigationShell(
+            location: state.uri.path,
+            child: child,
+          );
+        },
+        routes: [
+          GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+          GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
+          GoRoute(path: '/charging-history', builder: (context, state) => const ChargingHistoryScreen()),
+          GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
+        ],
+      ),
 
-      GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
       GoRoute(path: '/search', builder: (context, state) => const SearchStationScreen()),
       GoRoute(
         path: '/station-details',
@@ -73,7 +85,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/start-charging', builder: (context, state) => const StartChargingScreen()),
       GoRoute(path: '/live-charging', builder: (context, state) => const LiveChargingSessionScreen()),
       GoRoute(path: '/stop-charging', builder: (context, state) => const StopChargingScreen()),
-      GoRoute(path: '/charging-history', builder: (context, state) => const ChargingHistoryScreen()),
 
       GoRoute(path: '/wallet', builder: (context, state) => const WalletScreen()),
       GoRoute(path: '/add-money', builder: (context, state) => const AddMoneyScreen()),

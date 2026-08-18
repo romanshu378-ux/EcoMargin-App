@@ -173,7 +173,28 @@ class ChargingHistoryScreen extends ConsumerWidget {
             child: CircularProgressIndicator(color: Color(0xFF16A34A)),
           ),
           error: (err, st) => Center(
-            child: Text('Failed to load history: $err', style: const TextStyle(color: Colors.red)),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Colors.red, size: 48),
+                const SizedBox(height: 12),
+                Text(
+                  'Failed to load charging history: $err',
+                  style: const TextStyle(color: Colors.red, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () => ref.invalidate(chargingHistoryProvider),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF16A34A),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
