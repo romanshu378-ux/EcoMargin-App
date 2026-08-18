@@ -31,7 +31,7 @@ public class Wallet {
     private String currency = "INR";
 
     @Version
-    private Integer version;
+    private Long version;
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
