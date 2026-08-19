@@ -505,13 +505,28 @@ public class AdminController {
         return dto;
     }
 
+    @org.springframework.transaction.annotation.Transactional
     @PostMapping("/chargers")
     public ResponseEntity<Charger> createCharger(
             @RequestBody Charger charger,
             @AuthenticationPrincipal UserDetails principal
     ) {
-        if (charger.getStatus() == null) charger.setStatus("AVAILABLE");
+        if (charger.getStatus() == null || charger.getStatus().isBlank()) {
+            charger.setStatus("AVAILABLE");
+        }
         Charger saved = chargerRepository.save(charger);
+
+        List<Connector> existingConnectors = connectorRepository.findByCharger(saved);
+        if (existingConnectors == null || existingConnectors.isEmpty()) {
+            Connector defaultConnector = Connector.builder()
+                    .charger(saved)
+                    .connectorIndex(1)
+                    .type("CCS2")
+                    .maxPowerKw(new BigDecimal("60.00"))
+                    .status("AVAILABLE")
+                    .build();
+            connectorRepository.save(defaultConnector);
+        }
 
         auditLogService.logAction(
                 null,

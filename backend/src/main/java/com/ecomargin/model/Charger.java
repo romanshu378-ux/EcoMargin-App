@@ -33,8 +33,9 @@ public class Charger {
     private String model;
     private String brand;
 
+    @Builder.Default
     @Column(nullable = false)
-    private String status = "UNAVAILABLE"; // AVAILABLE, CHARGING, FAULTED, etc.
+    private String status = "AVAILABLE"; // AVAILABLE, CHARGING, FAULTED, etc.
 
     @Column(name = "firmware_version")
     private String firmwareVersion;

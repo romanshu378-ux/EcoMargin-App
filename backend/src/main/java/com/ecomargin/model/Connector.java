@@ -30,11 +30,13 @@ public class Connector {
     @Column(nullable = false)
     private String type; // CCS2, TYPE2, CHADEMO, GB_T
 
+    @Builder.Default
     @Column(nullable = false)
     private String status = "AVAILABLE";
 
+    @Builder.Default
     @Column(name = "max_power_kw", nullable = false, precision = 5, scale = 2)
-    private BigDecimal maxPowerKw = BigDecimal.valueOf(50.00);
+    private BigDecimal maxPowerKw = BigDecimal.valueOf(60.00);
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

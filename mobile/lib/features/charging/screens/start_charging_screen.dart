@@ -237,8 +237,18 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> with 
       }
     } catch (e) {
       if (mounted) {
+        String errorMsg = e.toString();
+        if (e.toString().contains('message:')) {
+          errorMsg = e.toString();
+        }
+        try {
+          final dynamic errData = (e as dynamic).response?.data;
+          if (errData != null && errData is Map && errData.containsKey('message')) {
+            errorMsg = errData['message'].toString();
+          }
+        } catch (_) {}
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to start charging: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(errorMsg), backgroundColor: Colors.red),
         );
       }
     } finally {
