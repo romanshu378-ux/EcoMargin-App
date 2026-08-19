@@ -38,6 +38,10 @@ public class Connector {
     @Column(name = "max_power_kw", nullable = false, precision = 5, scale = 2)
     private BigDecimal maxPowerKw = BigDecimal.valueOf(60.00);
 
+    @Builder.Default
+    @Column(name = "unit_rate", precision = 6, scale = 2)
+    private BigDecimal unitRate = BigDecimal.valueOf(18.00);
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

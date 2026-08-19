@@ -247,6 +247,145 @@ public class AdminController {
 
         Station updated = stationRepository.save(station);
 
+        // Process Chargers & Connectors if present in request
+        if (request.getChargers() != null) {
+            List<Charger> existingChargers = chargerRepository.findByStation(updated);
+            Set<Long> processedChargerIds = new HashSet<>();
+
+            for (int i = 0; i < request.getChargers().size(); i++) {
+                StationRequest.ChargerConfigRequest cReq = request.getChargers().get(i);
+                Charger charger = null;
+
+                if (cReq.getId() != null) {
+                    charger = chargerRepository.findById(cReq.getId()).orElse(null);
+                }
+
+                if (charger == null) {
+                    String ocppId = cReq.getOcppId() != null && !cReq.getOcppId().isBlank()
+                            ? cReq.getOcppId().trim()
+                            : ("STN-" + updated.getId() + "-CHG-" + (i + 1));
+                    charger = Charger.builder()
+                            .station(updated)
+                            .ocppId(ocppId)
+                            .brand(cReq.getBrand() != null ? cReq.getBrand() : "EcoMargin")
+                            .model(cReq.getModel() != null ? cReq.getModel() : "EV-Fast-60")
+                            .status(cReq.getStatus() != null ? cReq.getStatus().toUpperCase() : "AVAILABLE")
+                            .build();
+                } else {
+                    if (cReq.getOcppId() != null && !cReq.getOcppId().isBlank()) {
+                        charger.setOcppId(cReq.getOcppId().trim());
+                    }
+                    if (cReq.getBrand() != null) charger.setBrand(cReq.getBrand());
+                    if (cReq.getModel() != null) charger.setModel(cReq.getModel());
+                    if (cReq.getStatus() != null) charger.setStatus(cReq.getStatus().toUpperCase());
+                }
+
+                Charger savedCharger = chargerRepository.save(charger);
+                processedChargerIds.add(savedCharger.getId());
+
+                auditLogService.logAction(
+                        null,
+                        principal != null ? principal.getUsername() : "ADMIN",
+                        "CHARGER_UPDATED",
+                        "Charger",
+                        savedCharger.getId().toString(),
+                        null,
+                        savedCharger.getOcppId(),
+                        "127.0.0.1",
+                        "Updated charger: " + savedCharger.getOcppId()
+                );
+
+                if (cReq.getConnectors() != null) {
+                    List<Connector> existingConnectors = connectorRepository.findByCharger(savedCharger);
+                    Set<Long> processedConnectorIds = new HashSet<>();
+
+                    for (int j = 0; j < cReq.getConnectors().size(); j++) {
+                        StationRequest.ConnectorConfigRequest connReq = cReq.getConnectors().get(j);
+                        Connector connector = null;
+
+                        if (connReq.getId() != null) {
+                            connector = connectorRepository.findById(connReq.getId()).orElse(null);
+                        }
+
+                        BigDecimal kw = connReq.getMaxPowerKw() != null && connReq.getMaxPowerKw().compareTo(BigDecimal.ZERO) > 0
+                                ? connReq.getMaxPowerKw() : new BigDecimal("60.00");
+                        BigDecimal rate = connReq.getUnitRate() != null && connReq.getUnitRate().compareTo(BigDecimal.ZERO) > 0
+                                ? connReq.getUnitRate() : new BigDecimal("18.00");
+
+                        if (connector == null) {
+                            connector = Connector.builder()
+                                    .charger(savedCharger)
+                                    .connectorIndex(j + 1)
+                                    .type(connReq.getType() != null ? connReq.getType().toUpperCase() : "CCS2")
+                                    .maxPowerKw(kw)
+                                    .unitRate(rate)
+                                    .status(connReq.getStatus() != null ? connReq.getStatus().toUpperCase() : "AVAILABLE")
+                                    .build();
+                        } else {
+                            if (connReq.getType() != null) connector.setType(connReq.getType().toUpperCase());
+                            connector.setMaxPowerKw(kw);
+                            connector.setUnitRate(rate);
+                            if (connReq.getStatus() != null) connector.setStatus(connReq.getStatus().toUpperCase());
+                        }
+
+                        Connector savedConn = connectorRepository.save(connector);
+                        processedConnectorIds.add(savedConn.getId());
+
+                        auditLogService.logAction(
+                                null,
+                                principal != null ? principal.getUsername() : "ADMIN",
+                                "CONNECTOR_UPDATED",
+                                "Connector",
+                                savedConn.getId().toString(),
+                                null,
+                                savedConn.getType() + " (" + kw + " kW @ ₹" + rate + "/kWh)",
+                                "127.0.0.1",
+                                "Updated connector #" + savedConn.getConnectorIndex()
+                        );
+                    }
+
+                    for (Connector conn : existingConnectors) {
+                        if (!processedConnectorIds.contains(conn.getId())) {
+                            List<ChargingSession> sessions = chargingSessionRepository.findByConnectorAndStatusIn(conn, List.of("CHARGING", "STARTING", "PREPARING"));
+                            if (!sessions.isEmpty()) {
+                                log.warn("[ADMIN-SAFETY] Cannot hard delete connector {} with active session. Soft-deactivating.", conn.getId());
+                                conn.setStatus("UNAVAILABLE");
+                                connectorRepository.save(conn);
+                            } else {
+                                try {
+                                    connectorRepository.delete(conn);
+                                } catch (Exception e) {
+                                    log.warn("[ADMIN-SAFETY] Soft-deactivating connector {} due to historical data constraint: {}", conn.getId(), e.getMessage());
+                                    conn.setStatus("UNAVAILABLE");
+                                    connectorRepository.save(conn);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (Charger chg : existingChargers) {
+                if (!processedChargerIds.contains(chg.getId())) {
+                    List<Connector> chgConns = connectorRepository.findByCharger(chg);
+                    boolean hasActive = chgConns.stream().anyMatch(c -> !chargingSessionRepository.findByConnectorAndStatusIn(c, List.of("CHARGING", "STARTING", "PREPARING")).isEmpty());
+                    if (hasActive) {
+                        log.warn("[ADMIN-SAFETY] Cannot hard delete charger {} with active sessions. Soft-deactivating.", chg.getOcppId());
+                        chg.setStatus("UNAVAILABLE");
+                        chargerRepository.save(chg);
+                    } else {
+                        try {
+                            chargerRepository.delete(chg);
+                        } catch (Exception e) {
+                            log.warn("[ADMIN-SAFETY] Soft-deactivating charger {} due to historical constraint: {}", chg.getOcppId(), e.getMessage());
+                            chg.setStatus("UNAVAILABLE");
+                            chargerRepository.save(chg);
+                        }
+                    }
+                }
+            }
+        }
+
         auditLogService.logAction(
                 null,
                 principal != null ? principal.getUsername() : "ADMIN",
@@ -468,6 +607,7 @@ public class AdminController {
                 connMap.put("connectorId", conn.getConnectorIndex() != null ? conn.getConnectorIndex() : conn.getId());
                 connMap.put("type", conn.getType() != null ? conn.getType() : "CCS2");
                 connMap.put("maxPowerKw", conn.getMaxPowerKw() != null ? conn.getMaxPowerKw() : new BigDecimal("60.0"));
+                connMap.put("unitRate", conn.getUnitRate() != null ? conn.getUnitRate() : new BigDecimal("18.00"));
                 String cStat = conn.getStatus() != null ? conn.getStatus() : "AVAILABLE";
                 connMap.put("status", cStat);
 

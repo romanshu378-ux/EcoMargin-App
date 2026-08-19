@@ -100,14 +100,18 @@ public class StopTransactionHandler implements OcppRequestHandler {
         BigDecimal energyKwh = deltaWh.divide(BigDecimal.valueOf(1000.0), 3, RoundingMode.HALF_UP);
 
         double rate = 18.0;
-        try {
-            Setting rateSetting = settingRepository.findById("default_charging_rate_per_kwh").orElse(null);
-            if (rateSetting != null) {
-                double r = Double.parseDouble(rateSetting.getValue());
-                if (r > 0.0) rate = (r == 0.35 ? 18.0 : r);
+        if (session.getConnector() != null && session.getConnector().getUnitRate() != null && session.getConnector().getUnitRate().doubleValue() > 0) {
+            rate = session.getConnector().getUnitRate().doubleValue();
+        } else {
+            try {
+                Setting rateSetting = settingRepository.findById("default_charging_rate_per_kwh").orElse(null);
+                if (rateSetting != null) {
+                    double r = Double.parseDouble(rateSetting.getValue());
+                    if (r > 0.0) rate = (r == 0.35 ? 18.0 : r);
+                }
+            } catch (Exception e) {
+                // fallback
             }
-        } catch (Exception e) {
-            // fallback
         }
 
         BigDecimal totalCost = energyKwh.multiply(BigDecimal.valueOf(rate)).setScale(2, RoundingMode.HALF_UP);

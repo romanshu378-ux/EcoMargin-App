@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 public class StationRequest {
@@ -33,4 +34,26 @@ public class StationRequest {
 
     @NotBlank(message = "Station status is required")
     private String status;
+
+    private List<ChargerConfigRequest> chargers;
+
+    @Data
+    public static class ChargerConfigRequest {
+        private Long id;
+        private String ocppId;
+        private String brand;
+        private String model;
+        private String status;
+        private List<ConnectorConfigRequest> connectors;
+    }
+
+    @Data
+    public static class ConnectorConfigRequest {
+        private Long id;
+        private Integer connectorIndex;
+        private String type;
+        private BigDecimal maxPowerKw;
+        private BigDecimal unitRate;
+        private String status;
+    }
 }

@@ -115,14 +115,18 @@ public class MeterValuesHandler implements OcppRequestHandler {
         List<ChargingSession> sessions = chargingSessionRepository.findByConnectorAndStatusIn(connector, ACTIVE_STATUSES);
         for (ChargingSession session : sessions) {
             double rate = 18.0;
-            try {
-                Setting rateSetting = settingRepository.findById("default_charging_rate_per_kwh").orElse(null);
-                if (rateSetting != null) {
-                    double r = Double.parseDouble(rateSetting.getValue());
-                    if (r > 0.0) rate = (r == 0.35 ? 18.0 : r);
+            if (connector != null && connector.getUnitRate() != null && connector.getUnitRate().doubleValue() > 0) {
+                rate = connector.getUnitRate().doubleValue();
+            } else {
+                try {
+                    Setting rateSetting = settingRepository.findById("default_charging_rate_per_kwh").orElse(null);
+                    if (rateSetting != null) {
+                        double r = Double.parseDouble(rateSetting.getValue());
+                        if (r > 0.0) rate = (r == 0.35 ? 18.0 : r);
+                    }
+                } catch (Exception e) {
+                    // fallback
                 }
-            } catch (Exception e) {
-                // fallback
             }
 
             BigDecimal energyBd = BigDecimal.valueOf(energyKwh).setScale(3, RoundingMode.HALF_UP);

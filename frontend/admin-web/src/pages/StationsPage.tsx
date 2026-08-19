@@ -17,8 +17,27 @@ interface ConnectorDetailed {
   connectorId: number;
   type: string;
   maxPowerKw: number;
+  unitRate?: number;
   status: string;
   activeSession: ActiveSessionInfo | null;
+}
+
+interface EditableConnector {
+  id?: number;
+  connectorIndex: number;
+  type: string;
+  maxPowerKw: string;
+  unitRate: string;
+  status: string;
+}
+
+interface EditableCharger {
+  id?: number;
+  ocppId: string;
+  brand: string;
+  model: string;
+  status: string;
+  connectors: EditableConnector[];
 }
 
 interface ChargerDetailed {
@@ -84,6 +103,7 @@ export const StationsPage: React.FC = () => {
     longitude: '75.7873',
     status: 'ACTIVE'
   });
+  const [chargersConfig, setChargersConfig] = useState<EditableCharger[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
 
   // Target status for Status Control modal
@@ -174,6 +194,17 @@ export const StationsPage: React.FC = () => {
       longitude: '75.7873',
       status: 'ACTIVE'
     });
+    setChargersConfig([
+      {
+        ocppId: 'NEW-CHG-1',
+        brand: 'EcoMargin',
+        model: 'EV-Fast-60',
+        status: 'AVAILABLE',
+        connectors: [
+          { connectorIndex: 1, type: 'CCS2', maxPowerKw: '60', unitRate: '18.00', status: 'AVAILABLE' }
+        ]
+      }
+    ]);
     setFormError(null);
     setAddModalOpen(true);
   };
@@ -190,7 +221,102 @@ export const StationsPage: React.FC = () => {
       longitude: station.longitude != null ? station.longitude.toString() : '',
       status: station.status || 'ACTIVE'
     });
+
+    if (station.chargers && station.chargers.length > 0) {
+      setChargersConfig(station.chargers.map((chg, idx) => ({
+        id: chg.id,
+        ocppId: chg.ocppId || `CHG-${idx + 1}`,
+        brand: chg.brand || 'EcoMargin',
+        model: chg.model || 'EV-Fast-60',
+        status: chg.status || 'AVAILABLE',
+        connectors: chg.connectors && chg.connectors.length > 0 ? chg.connectors.map((c, kIdx) => ({
+          id: c.id,
+          connectorIndex: c.connectorId || (kIdx + 1),
+          type: c.type || 'CCS2',
+          maxPowerKw: (c.maxPowerKw != null ? c.maxPowerKw : 60).toString(),
+          unitRate: (c.unitRate != null ? c.unitRate : 18.00).toString(),
+          status: c.status || 'AVAILABLE'
+        })) : [
+          { connectorIndex: 1, type: 'CCS2', maxPowerKw: '60', unitRate: '18.00', status: 'AVAILABLE' }
+        ]
+      })));
+    } else {
+      setChargersConfig([
+        {
+          ocppId: `STN-${station.id}-CHG-1`,
+          brand: 'EcoMargin',
+          model: 'EV-Fast-60',
+          status: 'AVAILABLE',
+          connectors: [
+            { connectorIndex: 1, type: 'CCS2', maxPowerKw: '60', unitRate: '18.00', status: 'AVAILABLE' }
+          ]
+        }
+      ]);
+    }
     setFormError(null);
+  };
+
+  const handleAddCharger = () => {
+    setChargersConfig(prev => [
+      ...prev,
+      {
+        ocppId: `CHG-${prev.length + 1}`,
+        brand: 'EcoMargin',
+        model: 'EV-Fast-60',
+        status: 'AVAILABLE',
+        connectors: [
+          { connectorIndex: 1, type: 'CCS2', maxPowerKw: '60', unitRate: '18.00', status: 'AVAILABLE' }
+        ]
+      }
+    ]);
+  };
+
+  const handleRemoveCharger = (chargerIndex: number) => {
+    if (chargersConfig.length <= 1) return;
+    setChargersConfig(prev => prev.filter((_, idx) => idx !== chargerIndex));
+  };
+
+  const handleAddConnector = (chargerIndex: number) => {
+    setChargersConfig(prev => prev.map((chg, idx) => {
+      if (idx !== chargerIndex) return chg;
+      const nextIndex = chg.connectors.length + 1;
+      return {
+        ...chg,
+        connectors: [
+          ...chg.connectors,
+          { connectorIndex: nextIndex, type: 'CCS2', maxPowerKw: '60', unitRate: '18.00', status: 'AVAILABLE' }
+        ]
+      };
+    }));
+  };
+
+  const handleRemoveConnector = (chargerIndex: number, connectorIndex: number) => {
+    setChargersConfig(prev => prev.map((chg, idx) => {
+      if (idx !== chargerIndex) return chg;
+      if (chg.connectors.length <= 1) return chg;
+      return {
+        ...chg,
+        connectors: chg.connectors.filter((_, kIdx) => kIdx !== connectorIndex)
+      };
+    }));
+  };
+
+  const handleChargerChange = (chargerIndex: number, field: string, value: any) => {
+    setChargersConfig(prev => prev.map((chg, idx) => {
+      if (idx !== chargerIndex) return chg;
+      return { ...chg, [field]: value };
+    }));
+  };
+
+  const handleConnectorChange = (chargerIndex: number, connectorIndex: number, field: string, value: any) => {
+    setChargersConfig(prev => prev.map((chg, idx) => {
+      if (idx !== chargerIndex) return chg;
+      const updatedConnectors = chg.connectors.map((conn, kIdx) => {
+        if (kIdx !== connectorIndex) return conn;
+        return { ...conn, [field]: value };
+      });
+      return { ...chg, connectors: updatedConnectors };
+    }));
   };
 
   const openStatusChangeModal = (station: StationDetailed) => {
@@ -213,6 +339,28 @@ export const StationsPage: React.FC = () => {
       setFormError('Longitude must be a valid number between -180 and 180');
       return false;
     }
+
+    for (let i = 0; i < chargersConfig.length; i++) {
+      const chg = chargersConfig[i];
+      if (!chg.ocppId.trim()) {
+        setFormError(`Charger #${i + 1} requires an OCPP ID`);
+        return false;
+      }
+      for (let j = 0; j < chg.connectors.length; j++) {
+        const conn = chg.connectors[j];
+        const kw = parseFloat(conn.maxPowerKw);
+        if (isNaN(kw) || kw <= 0) {
+          setFormError(`Charger #${i + 1} Connector #${j + 1} power rating must be greater than 0 kW`);
+          return false;
+        }
+        const rate = parseFloat(conn.unitRate);
+        if (isNaN(rate) || rate <= 0) {
+          setFormError(`Charger #${i + 1} Connector #${j + 1} unit rate must be greater than ₹0/kWh`);
+          return false;
+        }
+      }
+    }
+
     setFormError(null);
     return true;
   };
@@ -233,7 +381,22 @@ export const StationsPage: React.FC = () => {
         country: formData.country.trim(),
         latitude: parseFloat(formData.latitude),
         longitude: parseFloat(formData.longitude),
-        status: formData.status
+        status: formData.status,
+        chargers: chargersConfig.map(chg => ({
+          id: chg.id,
+          ocppId: chg.ocppId.trim(),
+          brand: chg.brand,
+          model: chg.model,
+          status: chg.status,
+          connectors: chg.connectors.map((conn, kIdx) => ({
+            id: conn.id,
+            connectorIndex: conn.connectorIndex || (kIdx + 1),
+            type: conn.type,
+            maxPowerKw: parseFloat(conn.maxPowerKw),
+            unitRate: parseFloat(conn.unitRate),
+            status: conn.status
+          }))
+        }))
       };
 
       const isEdit = !!editStation;
@@ -755,10 +918,11 @@ export const StationsPage: React.FC = () => {
       {/* ADD / EDIT STATION MODAL */}
       {(addModalOpen || editStation) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full shadow-2xl p-6 space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white">
-                {editStation ? 'Edit Station' : 'Add New Charging Station'}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] shadow-2xl p-6 flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Edit3 size={18} className="text-emerald-400" />
+                {editStation ? 'Edit Station Configuration' : 'Add New Charging Station'}
               </h3>
               <button
                 onClick={() => { setAddModalOpen(false); setEditStation(null); }}
@@ -769,114 +933,292 @@ export const StationsPage: React.FC = () => {
             </div>
 
             {formError && (
-              <div className="bg-rose-950/40 border border-rose-900/60 p-3 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+              <div className="bg-rose-950/40 border border-rose-900/60 p-3 rounded-xl text-xs text-rose-300 flex items-center gap-2 mb-3">
                 <AlertTriangle size={15} /> {formError}
               </div>
             )}
 
-            <div className="space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Station Name *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Jaipur Tech Park Charging Hub"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Address</label>
-                <input
-                  type="text"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="Street address or location details"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
+            <div className="overflow-y-auto pr-1.5 space-y-5 text-xs flex-1">
+              {/* SECTION 1: STATION INFORMATION */}
+              <div className="space-y-3">
+                <h4 className="font-bold text-slate-300 text-xs uppercase tracking-wider">1. Station Information</h4>
                 <div>
-                  <label className="block font-semibold text-slate-300 mb-1">City</label>
+                  <label className="block font-semibold text-slate-300 mb-1">Station Name *</label>
                   <input
                     type="text"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g. Jaipur Tech Park Charging Hub"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>
+
                 <div>
-                  <label className="block font-semibold text-slate-300 mb-1">State</label>
+                  <label className="block font-semibold text-slate-300 mb-1">Address</label>
                   <input
                     type="text"
-                    value={formData.state}
-                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    placeholder="Street address or location details"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-300 mb-1">City</label>
+                    <input
+                      type="text"
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-300 mb-1">State</label>
+                    <input
+                      type="text"
+                      value={formData.state}
+                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-300 mb-1">Country</label>
+                    <input
+                      type="text"
+                      value={formData.country}
+                      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-300 mb-1">Latitude (-90 to 90) *</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={formData.latitude}
+                      onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                      placeholder="26.9124"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-300 mb-1">Longitude (-180 to 180) *</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={formData.longitude}
+                      onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                      placeholder="75.7873"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Country</label>
-                  <input
-                    type="text"
-                    value={formData.country}
-                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                  />
+                  <label className="block font-semibold text-slate-300 mb-1">Station Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-semibold"
+                  >
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="INACTIVE">INACTIVE / DISABLED</option>
+                    <option value="UNDER_MAINTENANCE">UNDER MAINTENANCE</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Latitude (-90 to 90) *</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData.latitude}
-                    onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
-                    placeholder="26.9124"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                  />
+              {/* SECTION 2: CHARGER & CONNECTOR CONFIGURATION */}
+              <div className="pt-4 border-t border-slate-800 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-slate-300 text-xs uppercase tracking-wider flex items-center gap-2">
+                      <Zap size={15} className="text-emerald-400" />
+                      2. Charger & Connector Configuration
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Manage chargers, connector types, power kW ratings, and per-kWh unit rates.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <span className="bg-slate-800 text-slate-300 px-2.5 py-1 rounded-lg font-mono">
+                      Chargers: {chargersConfig.length}
+                    </span>
+                    <span className="bg-emerald-950/60 text-emerald-300 border border-emerald-800/50 px-2.5 py-1 rounded-lg font-mono font-bold">
+                      Connectors: {chargersConfig.reduce((acc, c) => acc + c.connectors.length, 0)}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Longitude (-180 to 180) *</label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData.longitude}
-                    onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
-                    placeholder="75.7873"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
 
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="ACTIVE">ACTIVE</option>
-                  <option value="INACTIVE">INACTIVE / DISABLED</option>
-                  <option value="UNDER_MAINTENANCE">UNDER MAINTENANCE</option>
-                </select>
+                <div className="space-y-4">
+                  {chargersConfig.map((chg, cIdx) => (
+                    <div key={chg.id || `chg-${cIdx}`} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                        <div className="flex items-center gap-2">
+                          <Server size={14} className="text-emerald-400" />
+                          <span className="font-bold text-white text-xs">Charger #{cIdx + 1}</span>
+                          {chg.id && (
+                            <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-mono">
+                              ID #{chg.id}
+                            </span>
+                          )}
+                        </div>
+                        {chargersConfig.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCharger(cIdx)}
+                            className="text-slate-400 hover:text-rose-400 transition-colors text-[11px] flex items-center gap-1"
+                            title="Remove Charger"
+                          >
+                            <Trash2 size={13} /> Remove Charger
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">OCPP ID *</label>
+                          <input
+                            type="text"
+                            value={chg.ocppId}
+                            onChange={(e) => handleChargerChange(cIdx, 'ocppId', e.target.value)}
+                            placeholder="e.g. SF-HUB-01"
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Charger Status</label>
+                          <select
+                            value={chg.status}
+                            onChange={(e) => handleChargerChange(cIdx, 'status', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-semibold"
+                          >
+                            <option value="AVAILABLE">AVAILABLE</option>
+                            <option value="UNAVAILABLE">UNAVAILABLE / OFFLINE</option>
+                            <option value="FAULTED">FAULTED</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* CONNECTORS FOR THIS CHARGER */}
+                      <div className="space-y-2 pt-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-semibold text-slate-300">Connectors ({chg.connectors.length})</span>
+                          <button
+                            type="button"
+                            onClick={() => handleAddConnector(cIdx)}
+                            className="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 text-[11px]"
+                          >
+                            <Plus size={12} /> Add Connector
+                          </button>
+                        </div>
+
+                        <div className="space-y-2">
+                          {chg.connectors.map((conn, kIdx) => {
+                            const isDc = ['CCS2', 'CHADEMO', 'GB_T'].includes(conn.type.toUpperCase());
+
+                            return (
+                              <div key={conn.id || `conn-${cIdx}-${kIdx}`} className="bg-slate-900 p-3 rounded-lg border border-slate-800/80 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-bold text-emerald-400 font-mono">
+                                      Connector #{conn.connectorIndex || kIdx + 1}
+                                    </span>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
+                                      isDc ? 'bg-amber-950/60 text-amber-300 border border-amber-800/40' : 'bg-blue-950/60 text-blue-300 border border-blue-800/40'
+                                    }`}>
+                                      {isDc ? 'DC Fast' : 'AC Standard'}
+                                    </span>
+                                  </div>
+                                  {chg.connectors.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveConnector(cIdx, kIdx)}
+                                      className="text-slate-500 hover:text-rose-400 p-1"
+                                      title="Remove Connector"
+                                    >
+                                      <X size={13} />
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-2">
+                                  <div>
+                                    <label className="block text-[10px] text-slate-400 mb-1">Type</label>
+                                    <select
+                                      value={conn.type}
+                                      onChange={(e) => handleConnectorChange(cIdx, kIdx, 'type', e.target.value)}
+                                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500 font-semibold"
+                                    >
+                                      <option value="CCS2">CCS2 (DC)</option>
+                                      <option value="TYPE2">Type 2 (AC)</option>
+                                      <option value="CHADEMO">CHAdeMO (DC)</option>
+                                      <option value="GB_T">GB/T (DC)</option>
+                                      <option value="WALL_SOCKET">Wall Socket (AC)</option>
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-[10px] text-slate-400 mb-1">Power (kW) *</label>
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      value={conn.maxPowerKw}
+                                      onChange={(e) => handleConnectorChange(cIdx, kIdx, 'maxPowerKw', e.target.value)}
+                                      placeholder="60"
+                                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-[10px] text-slate-400 mb-1">Unit Rate (₹/kWh) *</label>
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      value={conn.unitRate}
+                                      onChange={(e) => handleConnectorChange(cIdx, kIdx, 'unitRate', e.target.value)}
+                                      placeholder="18.00"
+                                      className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={handleAddCharger}
+                    className="w-full py-2 bg-slate-950 hover:bg-slate-800 border border-dashed border-slate-700 hover:border-emerald-500/50 text-slate-300 hover:text-emerald-400 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+                  >
+                    <Plus size={14} /> Add Charger
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+            <div className="flex justify-end gap-2 pt-4 border-t border-slate-800 mt-4">
               <button
+                type="button"
                 onClick={() => { setAddModalOpen(false); setEditStation(null); }}
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleSaveStation}
                 disabled={actionLoading}
-                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-md transition-all disabled:opacity-50"
+                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2 rounded-xl text-xs font-semibold shadow-md transition-all disabled:opacity-50"
               >
                 {actionLoading && <RefreshCw size={14} className="animate-spin" />}
                 {editStation ? 'Save Changes' : 'Create Station'}
