@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../home/providers/home_providers.dart';
 import '../../home/models/station.dart';
+import '../../charging/screens/start_charging_screen.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -84,7 +85,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         setState(() {
           _permissionDenied = true;
         });
-        _showSnackbar('Location permission denied. Keeping map usable with default location.');
+        _showSnackbar('Location permission is required to find nearby chargers.');
         return;
       }
     }
@@ -93,7 +94,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       setState(() {
         _permissionDenied = true;
       });
-      _showSnackbar('Location permissions are permanently denied. Map remains active.');
+      _showSnackbar('Location permissions are permanently denied. Map remains active with default location.');
       return;
     }
 
@@ -136,6 +137,156 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
+  Future<void> _openMapNavigation(double lat, double lng) async {
+    final Uri googleMapsUrl = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
+    final Uri geoUrl = Uri.parse('geo:$lat,$lng?q=$lat,$lng');
+    try {
+      if (await canLaunchUrl(googleMapsUrl)) {
+        await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(geoUrl)) {
+        await launchUrl(geoUrl, mode: LaunchMode.externalApplication);
+      } else if (mounted) {
+        _showSnackbar('Could not open map application.');
+      }
+    } catch (e) {
+      if (mounted) {
+        _showSnackbar('Failed to launch navigation: $e');
+      }
+    }
+  }
+
+  void _showStationBottomSheet(BuildContext context, ChargingStation station) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final dist = Geolocator.distanceBetween(
+          _userPosition.latitude,
+          _userPosition.longitude,
+          station.latitude,
+          station.longitude,
+        ) / 1000.0;
+        final distStr = '${dist.toStringAsFixed(1)} km Away';
+
+        return Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      station.name,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF16A34A).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${station.availableChargers}/${station.totalChargers} Available',
+                      style: const TextStyle(
+                        color: Color(0xFF16A34A),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF64748B)),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      station.address,
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Distance: $distStr', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  Text('Power: ${station.chargerType}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  Text('Price: ${station.priceStr}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _openMapNavigation(station.latitude, station.longitude);
+                      },
+                      icon: const Icon(Icons.near_me, size: 16, color: Colors.white),
+                      label: const Text('Navigate', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade600,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => StartChargingScreen(
+                              station: station,
+                              stationId: station.id,
+                              connectorId: station.connectors.isNotEmpty ? station.connectors.first.id : null,
+                              chargerId: station.connectors.isNotEmpty ? station.connectors.first.chargerId : null,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.flash_on, size: 16, color: Colors.white),
+                      label: const Text('View Charger', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF16A34A),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Set<Marker> _createMarkers(List<ChargingStation> stations) {
     final markers = <Marker>{};
 
@@ -176,6 +327,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               );
             }
             _moveCameraTo(LatLng(station.latitude, station.longitude));
+            _showStationBottomSheet(context, station);
           },
         ),
       );
@@ -200,7 +352,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               s.latitude,
               s.longitude,
             ) / 1000.0;
-            return s.copyWith(distanceStr: '${dist.toStringAsFixed(1)} km');
+            return s.copyWith(distanceStr: '${dist.toStringAsFixed(1)} km Away');
           }).toList();
 
           // 2. Sort Nearest -> Farthest
@@ -296,9 +448,53 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ),
               ),
 
+              // Permission Denied Overlay Banner
+              if (_permissionDenied)
+                Positioned(
+                  top: 110,
+                  left: 16,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.12),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_off_rounded, color: Colors.orange, size: 24),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'Location permission is required to find nearby chargers.',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _determinePosition,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF16A34A),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Text('Enable Location', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
               // Right Floating Controls
               Positioned(
-                top: 120,
+                top: _permissionDenied ? 180 : 120,
                 right: 16,
                 child: Column(
                   children: [
@@ -514,18 +710,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                               children: [
                                 Expanded(
                                   child: ElevatedButton.icon(
-                                    onPressed: () async {
-                                      final url = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${station.latitude},${station.longitude}');
-                                      if (await canLaunchUrl(url)) {
-                                        await launchUrl(url, mode: LaunchMode.externalApplication);
-                                      } else {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Could not launch Directions.')),
-                                        );
-                                      }
-                                    },
+                                    onPressed: () => _openMapNavigation(station.latitude, station.longitude),
                                     icon: const Icon(Icons.near_me, size: 16, color: Colors.white),
-                                    label: const Text('Get Directions', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                    label: const Text('Navigate', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.blue.shade600,
                                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -537,10 +724,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                                 Expanded(
                                   child: ElevatedButton.icon(
                                     onPressed: () {
-                                      context.push('/station-details', extra: station.id);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => StartChargingScreen(
+                                            station: station,
+                                            stationId: station.id,
+                                            connectorId: station.connectors.isNotEmpty ? station.connectors.first.id : null,
+                                            chargerId: station.connectors.isNotEmpty ? station.connectors.first.chargerId : null,
+                                          ),
+                                        ),
+                                      );
                                     },
                                     icon: const Icon(Icons.flash_on, size: 16, color: Colors.white),
-                                    label: const Text('Start Charging', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                    label: const Text('View Charger', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF16A34A),
                                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -586,7 +783,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          'No charging stations found nearby.',
+                          'No chargers found nearby.',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                           textAlign: TextAlign.center,
                         ),

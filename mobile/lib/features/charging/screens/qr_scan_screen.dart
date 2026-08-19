@@ -19,7 +19,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
         title: const Text('Scan Charger QR'),
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => context.go('/'),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/'),
         ),
       ),
       body: Stack(
@@ -92,7 +92,7 @@ class _QrScanScreenState extends State<QrScanScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Charging Session Started!')),
               );
-              context.go('/');
+              context.push('/start-charging');
             },
             child: const Text('Start Charging'),
           ),

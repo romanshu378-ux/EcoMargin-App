@@ -26,7 +26,7 @@ class ThemeScreen extends ConsumerWidget {
             onChanged: (val) {
               if (val != null) {
                 ref.read(themeModeProvider.notifier).state = val;
-                context.go('/settings');
+                context.pop();
               }
             },
           ),
@@ -40,7 +40,7 @@ class ThemeScreen extends ConsumerWidget {
             onChanged: (val) {
               if (val != null) {
                 ref.read(themeModeProvider.notifier).state = val;
-                context.go('/settings');
+                context.pop();
               }
             },
           ),

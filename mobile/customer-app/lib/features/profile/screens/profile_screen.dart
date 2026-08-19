@@ -125,6 +125,10 @@ class ProfileScreen extends ConsumerWidget {
                   title: const Text('Sign Out', style: TextStyle(color: Colors.red)),
                   onTap: () async {
                     await ref.read(storageServiceProvider).clearAllTokens();
+                    ref.read(walletBalanceProvider.notifier).state = 0.0;
+                    ref.invalidate(walletBalanceAsyncProvider);
+                    ref.invalidate(walletTransactionsProvider);
+                    ref.invalidate(profileProvider);
                     ref.read(authStateProvider.notifier).state = false;
                     if (context.mounted) {
                       context.go('/login');

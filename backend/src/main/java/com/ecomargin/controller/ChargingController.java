@@ -2,12 +2,15 @@ package com.ecomargin.controller;
 
 import com.ecomargin.model.*;
 import com.ecomargin.repository.*;
+import com.ecomargin.service.NotificationService;
 import com.ecomargin.service.WalletService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -28,26 +31,52 @@ public class ChargingController {
     private final UserRepository userRepository;
     private final TransactionRepository transactionRepository;
     private final ConnectorRepository connectorRepository;
+    private final ChargerRepository chargerRepository;
+    private final StationRepository stationRepository;
     private final SettingRepository settingRepository;
     private final WalletService walletService;
+    private final NotificationService notificationService;
 
     private static final List<String> ACTIVE_STATUSES = List.of(
             "STARTING", "ACTIVE", "STOPPING", "PREPARING", "CHARGING", "FINISHING"
     );
 
     private User getAuthenticatedUser() {
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
+        }
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (principal instanceof User) {
             return (User) principal;
         }
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        if (email == null || "anonymousUser".equalsIgnoreCase(email)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated");
+        }
         return userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new RuntimeException("User not authenticated"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not authenticated"));
+    }
+
+    private Long parseId(Map<String, Object> payload, String key) {
+        if (payload == null || !payload.containsKey(key)) return null;
+        Object val = payload.get(key);
+        if (val == null) return null;
+        if (val instanceof Number) {
+            return ((Number) val).longValue();
+        }
+        if (val instanceof String) {
+            try {
+                return Long.parseLong((String) val);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private Map<String, Object> mapSessionToMap(ChargingSession session) {
         if (session == null) return null;
-        
+
         long durationSec = 0;
         if (ACTIVE_STATUSES.contains(session.getStatus())) {
             durationSec = Duration.between(session.getStartTime(), LocalDateTime.now()).getSeconds();
@@ -61,15 +90,14 @@ public class ChargingController {
         double speedKw = 42.5;
         double energyKwh = (durationSec * speedKw) / 3600.0;
         double pricePerKwh = 18.0;
-        
-        // Read dynamic rate from settings
+
         try {
             Setting rateSetting = settingRepository.findById("default_charging_rate_per_kwh").orElse(null);
             if (rateSetting != null) {
                 double rate = Double.parseDouble(rateSetting.getValue());
                 if (rate > 0.0) {
                     if (rate == 0.35) {
-                        pricePerKwh = 18.0; // ₹18.00 is a standard rate in India
+                        pricePerKwh = 18.0;
                     } else {
                         pricePerKwh = rate;
                     }
@@ -89,15 +117,21 @@ public class ChargingController {
         }
 
         String stationName = "EcoMargin Charging Hub";
+        String stationAddress = "Downtown EV Station, City Center";
         String chargerId = "CHG-DC-04";
         String connectorType = "CCS2";
+        Long connectorId = null;
 
         if (session.getConnector() != null) {
+            connectorId = session.getConnector().getId();
             connectorType = session.getConnector().getType();
             if (session.getConnector().getCharger() != null) {
                 chargerId = session.getConnector().getCharger().getOcppId();
                 if (session.getConnector().getCharger().getStation() != null) {
                     stationName = session.getConnector().getCharger().getStation().getName();
+                    if (session.getConnector().getCharger().getStation().getAddress() != null) {
+                        stationAddress = session.getConnector().getCharger().getStation().getAddress();
+                    }
                 }
             }
         }
@@ -105,26 +139,31 @@ public class ChargingController {
         Map<String, Object> map = new HashMap<>();
         map.put("sessionId", session.getId());
         map.put("stationName", stationName);
+        map.put("stationAddress", stationAddress);
+        map.put("address", stationAddress);
         map.put("chargerId", chargerId);
         map.put("connectorType", connectorType);
+        map.put("connectorId", connectorId != null ? connectorId.toString() : "CONN-01");
         map.put("status", session.getStatus());
         map.put("percentage", batteryPercentage);
         map.put("kwhDelivered", energyKwh);
         map.put("currentPowerKw", speedKw);
+        map.put("peakPowerKw", speedKw);
+        map.put("voltage", 400.0);
+        map.put("co2SavedKg", BigDecimal.valueOf(energyKwh * 0.85).setScale(2, RoundingMode.HALF_UP).doubleValue());
         map.put("durationSeconds", durationSec);
         map.put("totalCost", cost);
         map.put("startTime", session.getStartTime());
         map.put("endTime", session.getEndTime());
         map.put("ratePerKwh", pricePerKwh);
-        map.put("paymentMethod", "Wallet");
+        map.put("paymentMethod", "EcoMargin Wallet");
         map.put("ocppTransactionId", session.getOcppTransactionId() != null ? session.getOcppTransactionId() : ("OCPP-TX-" + session.getId()));
 
-        // Support additional structure for Requirement 3
         map.put("powerKw", speedKw);
         map.put("energyKwh", energyKwh);
         map.put("duration", durationSec);
         map.put("currentCost", cost);
-        
+
         BigDecimal walletBalance = BigDecimal.ZERO;
         if (session.getUser() != null) {
             Wallet w = walletRepository.findByUserId(session.getUser().getId()).orElse(null);
@@ -178,7 +217,7 @@ public class ChargingController {
         User user = getAuthenticatedUser();
         Optional<ChargingSession> activeOpt = chargingSessionRepository
                 .findFirstByUserAndStatusInOrderByCreatedAtDesc(user, ACTIVE_STATUSES);
-        
+
         if (activeOpt.isEmpty()) {
             return ResponseEntity.noContent().build();
         }
@@ -188,137 +227,221 @@ public class ChargingController {
     @PostMapping("/start")
     public ResponseEntity<?> startCharging(@RequestBody(required = false) Map<String, Object> payload) {
         User user = getAuthenticatedUser();
-        
-        Optional<ChargingSession> activeOpt = chargingSessionRepository
-                .findFirstByUserAndStatusInOrderByCreatedAtDesc(user, ACTIVE_STATUSES);
-        if (activeOpt.isPresent()) {
-            return ResponseEntity.status(409).body(Map.of(
-                    "code", "ACTIVE_SESSION_EXISTS",
-                    "message", "User already has an active charging session."
+
+        if (!user.isEnabled() || !user.isAccountNonLocked()) {
+            log.warn("Security Alert: Inactive or locked user account {} attempted to start charging", user.getEmail());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "code", "USER_INACTIVE",
+                    "message", "User account is disabled or inactive."
             ));
         }
 
-        Wallet wallet = walletRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new RuntimeException("Wallet not found"));
-        
-        BigDecimal minRequired = new BigDecimal("50.00");
-        try {
-            Setting minBalanceSetting = settingRepository.findById("min_wallet_balance_to_start").orElse(null);
-            if (minBalanceSetting != null) {
-                minRequired = new BigDecimal(minBalanceSetting.getValue());
-            }
-        } catch (Exception e) {
-            log.warn("Failed to load min_wallet_balance_to_start setting: {}", e.getMessage());
-        }
-
-        if (wallet.getBalance().compareTo(minRequired) < 0) {
-            Map<String, Object> body = new HashMap<>();
-            body.put("code", "INSUFFICIENT_WALLET_BALANCE");
-            body.put("message", "Insufficient wallet balance to start charging. Minimum ₹" + minRequired + " required.");
-            body.put("availableBalance", wallet.getBalance());
-            body.put("requiredBalance", minRequired);
-            return ResponseEntity.status(402).body(body);
-        }
-
-        Long connectorId = null;
-        if (payload != null && payload.containsKey("connectorId")) {
-            Object idObj = payload.get("connectorId");
-            if (idObj instanceof Number) {
-                connectorId = ((Number) idObj).longValue();
-            } else if (idObj instanceof String) {
-                try {
-                    connectorId = Long.parseLong((String) idObj);
-                } catch (NumberFormatException e) {
-                    // Ignore
-                }
-            }
-        }
-
-        Connector connector = null;
-        if (connectorId != null) {
-            connector = connectorRepository.findById(connectorId).orElse(null);
-            if (connector == null) {
-                return ResponseEntity.status(404).body(Map.of(
-                        "code", "CONNECTOR_NOT_FOUND",
-                        "message", "The specified connector was not found."
+        synchronized (("USER_START_LOCK_" + user.getId()).intern()) {
+            Optional<ChargingSession> activeOpt = chargingSessionRepository
+                    .findFirstByUserAndStatusInOrderByCreatedAtDesc(user, ACTIVE_STATUSES);
+            if (activeOpt.isPresent()) {
+                log.warn("Security Alert: Concurrent session start attempt for user {}", user.getEmail());
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                        "code", "ACTIVE_SESSION_EXISTS",
+                        "message", "User already has an active charging session."
                 ));
             }
-        } else {
-            List<Connector> connectors = connectorRepository.findAll();
-            if (!connectors.isEmpty()) {
-                connector = connectors.get(0);
+
+            Wallet wallet = walletRepository.findByUserId(user.getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Wallet not found"));
+
+            BigDecimal minRequired = new BigDecimal("50.00");
+            try {
+                Setting minBalanceSetting = settingRepository.findById("min_wallet_balance_to_start").orElse(null);
+                if (minBalanceSetting != null) {
+                    minRequired = new BigDecimal(minBalanceSetting.getValue());
+                }
+            } catch (Exception e) {
+                log.warn("Failed to load min_wallet_balance_to_start setting: {}", e.getMessage());
             }
-        }
 
-        if (connector == null) {
-            return ResponseEntity.status(404).body(Map.of(
-                    "code", "CONNECTOR_NOT_FOUND",
-                    "message", "No connectors available on the system."
-            ));
-        }
+            if (wallet.getBalance().compareTo(minRequired) < 0) {
+                log.warn("Security Alert: User {} attempted start with insufficient wallet balance {}", user.getEmail(), wallet.getBalance());
+                Map<String, Object> body = new HashMap<>();
+                body.put("code", "INSUFFICIENT_WALLET_BALANCE");
+                body.put("message", "Insufficient wallet balance to start charging. Minimum ₹" + minRequired + " required.");
+                body.put("availableBalance", wallet.getBalance());
+                body.put("requiredBalance", minRequired);
+                return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(body);
+            }
 
-        // Validate connector is available
-        if (!"AVAILABLE".equalsIgnoreCase(connector.getStatus())) {
-            return ResponseEntity.status(409).body(Map.of(
-                    "code", "CONNECTOR_UNAVAILABLE",
-                    "message", "Connector is currently unavailable."
-            ));
-        }
+            // Relational Hierarchy Validation (Prevent trusting client claims)
+            Long clientStationId = parseId(payload, "stationId");
+            Long clientChargerId = parseId(payload, "chargerId");
+            Long clientConnectorId = parseId(payload, "connectorId");
 
-        // Validate charger is available
-        Charger charger = connector.getCharger();
-        if (charger == null || !"AVAILABLE".equalsIgnoreCase(charger.getStatus())) {
-            return ResponseEntity.status(409).body(Map.of(
-                    "code", "CHARGER_UNAVAILABLE",
-                    "message", "Charger is currently unavailable."
-            ));
-        }
+            Connector connector = null;
 
-        // Validate station is active
-        Station station = charger.getStation();
-        if (station == null || !"ACTIVE".equalsIgnoreCase(station.getStatus())) {
-            return ResponseEntity.status(409).body(Map.of(
-                    "code", "STATION_UNAVAILABLE",
-                    "message", "Station is currently unavailable."
-            ));
-        }
+            if (clientConnectorId != null) {
+                connector = connectorRepository.findById(clientConnectorId).orElse(null);
+                if (connector == null) {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                            "code", "CONNECTOR_NOT_FOUND",
+                            "message", "The specified connector was not found."
+                    ));
+                }
 
-        ChargingSession session = ChargingSession.builder()
-                .user(user)
-                .connector(connector)
-                .status("CHARGING") // Initial charging status
-                .startTime(LocalDateTime.now())
-                .totalEnergyKwh(BigDecimal.ZERO)
-                .totalCost(BigDecimal.ZERO)
-                .ocppTransactionId("OCPP-TX-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
-                .meterStartWh(BigDecimal.valueOf(1000.000))
-                .build();
-        
-        ChargingSession saved = chargingSessionRepository.save(session);
-        return ResponseEntity.ok(mapSessionToMap(saved));
+                // Validate Connector -> Charger Relationship
+                Charger charger = connector.getCharger();
+                if (charger == null) {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                            "code", "CHARGER_NOT_FOUND",
+                            "message", "Charger associated with connector not found."
+                    ));
+                }
+                if (clientChargerId != null && !charger.getId().equals(clientChargerId)) {
+                    log.warn("Security Alert: Relational Mismatch! Client specified chargerId {} but connector {} belongs to chargerId {}",
+                            clientChargerId, clientConnectorId, charger.getId());
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                            "code", "INVALID_RELATIONSHIP",
+                            "message", "Connector does not belong to the specified charger."
+                    ));
+                }
+
+                // Validate Charger -> Station Relationship
+                Station station = charger.getStation();
+                if (station == null) {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                            "code", "STATION_NOT_FOUND",
+                            "message", "Station associated with charger not found."
+                    ));
+                }
+                if (clientStationId != null && !station.getId().equals(clientStationId)) {
+                    log.warn("Security Alert: Relational Mismatch! Client specified stationId {} but charger {} belongs to stationId {}",
+                            clientStationId, charger.getId(), station.getId());
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                            "code", "INVALID_RELATIONSHIP",
+                            "message", "Charger does not belong to the specified station."
+                    ));
+                }
+            } else if (clientChargerId != null) {
+                Charger charger = chargerRepository.findById(clientChargerId).orElse(null);
+                if (charger == null) {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                            "code", "CHARGER_NOT_FOUND",
+                            "message", "The specified charger was not found."
+                    ));
+                }
+
+                Station station = charger.getStation();
+                if (station == null) {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                            "code", "STATION_NOT_FOUND",
+                            "message", "Station associated with charger not found."
+                    ));
+                }
+                if (clientStationId != null && !station.getId().equals(clientStationId)) {
+                    log.warn("Security Alert: Relational Mismatch! Client specified stationId {} but charger {} belongs to stationId {}",
+                            clientStationId, clientChargerId, station.getId());
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                            "code", "INVALID_RELATIONSHIP",
+                            "message", "Charger does not belong to the specified station."
+                    ));
+                }
+
+                List<Connector> connectors = connectorRepository.findByCharger(charger);
+                if (!connectors.isEmpty()) {
+                    connector = connectors.get(0);
+                }
+            } else {
+                List<Connector> connectors = connectorRepository.findAll();
+                if (!connectors.isEmpty()) {
+                    connector = connectors.get(0);
+                }
+            }
+
+            if (connector == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                        "code", "CONNECTOR_NOT_FOUND",
+                        "message", "No valid connectors available."
+                ));
+            }
+
+            // Connector Status Validation
+            String connStatus = connector.getStatus() != null ? connector.getStatus().toUpperCase() : "UNAVAILABLE";
+            if (!List.of("AVAILABLE", "PREPARING", "PLUGGED").contains(connStatus)) {
+                log.warn("Security Alert: Attempted to start session on connector {} in status {}", connector.getId(), connStatus);
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                        "code", "CONNECTOR_UNAVAILABLE",
+                        "message", "Connector is currently unavailable (" + connStatus + ")."
+                ));
+            }
+
+            // Charger Status Validation
+            Charger charger = connector.getCharger();
+            if (charger == null || !"AVAILABLE".equalsIgnoreCase(charger.getStatus())) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                        "code", "CHARGER_UNAVAILABLE",
+                        "message", "Charger is currently unavailable."
+                ));
+            }
+
+            // Station Status Validation
+            Station station = charger.getStation();
+            if (station == null || !"ACTIVE".equalsIgnoreCase(station.getStatus())) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                        "code", "STATION_UNAVAILABLE",
+                        "message", "Station is currently unavailable."
+                ));
+            }
+
+            ChargingSession session = ChargingSession.builder()
+                    .user(user)
+                    .connector(connector)
+                    .status("CHARGING")
+                    .startTime(LocalDateTime.now())
+                    .totalEnergyKwh(BigDecimal.ZERO)
+                    .totalCost(BigDecimal.ZERO)
+                    .ocppTransactionId("OCPP-TX-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                    .meterStartWh(BigDecimal.valueOf(1000.000))
+                    .build();
+
+            ChargingSession saved = chargingSessionRepository.save(session);
+
+            String stName = station.getName() != null ? station.getName() : "EcoMargin Charging Hub";
+            notificationService.createNotification(
+                    user,
+                    "Charging Started",
+                    "Your charging session at " + stName + " has started.",
+                    "CHARGING"
+            );
+
+            return ResponseEntity.ok(mapSessionToMap(saved));
+        }
     }
 
-    @GetMapping("/{sessionId}")
+    @GetMapping("/{sessionId:\\d+}")
     public ResponseEntity<?> getSessionById(@PathVariable Long sessionId) {
         User user = getAuthenticatedUser();
-        ChargingSession session = chargingSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Charging session not found"));
+        ChargingSession session = chargingSessionRepository.findById(sessionId).orElse(null);
+        if (session == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Charging session not found"));
+        }
 
-        if (!session.getUser().getId().equals(user.getId())) {
-            return ResponseEntity.status(403).body(Map.of("message", "Access denied"));
+        if (session.getUser() == null || !session.getUser().getId().equals(user.getId())) {
+            log.warn("Security Alert: IDOR attempt by user {} (id={}) to view session {} owned by user {}",
+                    user.getEmail(), user.getId(), sessionId, session.getUser() != null ? session.getUser().getId() : "null");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Access denied"));
         }
 
         return ResponseEntity.ok(mapSessionToMap(session));
     }
 
-    @PostMapping({"/stop", "/{sessionId}/stop"})
+    @PostMapping({"/stop", "/{sessionId:\\d+}/stop"})
     public ResponseEntity<?> stopCharging(@PathVariable(required = false) Long sessionId) {
         User user = getAuthenticatedUser();
         ChargingSession session;
 
         if (sessionId != null) {
-            session = chargingSessionRepository.findById(sessionId)
-                    .orElseThrow(() -> new RuntimeException("Charging session not found: " + sessionId));
+            session = chargingSessionRepository.findById(sessionId).orElse(null);
+            if (session == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Charging session not found"));
+            }
         } else {
             Optional<ChargingSession> activeOpt = chargingSessionRepository
                     .findFirstByUserAndStatusInOrderByCreatedAtDesc(user, ACTIVE_STATUSES);
@@ -328,71 +451,101 @@ public class ChargingController {
             session = activeOpt.get();
         }
 
-        // Security check
-        if (!session.getUser().getId().equals(user.getId())) {
-            return ResponseEntity.status(403).body(Map.of("message", "Access denied"));
+        // Ownership Verification (IDOR Protection)
+        if (session.getUser() == null || !session.getUser().getId().equals(user.getId())) {
+            log.warn("Security Alert: IDOR attempt by user {} (id={}) to stop session {} owned by user {}",
+                    user.getEmail(), user.getId(), session.getId(), session.getUser() != null ? session.getUser().getId() : "null");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Access denied"));
         }
 
-        // Idempotent Stop check: if session is already completed
-        if (session.getStatus().equals("COMPLETED")) {
-            log.info("Charging session {} already stopped. Returning existing session details.", session.getId());
+        // Idempotent Stop & Double Debit Protection
+        if ("COMPLETED".equalsIgnoreCase(session.getStatus()) || "STOPPED".equalsIgnoreCase(session.getStatus())) {
+            log.info("Charging session {} already stopped. Returning details without duplicate wallet debit.", session.getId());
             return ResponseEntity.ok(mapSessionToMap(session));
         }
 
-        LocalDateTime endTime = LocalDateTime.now();
-        long durationSec = Duration.between(session.getStartTime(), endTime).getSeconds();
-        if (durationSec < 0) durationSec = 0;
+        // Verify session state is active
+        if (!ACTIVE_STATUSES.contains(session.getStatus().toUpperCase())) {
+            log.warn("Security Alert: User {} attempted to stop session {} in non-active status {}",
+                    user.getEmail(), session.getId(), session.getStatus());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "code", "INVALID_SESSION_STATE",
+                    "message", "Charging session is not in an active state."
+            ));
+        }
 
-        double speedKw = 42.5;
-        double energyKwh = (durationSec * speedKw) / 3600.0;
-        double pricePerKwh = 18.0;
+        synchronized (("USER_STOP_LOCK_" + session.getId()).intern()) {
+            ChargingSession freshSession = chargingSessionRepository.findById(session.getId()).orElse(session);
+            if ("COMPLETED".equalsIgnoreCase(freshSession.getStatus()) || "STOPPED".equalsIgnoreCase(freshSession.getStatus())) {
+                return ResponseEntity.ok(mapSessionToMap(freshSession));
+            }
 
-        try {
-            Setting rateSetting = settingRepository.findById("default_charging_rate_per_kwh").orElse(null);
-            if (rateSetting != null) {
-                double rate = Double.parseDouble(rateSetting.getValue());
-                if (rate > 0.0) {
-                    if (rate == 0.35) {
-                        pricePerKwh = 18.0;
-                    } else {
-                        pricePerKwh = rate;
+            LocalDateTime endTime = LocalDateTime.now();
+            long durationSec = Duration.between(freshSession.getStartTime(), endTime).getSeconds();
+            if (durationSec < 0) durationSec = 0;
+
+            double speedKw = 42.5;
+            double energyKwh = (durationSec * speedKw) / 3600.0;
+            double pricePerKwh = 18.0;
+
+            try {
+                Setting rateSetting = settingRepository.findById("default_charging_rate_per_kwh").orElse(null);
+                if (rateSetting != null) {
+                    double rate = Double.parseDouble(rateSetting.getValue());
+                    if (rate > 0.0) {
+                        if (rate == 0.35) {
+                            pricePerKwh = 18.0;
+                        } else {
+                            pricePerKwh = rate;
+                        }
                     }
                 }
+            } catch (Exception e) {
+                // fallback
             }
-        } catch (Exception e) {
-            // fallback
+
+            double cost = energyKwh * pricePerKwh;
+            BigDecimal finalCost = BigDecimal.valueOf(cost).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal finalEnergy = BigDecimal.valueOf(energyKwh).setScale(3, RoundingMode.HALF_UP);
+
+            freshSession.setEndTime(endTime);
+            freshSession.setStatus("COMPLETED");
+            freshSession.setTotalEnergyKwh(finalEnergy);
+            freshSession.setMeterStopWh(freshSession.getMeterStartWh() != null
+                    ? freshSession.getMeterStartWh().add(finalEnergy.multiply(BigDecimal.valueOf(1000)))
+                    : finalEnergy.multiply(BigDecimal.valueOf(1000)));
+
+            String ocppTxId = freshSession.getOcppTransactionId();
+            if (ocppTxId == null) {
+                ocppTxId = "OCPP-TX-" + freshSession.getId();
+            }
+
+            // Deduct balance and create debit transaction ledger entry atomically
+            walletService.processChargingDebit(freshSession.getId(), ocppTxId, finalCost);
+
+            ChargingSession saved = chargingSessionRepository.save(freshSession);
+
+            notificationService.createNotification(
+                    user,
+                    "Charging Completed",
+                    "Your charging session has been completed. ₹" + String.format("%.2f", cost) + " was deducted from your wallet.",
+                    "CHARGING"
+            );
+
+            return ResponseEntity.ok(mapSessionToMap(saved));
         }
-
-        double cost = energyKwh * pricePerKwh;
-        BigDecimal finalCost = BigDecimal.valueOf(cost).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal finalEnergy = BigDecimal.valueOf(energyKwh).setScale(3, RoundingMode.HALF_UP);
-
-        session.setEndTime(endTime);
-        session.setStatus("COMPLETED");
-        session.setTotalEnergyKwh(finalEnergy);
-        session.setMeterStopWh(session.getMeterStartWh().add(finalEnergy.multiply(BigDecimal.valueOf(1000))));
-        
-        String ocppTxId = session.getOcppTransactionId();
-        if (ocppTxId == null) {
-            ocppTxId = "OCPP-TX-" + session.getId();
-        }
-
-        // Deduct balance and create debit transaction ledger entry atomically
-        walletService.processChargingDebit(session.getId(), ocppTxId, finalCost);
-        
-        // Save the updated completed charging session details
-        ChargingSession saved = chargingSessionRepository.save(session);
-        return ResponseEntity.ok(mapSessionToMap(saved));
     }
 
-    @PostMapping("/{sessionId}/billing")
+    @PostMapping("/{sessionId:\\d+}/billing")
     public ResponseEntity<?> processBilling(@PathVariable Long sessionId) {
         User user = getAuthenticatedUser();
-        ChargingSession session = chargingSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new RuntimeException("Charging session not found"));
+        ChargingSession session = chargingSessionRepository.findById(sessionId).orElse(null);
+        if (session == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "Charging session not found"));
+        }
 
-        if (!session.getUser().getId().equals(user.getId())) {
-            return ResponseEntity.status(403).body(Map.of("message", "Access denied"));
+        if (session.getUser() == null || !session.getUser().getId().equals(user.getId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Access denied"));
         }
 
         return ResponseEntity.ok(mapSessionToMap(session));
@@ -402,12 +555,10 @@ public class ChargingController {
     public ResponseEntity<?> getHistory() {
         User user = getAuthenticatedUser();
         List<ChargingSession> sessions = chargingSessionRepository.findByUserOrderByCreatedAtDesc(user);
-        
+
         List<Map<String, Object>> list = sessions.stream()
-                .filter(s -> s.getStatus().equals("COMPLETED"))
                 .map(this::mapSessionToMap)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);
     }
 }
-

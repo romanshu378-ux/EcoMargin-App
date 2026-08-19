@@ -23,7 +23,7 @@ class WalletScreen extends StatelessWidget {
                 children: [
                   Text('Wallet Balance', style: TextStyle(color: Colors.grey, fontSize: 14)),
                   SizedBox(height: 8),
-                  Text('\$45.00', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white)),
+                  Text('₹45.00', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white)),
                 ],
               ),
             ),
@@ -31,7 +31,7 @@ class WalletScreen extends StatelessWidget {
             ElevatedButton.icon(
               onPressed: () {},
               icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text('Top Up \$25.00', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              label: const Text('Top Up ₹25.00', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF10B981),
                 minimumSize: const Size.fromHeight(50),

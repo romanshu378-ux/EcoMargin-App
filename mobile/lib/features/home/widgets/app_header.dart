@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/home_providers.dart';
+import '../../../core/providers/core_providers.dart';
 
 class AppHeader extends ConsumerWidget {
   final VoidCallback onMenuPressed;
@@ -14,7 +14,8 @@ class AppHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final unreadCount = ref.watch(unreadNotificationCountProvider);
+    final unreadAsync = ref.watch(unreadNotificationCountAsyncProvider);
+    final unreadCount = unreadAsync.asData?.value ?? ref.watch(unreadNotificationCountProvider);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -94,7 +95,7 @@ class AppHeader extends ConsumerWidget {
             ],
           ),
 
-          // Right: Notification Bell Icon with Green Dot Badge
+          // Right: Notification Bell Icon with Green Badge
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -108,20 +109,28 @@ class AppHeader extends ConsumerWidget {
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
-              if (unreadCount > 0)
+              if ((unreadCount ?? 0) > 0)
                 Positioned(
-                  top: 2,
-                  right: 2,
+                  top: -2,
+                  right: -2,
                   child: Container(
-                    width: 9,
-                    height: 9,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF16A34A),
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF16A34A),
                       shape: BoxShape.circle,
-                      border: Border.all(
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      (unreadCount ?? 0) > 9 ? '9+' : '$unreadCount',
+                      style: const TextStyle(
                         color: Colors.white,
-                        width: 1.5,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
                       ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ),

@@ -1,5 +1,7 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/core_providers.dart';
 
 
 import '../../features/auth/screens/splash_screen.dart';
@@ -16,6 +18,7 @@ import '../../features/map/screens/station_details_screen.dart';
 import '../../features/map/screens/charger_details_screen.dart';
 import '../../features/map/screens/favorites_screen.dart';
 
+import '../../features/charging/screens/qr_scan_screen.dart';
 import '../../features/charging/screens/start_charging_screen.dart';
 import '../../features/charging/screens/live_charging_session_screen.dart';
 import '../../features/charging/screens/stop_charging_screen.dart';
@@ -31,6 +34,8 @@ import '../../features/profile/screens/profile_screen.dart';
 import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/profile/screens/vehicle_management_screen.dart';
 import '../../features/profile/screens/add_edit_vehicle_screen.dart';
+import '../../features/profile/screens/rfid_card_screen.dart';
+import '../../features/profile/screens/privacy_settings_screen.dart';
 
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/settings/screens/language_screen.dart';
@@ -39,6 +44,7 @@ import '../../features/settings/screens/notifications_screen.dart';
 import '../../features/settings/screens/help_support_screen.dart';
 import '../../features/settings/screens/raise_complaint_screen.dart';
 import '../../features/settings/screens/faq_screen.dart';
+import '../../features/settings/screens/faqs_screen.dart';
 import '../../features/settings/screens/about_screen.dart';
 import '../../features/settings/screens/privacy_policy_screen.dart';
 import '../../features/settings/screens/terms_conditions_screen.dart';
@@ -48,43 +54,165 @@ import '../../features/error/screens/no_internet_screen.dart';
 import '../../features/error/screens/maintenance_screen.dart';
 import '../../features/error/screens/not_found_screen.dart';
 
-final routerProvider = Provider<GoRouter>((ref) {
-  return GoRouter(
-    initialLocation: '/splash',
-    errorBuilder: (context, state) => const NotFoundScreen(),
-    routes: [
-      GoRoute(path: '/splash', builder: (context, state) => const SplashScreen()),
-      GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingScreen()),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
-      GoRoute(path: '/forgot-password', builder: (context, state) => const ForgotPasswordScreen()),
+class NavigationShell extends ConsumerWidget {
+  final Widget child;
+  final String location;
 
-      ShellRoute(
-        builder: (context, state, child) {
-          return NavigationShell(
-            location: state.uri.path,
-            child: child,
-          );
-        },
-        routes: [
-          GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
-          GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
-          GoRoute(path: '/charging-history', builder: (context, state) => const ChargingHistoryScreen()),
-          GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
-        ],
-      ),
+  const NavigationShell({
+    super.key,
+    required this.child,
+    required this.location,
+  });
+
+  int _getSelectedIndex() {
+    if (location == '/') return 0;
+    if (location.startsWith('/map')) return 1;
+    if (location.startsWith('/bookings') || location.startsWith('/charging-history')) return 2;
+    if (location.startsWith('/profile')) return 3;
+    return 0;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selectedIndex = _getSelectedIndex();
+
+    return Scaffold(
+      body: child,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : Colors.white,
+          border: Border(
+            top: BorderSide(
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+              width: 1,
+            ),
+          ),
+        ),
+        child: NavigationBar(
+          selectedIndex: selectedIndex,
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          indicatorColor: const Color(0xFF16A34A).withOpacity(0.12),
+  onDestinationSelected: (index) {
+    if (index == selectedIndex) return;
+    if (index == 0) context.go('/');
+    if (index == 1) context.go('/map');
+    if (index == 2) context.go('/charging-history');
+    if (index == 3) context.go('/profile');
+  },
+  destinations: const [
+    NavigationDestination(
+      icon: Icon(Icons.home_outlined),
+      selectedIcon: Icon(Icons.home_rounded, color: Color(0xFF16A34A)),
+      label: 'Home',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.map_outlined),
+      selectedIcon: Icon(Icons.map_rounded, color: Color(0xFF16A34A)),
+      label: 'Map',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.history_outlined),
+      selectedIcon: Icon(Icons.history_rounded, color: Color(0xFF16A34A)),
+      label: 'Charging History',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.person_outline_rounded),
+      selectedIcon: Icon(Icons.person_rounded, color: Color(0xFF16A34A)),
+      label: 'Profile',
+    ),
+  ],
+),
+),
+);
+}
+}
+
+final routerProvider = Provider<GoRouter>((ref) {
+return GoRouter(
+initialLocation: '/splash',
+errorBuilder: (context, state) => const NotFoundScreen(),
+routes: [
+GoRoute(path: '/splash', builder: (context, state) => const SplashScreen()),
+GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingScreen()),
+GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
+GoRoute(path: '/forgot-password', builder: (context, state) => const ForgotPasswordScreen()),
+
+ShellRoute(
+builder: (context, state, child) {
+  return NavigationShell(
+    location: state.uri.path,
+    child: child,
+  );
+},
+routes: [
+  GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+  GoRoute(path: '/map', builder: (context, state) => const MapScreen()),
+  GoRoute(path: '/charging-history', builder: (context, state) => const ChargingHistoryScreen()),
+  GoRoute(path: '/bookings', builder: (context, state) => const ChargingHistoryScreen()),
+  GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
+],
+),
 
       GoRoute(path: '/search', builder: (context, state) => const SearchStationScreen()),
       GoRoute(
         path: '/station-details',
-        builder: (context, state) => const StationDetailsScreen(stationId: 'st-01'),
+        builder: (context, state) {
+          final id = state.uri.queryParameters['id'] ?? (state.extra as String?) ?? 'st-01';
+          return StationDetailsScreen(stationId: id);
+        },
       ),
-      GoRoute(path: '/charger-details', builder: (context, state) => const ChargerDetailsScreen()),
+      GoRoute(
+        path: '/charger-details',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final connectorId = state.uri.queryParameters['connectorId'] ?? extra?['connectorId'];
+          final chargerId = state.uri.queryParameters['chargerId'] ?? extra?['chargerId'];
+          final stationId = state.uri.queryParameters['stationId'] ?? extra?['stationId'];
+          return ChargerDetailsScreen(
+            connectorId: connectorId,
+            chargerId: chargerId,
+            stationId: stationId,
+          );
+        },
+      ),
       GoRoute(path: '/favorites', builder: (context, state) => const FavoritesScreen()),
 
-      GoRoute(path: '/start-charging', builder: (context, state) => const StartChargingScreen()),
-      GoRoute(path: '/live-charging', builder: (context, state) => const LiveChargingSessionScreen()),
+      GoRoute(path: '/scan', builder: (context, state) => const QrScanScreen()),
+      GoRoute(
+        path: '/start-charging',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final connectorId = state.uri.queryParameters['connectorId'] ?? extra?['connectorId'];
+          final chargerId = state.uri.queryParameters['chargerId'] ?? extra?['chargerId'];
+          final stationId = state.uri.queryParameters['stationId'] ?? extra?['stationId'];
+          return StartChargingScreen(
+            connectorId: connectorId,
+            chargerId: chargerId,
+            stationId: stationId,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/live-charging',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final stationId = state.uri.queryParameters['stationId'] ?? extra?['stationId'];
+          final sessionId = state.uri.queryParameters['sessionId'] ?? extra?['sessionId'];
+          final connectorId = state.uri.queryParameters['connectorId'] ?? extra?['connectorId'];
+          final chargerId = state.uri.queryParameters['chargerId'] ?? extra?['chargerId'];
+          return LiveChargingSessionScreen(
+            stationId: stationId,
+            sessionId: sessionId,
+            connectorId: connectorId,
+            chargerId: chargerId,
+          );
+        },
+      ),
       GoRoute(path: '/stop-charging', builder: (context, state) => const StopChargingScreen()),
+      GoRoute(path: '/charging-history', builder: (context, state) => const ChargingHistoryScreen()),
 
       GoRoute(path: '/wallet', builder: (context, state) => const WalletScreen()),
       GoRoute(path: '/add-money', builder: (context, state) => const AddMoneyScreen()),
@@ -94,10 +222,18 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
 
-      GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
       GoRoute(path: '/edit-profile', builder: (context, state) => const EditProfileScreen()),
       GoRoute(path: '/vehicles', builder: (context, state) => const VehicleManagementScreen()),
-      GoRoute(path: '/add-edit-vehicle', builder: (context, state) => const AddEditVehicleScreen()),
+      GoRoute(
+        path: '/add-edit-vehicle',
+        builder: (context, state) {
+          final vehicle = state.extra as EvVehicle?;
+          return AddEditVehicleScreen(vehicle: vehicle);
+        },
+      ),
+      GoRoute(path: '/rfid-card', builder: (context, state) => const RfidCardScreen()),
+      GoRoute(path: '/privacy-settings', builder: (context, state) => const PrivacySettingsScreen()),
+      GoRoute(path: '/faqs', builder: (context, state) => const FaqsScreen()),
 
       GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
       GoRoute(path: '/language', builder: (context, state) => const LanguageScreen()),

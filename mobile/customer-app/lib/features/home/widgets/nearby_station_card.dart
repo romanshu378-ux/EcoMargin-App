@@ -333,7 +333,7 @@ class NearbyStationCard extends StatelessWidget {
                   ),
                 ),
                 child: const Text(
-                  'View',
+                  'View Details',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 12,

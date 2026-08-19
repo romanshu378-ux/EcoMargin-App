@@ -49,8 +49,66 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
               child: ElevatedButton(
                 onPressed: _understandWarning
                     ? () {
-                        ref.read(authStateProvider.notifier).state = false;
-                        context.go('/login');
+                        showDialog(
+                          context: context,
+                          builder: (dialogCtx) => AlertDialog(
+                            title: const Text('Delete Account', style: TextStyle(fontWeight: FontWeight.bold)),
+                            content: const Text(
+                              'Are you sure you want to delete your EcoMargin account?\nThis action may permanently remove your account data.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(dialogCtx),
+                                child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                              ),
+                              TextButton(
+                                onPressed: () async {
+                                  Navigator.pop(dialogCtx);
+                                  showDialog(
+                                    context: context,
+                                    barrierDismissible: false,
+                                    builder: (context) => const Center(
+                                      child: CircularProgressIndicator(color: Color(0xFF16A34A)),
+                                    ),
+                                  );
+                                  try {
+                                    final apiClient = ref.read(apiClientProvider);
+                                    final storageService = ref.read(storageServiceProvider);
+                                    final response = await apiClient.dio.delete('/profile');
+                                    
+                                    if (context.mounted) {
+                                      Navigator.pop(context); // pop loading
+                                    }
+                                    
+                                    if (response.statusCode == 200) {
+                                      await storageService.clearAllTokens();
+                                      ref.read(authStateProvider.notifier).state = false;
+                                      if (context.mounted) {
+                                        context.go('/login');
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Your account was successfully deleted.')),
+                                        );
+                                      }
+                                    } else {
+                                      throw Exception('Failed deletion');
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      Navigator.pop(context); // pop loading if still there
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Failed to delete account. Please try again.'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                child: const Text('Delete Account', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
+                        );
                       }
                     : null,
                 style: ElevatedButton.styleFrom(

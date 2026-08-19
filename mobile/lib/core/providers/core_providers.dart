@@ -27,6 +27,16 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.light);
 final languageProvider = StateProvider<String>((ref) => 'English');
 
 // Live Charging Session Model & Notifier
+class PowerSample {
+  final DateTime timestamp;
+  final double powerKw;
+
+  const PowerSample({
+    required this.timestamp,
+    required this.powerKw,
+  });
+}
+
 class ChargingSessionState {
   final bool isCharging;
   final String? sessionId;
@@ -44,6 +54,7 @@ class ChargingSessionState {
   final bool hasConnectionError;
   final DateTime? startTime;
   final DateTime? lastUpdated;
+  final List<PowerSample> powerSamples;
 
   ChargingSessionState({
     this.isCharging = false,
@@ -62,6 +73,7 @@ class ChargingSessionState {
     this.hasConnectionError = false,
     this.startTime,
     this.lastUpdated,
+    this.powerSamples = const [],
   });
 
   ChargingSessionState copyWith({
@@ -81,6 +93,7 @@ class ChargingSessionState {
     bool? hasConnectionError,
     DateTime? startTime,
     DateTime? lastUpdated,
+    List<PowerSample>? powerSamples,
   }) {
     return ChargingSessionState(
       isCharging: isCharging ?? this.isCharging,
@@ -99,6 +112,7 @@ class ChargingSessionState {
       hasConnectionError: hasConnectionError ?? this.hasConnectionError,
       startTime: startTime ?? this.startTime,
       lastUpdated: lastUpdated ?? this.lastUpdated,
+      powerSamples: powerSamples ?? this.powerSamples,
     );
   }
 }
@@ -192,6 +206,15 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> with W
           fetchWalletBalance();
         }
 
+        final pKw = double.tryParse(data['currentPowerKw']?.toString() ?? '0') ?? 0.0;
+        final updatedSamples = List<PowerSample>.from(state.powerSamples);
+        if (pKw > 0 || updatedSamples.isNotEmpty) {
+          updatedSamples.add(PowerSample(timestamp: DateTime.now(), powerKw: pKw));
+          if (updatedSamples.length > 100) {
+            updatedSamples.removeAt(0);
+          }
+        }
+
         state = ChargingSessionState(
           isCharging: isActive,
           sessionId: sessId,
@@ -201,7 +224,7 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> with W
           connectorType: data['connectorType'] ?? '',
           percentage: double.tryParse(data['percentage']?.toString() ?? '0') ?? 0.0,
           kwhDelivered: double.tryParse(data['kwhDelivered']?.toString() ?? '0') ?? 0.0,
-          currentPowerKw: double.tryParse(data['currentPowerKw']?.toString() ?? '0') ?? 0.0,
+          currentPowerKw: pKw,
           voltage: volt,
           current: curr,
           durationSeconds: durationSecs,
@@ -209,6 +232,7 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> with W
           hasConnectionError: false,
           startTime: parsedStart,
           lastUpdated: DateTime.now(),
+          powerSamples: updatedSamples,
         );
 
         if (isActive && !_isAppPaused) {
@@ -325,18 +349,23 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> with W
         );
         
         final walletBal = double.tryParse(data['walletBalance']?.toString() ?? '0') ?? 0.0;
-        ref.read(walletBalanceProvider.notifier).state = walletBal;
-
-        ref.invalidate(walletTransactionsProvider);
-        ref.invalidate(chargingHistoryProvider);
+        Future.microtask(() {
+          ref.read(walletBalanceProvider.notifier).state = walletBal;
+          ref.invalidate(walletBalanceAsyncProvider);
+          ref.invalidate(walletTransactionsProvider);
+          ref.invalidate(chargingHistoryProvider);
+        });
       }
     } catch (_) {
       _timer?.cancel();
       final storage = ref.read(storageServiceProvider);
       await storage.saveData('active_session_id', null);
       state = state.copyWith(isCharging: false, hasConnectionError: false);
-      ref.invalidate(walletTransactionsProvider);
-      ref.invalidate(chargingHistoryProvider);
+      Future.microtask(() {
+        ref.invalidate(walletBalanceAsyncProvider);
+        ref.invalidate(walletTransactionsProvider);
+        ref.invalidate(chargingHistoryProvider);
+      });
     }
   }
 
@@ -383,25 +412,45 @@ final walletBalanceAsyncProvider = FutureProvider.autoDispose<double>((ref) asyn
 });
 
 final walletTransactionsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-  try {
-    final apiClient = ref.watch(apiClientProvider);
-    final response = await apiClient.dio.get('/wallet/transactions');
-    if (response.statusCode == 200 && response.data is List) {
-      return List<Map<String, dynamic>>.from(response.data);
-    }
-  } catch (_) {}
+  final apiClient = ref.watch(apiClientProvider);
+  final response = await apiClient.dio.get('/wallet/transactions');
+  if (response.statusCode == 200 && response.data is List) {
+    return List<Map<String, dynamic>>.from(response.data);
+  }
   return [];
 });
 
 final chargingHistoryProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final apiClient = ref.watch(apiClientProvider);
+  final response = await apiClient.dio.get('/charging-sessions/history');
+  if (response.statusCode == 200 && response.data is List) {
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+  return [];
+});
+
+final notificationsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final apiClient = ref.watch(apiClientProvider);
+  final response = await apiClient.dio.get('/notifications');
+  if (response.statusCode == 200 && response.data is List) {
+    return List<Map<String, dynamic>>.from(response.data);
+  }
+  return [];
+});
+
+final unreadNotificationCountProvider = StateProvider<int>((ref) => 0);
+
+final unreadNotificationCountAsyncProvider = FutureProvider.autoDispose<int>((ref) async {
   try {
     final apiClient = ref.watch(apiClientProvider);
-    final response = await apiClient.dio.get('/charging-sessions/history');
-    if (response.statusCode == 200 && response.data is List) {
-      return List<Map<String, dynamic>>.from(response.data);
+    final response = await apiClient.dio.get('/notifications/unread-count');
+    if (response.statusCode == 200 && response.data != null) {
+      final count = int.tryParse(response.data['unreadCount']?.toString() ?? '0') ?? 0;
+      ref.read(unreadNotificationCountProvider.notifier).state = count;
+      return count;
     }
   } catch (_) {}
-  return [];
+  return 0;
 });
 
 // User Profile Model

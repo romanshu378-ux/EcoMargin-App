@@ -192,5 +192,4 @@ final stationsProvider = StateNotifierProvider<StationNotifier, AsyncValue<List<
   return StationNotifier(ref);
 });
 
-final unreadNotificationCountProvider = StateProvider<int>((ref) => 1);
 final currentLocationProvider = StateProvider<String>((ref) => 'Current Location');

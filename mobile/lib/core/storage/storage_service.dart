@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 class StorageService {
   static const String _tokenKey = 'jwt_token';
+  static const String _refreshTokenKey = 'jwt_refresh_token';
   static const String _userBox = 'user_box';
   
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
@@ -24,6 +25,23 @@ class StorageService {
 
   Future<void> deleteToken() async {
     await _secureStorage.delete(key: _tokenKey);
+  }
+
+  Future<void> saveRefreshToken(String token) async {
+    await _secureStorage.write(key: _refreshTokenKey, value: token);
+  }
+
+  Future<String?> getRefreshToken() async {
+    return await _secureStorage.read(key: _refreshTokenKey);
+  }
+
+  Future<void> deleteRefreshToken() async {
+    await _secureStorage.delete(key: _refreshTokenKey);
+  }
+
+  Future<void> clearAllTokens() async {
+    await deleteToken();
+    await deleteRefreshToken();
   }
 
   // General App Data Storage

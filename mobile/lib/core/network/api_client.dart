@@ -1,10 +1,11 @@
+import 'dart:io';
 import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../storage/storage_service.dart';
+import '../config/app_config.dart';
 
 class ApiClient {
-  static const String _defaultBaseUrl = 'https://ecomargin-app.onrender.com/api/v1';
   final Dio _dio;
   final StorageService _storageService;
 
@@ -93,19 +94,62 @@ class ApiClient {
             } catch (_) {}
           }
 
+          // Refresh Token handling for 401 Unauthorized
+          if (statusCode == 401 && !e.requestOptions.path.contains('/auth/')) {
+            final refreshToken = await _storageService.getRefreshToken();
+            if (refreshToken != null && refreshToken.isNotEmpty) {
+              try {
+                final refreshDio = Dio();
+                refreshDio.options.baseUrl = AppConfig.baseUrl;
+                refreshDio.options.headers['Content-Type'] = 'application/json';
+                final refreshResponse = await refreshDio.post(
+                  '/auth/refresh',
+                  data: {'refreshToken': refreshToken},
+                );
+
+                if (refreshResponse.statusCode == 200) {
+                  final newAccessToken = refreshResponse.data['accessToken'];
+                  final newRefreshToken = refreshResponse.data['refreshToken'];
+
+                  await _storageService.saveToken(newAccessToken);
+                  await _storageService.saveRefreshToken(newRefreshToken);
+
+                  e.requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
+                  
+                  final retryResponse = await _dio.fetch(e.requestOptions);
+                  return handler.resolve(retryResponse);
+                }
+              } catch (refreshErr) {
+                if (kDebugMode) {
+                  debugPrint('[API] Token refresh failed: $refreshErr');
+                }
+                await _storageService.clearAllTokens();
+              }
+            } else {
+              await _storageService.clearAllTokens();
+            }
+          }
+
           return handler.next(e);
         },
       ),
     );
   }
 
+  /// Checks connectivity to the backend health endpoint.
+  /// Retries up to [maxRetries] times to allow Render cold starts.
   Future<bool> checkHealth({
     int maxRetries = 5,
     Duration retryDelay = const Duration(seconds: 3),
   }) async {
-    const rootHost = 'https://ecomargin-app.onrender.com';
+    final rootHost = AppConfig.baseUrl.replaceAll('/api/v1', '');
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
       try {
+        if (kDebugMode) {
+          debugPrint('[HEALTH] Checking health (attempt $attempt/$maxRetries)...');
+        }
+
+        // Try direct /health at root host
         final response = await Dio().get(
           '$rootHost/health',
           options: Options(
@@ -116,9 +160,16 @@ class ApiClient {
         );
 
         if (response.statusCode == 200) {
+          if (kDebugMode) {
+            debugPrint('[HEALTH] Backend is UP and responding!');
+          }
           return true;
         }
-      } catch (_) {
+      } on DioException catch (e) {
+        if (kDebugMode) {
+          debugPrint('[HEALTH] Health check attempt $attempt failed: ${e.response?.statusCode ?? e.type.name}');
+        }
+        // Try fallback to /api/v1/health
         try {
           final altResp = await _dio.get(
             'health',
@@ -131,6 +182,10 @@ class ApiClient {
             return true;
           }
         } catch (_) {}
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[HEALTH] Health check error: $e');
+        }
       }
 
       if (attempt < maxRetries) {
@@ -140,6 +195,7 @@ class ApiClient {
     return false;
   }
 
+  /// Helper to extract clean human-readable backend error messages.
   static String extractErrorMessage(
     dynamic error, {
     String defaultMsg = 'An error occurred while connecting to server.',
@@ -153,6 +209,9 @@ class ApiClient {
           }
           if (data['error'] != null && data['error'].toString().trim().isNotEmpty) {
             return data['error'].toString();
+          }
+          if (data['details'] != null && data['details'].toString().trim().isNotEmpty) {
+            return data['details'].toString();
           }
         } else if (data is String && data.trim().isNotEmpty && !data.contains('<html>')) {
           return data;
@@ -169,7 +228,7 @@ class ApiClient {
           case 403:
             return 'Access denied.';
           case 404:
-            return 'Requested resource not found.';
+            return 'Requested service or user not found.';
           case 409:
             return 'Email is already registered. Please login.';
           case 422:
@@ -189,6 +248,10 @@ class ApiClient {
           error.type == DioExceptionType.receiveTimeout ||
           error.type == DioExceptionType.sendTimeout) {
         return 'Server connection timed out. Render backend may be waking up.';
+      }
+
+      if (error.type == DioExceptionType.connectionError || error.error is SocketException) {
+        return 'Unable to connect to EcoMargin server. Please check your internet connection.';
       }
 
       return error.message ?? defaultMsg;

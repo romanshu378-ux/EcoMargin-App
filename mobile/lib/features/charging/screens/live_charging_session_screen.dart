@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../core/utils/connector_status.dart';
+import '../widgets/charging_power_chart.dart';
 
 class LiveChargingSessionScreen extends ConsumerWidget {
   final String? stationId;
@@ -61,6 +62,23 @@ class LiveChargingSessionScreen extends ConsumerWidget {
     final displayConnector = connectorId ?? (session.connectorType.isNotEmpty ? session.connectorType : 'CCS2');
     final activeSessionId = session.sessionId ?? sessionId ?? 'OCPP-TX-8492';
     final co2Saved = (session.kwhDelivered * 0.85).toStringAsFixed(2);
+
+    final int secondsSinceUpdate = session.lastUpdated != null
+        ? DateTime.now().difference(session.lastUpdated!).inSeconds
+        : 0;
+    final bool isStale = secondsSinceUpdate > 10;
+
+    String connectionLabel = '● Live';
+    Color connectionColor = const Color(0xFF16A34A);
+    if (session.hasConnectionError) {
+      connectionLabel = '🔴 Offline';
+      connectionColor = Colors.red;
+    } else if (isStale) {
+      connectionLabel = '🟡 Connection delayed';
+      connectionColor = Colors.amber.shade800;
+    } else if (session.lastUpdated != null) {
+      connectionLabel = '● Live • ${secondsSinceUpdate}s ago';
+    }
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
@@ -120,11 +138,11 @@ class LiveChargingSessionScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.red, width: 1.5),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.error_rounded, color: Colors.red, size: 28),
-                      SizedBox(width: 12),
-                      Expanded(
+                      const Icon(Icons.error_rounded, color: Colors.red, size: 28),
+                      const SizedBox(width: 12),
+                      const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -224,7 +242,7 @@ class LiveChargingSessionScreen extends ConsumerWidget {
                     width: 210,
                     height: 210,
                     child: CircularProgressIndicator(
-                      value: (session.percentage / 100.0).clamp(0.0, 1.0),
+                      value: session.percentage > 0 ? (session.percentage / 100.0).clamp(0.0, 1.0) : 0.0,
                       strokeWidth: 16,
                       backgroundColor: const Color(0xFF16A34A).withOpacity(0.15),
                       valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
@@ -234,7 +252,7 @@ class LiveChargingSessionScreen extends ConsumerWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        '${session.percentage.toInt()}%',
+                        session.percentage > 0 ? '${session.percentage.toInt()}%' : '--',
                         style: const TextStyle(
                           fontSize: 48,
                           fontWeight: FontWeight.w900,
@@ -259,24 +277,34 @@ class LiveChargingSessionScreen extends ConsumerWidget {
 
               const SizedBox(height: 28),
 
-              // Live Metrics Grid (Energy, Duration, Cost, Power)
+              // Live Metrics Grid (6 cards: Power, Energy, Voltage, Current, Cost, Duration)
               GridView.count(
                 crossAxisCount: 2,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
-                childAspectRatio: 1.5,
+                childAspectRatio: 1.4,
                 children: [
+                  _MetricCard(
+                    icon: Icons.speed_rounded,
+                    label: 'Power',
+                    value: session.currentPowerKw > 0 ? '${session.currentPowerKw.toStringAsFixed(1)} kW' : '-- kW',
+                  ),
                   _MetricCard(
                     icon: Icons.electric_meter_rounded,
                     label: 'Energy Delivered',
                     value: '${session.kwhDelivered.toStringAsFixed(2)} kWh',
                   ),
                   _MetricCard(
-                    icon: Icons.timer_outlined,
-                    label: 'Duration',
-                    value: durationFormatted,
+                    icon: Icons.bolt_rounded,
+                    label: 'Voltage',
+                    value: session.voltage != null ? '${session.voltage!.toStringAsFixed(0)} V' : '-- V',
+                  ),
+                  _MetricCard(
+                    icon: Icons.electrical_services_rounded,
+                    label: 'Current',
+                    value: session.current != null ? '${session.current!.toStringAsFixed(0)} A' : '-- A',
                   ),
                   _MetricCard(
                     icon: Icons.currency_rupee_rounded,
@@ -285,16 +313,26 @@ class LiveChargingSessionScreen extends ConsumerWidget {
                     valueColor: const Color(0xFF16A34A),
                   ),
                   _MetricCard(
-                    icon: Icons.speed_rounded,
-                    label: 'Charging Power',
-                    value: '${session.currentPowerKw.toStringAsFixed(1)} kW',
+                    icon: Icons.timer_outlined,
+                    label: 'Duration',
+                    value: durationFormatted,
                   ),
                 ],
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-              // Technical Details Card (Connector ID, Type, Voltage, Current)
+              // Charging Power Graph Widget
+              ChargingPowerChart(
+                samples: session.powerSamples,
+                currentPowerKw: session.currentPowerKw,
+                hasConnectionError: session.hasConnectionError,
+                onRetry: () => ref.read(chargingSessionProvider.notifier).checkActiveSession(),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Technical Details Card
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -329,8 +367,8 @@ class LiveChargingSessionScreen extends ConsumerWidget {
                           ),
                         ),
                         Text(
-                          session.lastUpdated != null ? 'Updated ${DateTime.now().difference(session.lastUpdated!).inSeconds}s ago' : '● Live',
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF16A34A), fontWeight: FontWeight.bold),
+                          connectionLabel,
+                          style: TextStyle(fontSize: 11, color: connectionColor, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),

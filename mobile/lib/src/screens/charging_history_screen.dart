@@ -15,7 +15,7 @@ class ChargingHistoryScreen extends StatelessWidget {
             child: ListTile(
               title: Text('Downtown Hub Fast Charge'),
               subtitle: Text('42.5 kWh • 45 mins'),
-              trailing: Text('\$18.70', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+              trailing: Text('₹18.70', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
             ),
           ),
         ],

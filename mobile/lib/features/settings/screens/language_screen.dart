@@ -38,7 +38,7 @@ class LanguageScreen extends ConsumerWidget {
               trailing: isSelected ? const Icon(Icons.check_circle, color: Color(0xFF16A34A)) : null,
               onTap: () {
                 ref.read(languageProvider.notifier).state = lang;
-                context.go('/settings');
+                context.pop();
               },
             ),
           );

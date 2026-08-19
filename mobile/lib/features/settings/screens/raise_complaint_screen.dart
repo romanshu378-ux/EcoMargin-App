@@ -56,7 +56,7 @@ class _RaiseComplaintScreenState extends State<RaiseComplaintScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Support ticket submitted! Ticket ID #TKT-9912')),
                   );
-                  context.go('/help');
+                  context.pop();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF16A34A),

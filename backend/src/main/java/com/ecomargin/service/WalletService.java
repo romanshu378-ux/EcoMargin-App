@@ -22,6 +22,7 @@ public class WalletService {
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
     private final ChargingSessionRepository chargingSessionRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public Transaction processChargingDebit(Long sessionId, String transactionId, BigDecimal amount) {
@@ -78,6 +79,27 @@ public class WalletService {
         // 6. Update charging_session.total_cost
         session.setTotalCost(amount);
         chargingSessionRepository.save(session);
+
+        // 7. Trigger notifications
+        try {
+            notificationService.createNotification(
+                    session.getUser(),
+                    "Payment Deducted",
+                    "₹" + String.format("%.2f", amount) + " was debited for your charging session.",
+                    "TRANSACTION"
+            );
+
+            if (balanceAfter.compareTo(new BigDecimal("50.00")) < 0) {
+                notificationService.createNotification(
+                        session.getUser(),
+                        "Low Wallet Balance",
+                        "Your wallet balance is below ₹50. Add money to continue charging.",
+                        "SYSTEM"
+                );
+            }
+        } catch (Exception e) {
+            log.warn("Failed to create debit notification: {}", e.getMessage());
+        }
 
         return savedTx;
     }
