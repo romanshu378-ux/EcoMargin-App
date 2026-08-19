@@ -23,12 +23,19 @@ export default function App() {
         {/* Admin Routes */}
         <Route path="/" element={<AdminLayout />}>
           <Route index element={<DashboardPage />} />
+          <Route path="dashboard" element={<DashboardPage />} />
           <Route path="stations" element={<StationsPage />} />
           <Route path="chargers" element={<ChargersPage />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="vendors" element={<VendorsPage />} />
+          <Route path="orders" element={<TransactionsPage />} />
+          <Route path="payments" element={<TransactionsPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
+          <Route path="audit-logs" element={<FirmwareDiagnosticsPage />} />
           <Route path="diagnostics" element={<FirmwareDiagnosticsPage />} />
+          <Route path="reports" element={<DashboardPage />} />
+          <Route path="settings" element={<DashboardPage />} />
+          <Route path="*" element={<DashboardPage />} />
         </Route>
 
         {/* CPO Vendor Routes */}
