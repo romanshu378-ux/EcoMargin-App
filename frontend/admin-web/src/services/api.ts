@@ -1,9 +1,18 @@
 import axios from 'axios';
 
 export const getApiBaseUrl = () => {
-  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  let envUrl = import.meta.env.VITE_API_BASE_URL;
   if (envUrl && envUrl.trim() !== '') {
-    return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+    envUrl = envUrl.trim();
+    if (envUrl.endsWith('/')) envUrl = envUrl.slice(0, -1);
+    if (!envUrl.endsWith('/api/v1')) {
+      if (envUrl.endsWith('/api')) {
+        envUrl = `${envUrl}/v1`;
+      } else {
+        envUrl = `${envUrl}/api/v1`;
+      }
+    }
+    return envUrl;
   }
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     return 'http://localhost:8080/api/v1';
