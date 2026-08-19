@@ -34,40 +34,40 @@ class StationNotifier extends StateNotifier<AsyncValue<List<ChargingStation>>> {
                     if (status.toUpperCase() == 'AVAILABLE') {
                       available++;
                     }
+                    final double rate = (conn['unitRate'] as num?)?.toDouble() ?? 18.0;
                     connectors.add(StationConnector(
                       id: conn['id']?.toString() ?? '',
                       type: conn['type'] ?? 'CCS2',
                       status: status,
-                      maxPowerKw: (conn['maxPowerKw'] as num?)?.toDouble() ?? 50.0,
+                      maxPowerKw: (conn['maxPowerKw'] as num?)?.toDouble() ?? 60.0,
+                      unitRate: rate,
                       chargerId: chargerId,
                     ));
                   }
                 }
               }
             }
-            
-            // fallback if empty
-            if (connectors.isEmpty) {
-              connectors.addAll([
-                const StationConnector(id: '1', type: 'CCS2', status: 'AVAILABLE', maxPowerKw: 60.0, chargerId: 'CHG-DC-04'),
-                const StationConnector(id: '2', type: 'Type 2', status: 'AVAILABLE', maxPowerKw: 22.0, chargerId: 'CHG-AC-02'),
-              ]);
-              total = 2;
-              available = 2;
-            }
 
             final chargerType = json['chargerType'] ?? (connectors.isNotEmpty ? connectors.first.type : 'CCS2');
+
+            String computedPriceStr = json['priceStr'] ?? '';
+            if (computedPriceStr.isEmpty && connectors.isNotEmpty) {
+              final double minRate = connectors.map((c) => c.unitRate).reduce((a, b) => a < b ? a : b);
+              computedPriceStr = '₹${minRate % 1 == 0 ? minRate.toInt() : minRate.toStringAsFixed(2)} / kWh';
+            } else if (computedPriceStr.isEmpty) {
+              computedPriceStr = '₹18.00 / kWh';
+            }
 
             return ChargingStation(
               id: json['id']?.toString() ?? '',
               name: json['name'] ?? 'EcoMargin Charging Station',
-              address: json['address'] ?? 'Tonk Road, Jaipur, Rajasthan',
+              address: json['address'] ?? 'Jaipur, Rajasthan',
               distanceStr: json['distanceStr'] ?? '0.8 km Away',
               totalChargers: total,
               availableChargers: available,
               chargerType: chargerType,
               chargerCategory: json['chargerCategory'] ?? (chargerType.contains('CCS2') ? 'Fast Charger' : 'Standard Charger'),
-              priceStr: json['priceStr'] ?? '₹12 / kWh',
+              priceStr: computedPriceStr,
               priceSubtext: json['priceSubtext'] ?? 'Starting from',
               imageUrl: json['imageUrl'] ?? 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
               isVerified: json['isVerified'] ?? true,
@@ -93,7 +93,7 @@ class StationNotifier extends StateNotifier<AsyncValue<List<ChargingStation>>> {
           availableChargers: 2,
           chargerType: 'CCS2, Type 2',
           chargerCategory: 'Fast Charger',
-          priceStr: '₹12 / kWh',
+          priceStr: '₹18 / kWh',
           priceSubtext: 'Starting from',
           imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
           isVerified: true,
@@ -101,8 +101,8 @@ class StationNotifier extends StateNotifier<AsyncValue<List<ChargingStation>>> {
           latitude: 26.9150,
           longitude: 75.7920,
           connectors: [
-            StationConnector(id: '1', type: 'CCS2', status: 'AVAILABLE', maxPowerKw: 60.0, chargerId: 'TX_AUS_DWTN_01'),
-            StationConnector(id: '2', type: 'Type 2', status: 'AVAILABLE', maxPowerKw: 22.0, chargerId: 'TX_AUS_DWTN_01'),
+            StationConnector(id: '1', type: 'CCS2', status: 'AVAILABLE', maxPowerKw: 60.0, unitRate: 18.0, chargerId: 'TX_AUS_DWTN_01'),
+            StationConnector(id: '2', type: 'Type 2', status: 'AVAILABLE', maxPowerKw: 22.0, unitRate: 18.0, chargerId: 'TX_AUS_DWTN_01'),
           ],
         ),
         const ChargingStation(
@@ -114,7 +114,7 @@ class StationNotifier extends StateNotifier<AsyncValue<List<ChargingStation>>> {
           availableChargers: 2,
           chargerType: 'CCS2, GB/T',
           chargerCategory: 'Super Charger',
-          priceStr: '₹15 / kWh',
+          priceStr: '₹18 / kWh',
           priceSubtext: 'Starting from',
           imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
           isVerified: true,
@@ -122,8 +122,8 @@ class StationNotifier extends StateNotifier<AsyncValue<List<ChargingStation>>> {
           latitude: 26.8540,
           longitude: 75.8140,
           connectors: [
-            StationConnector(id: '3', type: 'CCS2', status: 'AVAILABLE', maxPowerKw: 120.0, chargerId: 'TX_AUS_DWTN_02'),
-            StationConnector(id: '4', type: 'GB/T', status: 'AVAILABLE', maxPowerKw: 60.0, chargerId: 'TX_AUS_DWTN_02'),
+            StationConnector(id: '3', type: 'CCS2', status: 'AVAILABLE', maxPowerKw: 120.0, unitRate: 18.0, chargerId: 'TX_AUS_DWTN_02'),
+            StationConnector(id: '4', type: 'GB/T', status: 'AVAILABLE', maxPowerKw: 60.0, unitRate: 18.0, chargerId: 'TX_AUS_DWTN_02'),
           ],
         ),
         const ChargingStation(
@@ -135,7 +135,7 @@ class StationNotifier extends StateNotifier<AsyncValue<List<ChargingStation>>> {
           availableChargers: 1,
           chargerType: 'Type 2',
           chargerCategory: 'Standard Charger',
-          priceStr: '₹10 / kWh',
+          priceStr: '₹18 / kWh',
           priceSubtext: 'Starting from',
           imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
           isVerified: true,
@@ -143,7 +143,7 @@ class StationNotifier extends StateNotifier<AsyncValue<List<ChargingStation>>> {
           latitude: 26.9180,
           longitude: 75.8010,
           connectors: [
-            StationConnector(id: '5', type: 'Type 2', status: 'AVAILABLE', maxPowerKw: 22.0, chargerId: 'TX_AUS_NL_01'),
+            StationConnector(id: '5', type: 'Type 2', status: 'AVAILABLE', maxPowerKw: 22.0, unitRate: 18.0, chargerId: 'TX_AUS_NL_01'),
           ],
         ),
         const ChargingStation(
@@ -163,7 +163,7 @@ class StationNotifier extends StateNotifier<AsyncValue<List<ChargingStation>>> {
           latitude: 26.9080,
           longitude: 75.7480,
           connectors: [
-            StationConnector(id: '6', type: 'CCS2', status: 'AVAILABLE', maxPowerKw: 240.0, chargerId: 'TX_AUS_NL_02'),
+            StationConnector(id: '6', type: 'CCS2', status: 'AVAILABLE', maxPowerKw: 240.0, unitRate: 18.0, chargerId: 'TX_AUS_NL_02'),
           ],
         ),
       ];

@@ -179,7 +179,7 @@ class StationDetailsScreen extends ConsumerWidget {
                               context,
                               title: '${conn.type} Connector',
                               power: '${conn.maxPowerKw.toInt()} kW',
-                              price: station.priceStr,
+                              price: '₹${conn.unitRate % 1 == 0 ? conn.unitRate.toInt() : conn.unitRate.toStringAsFixed(2)} / kWh',
                               isAvailable: conn.status.toUpperCase() == 'AVAILABLE',
                               connectorId: conn.id,
                               chargerId: conn.chargerId,

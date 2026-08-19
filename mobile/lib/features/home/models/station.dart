@@ -3,6 +3,7 @@ class StationConnector {
   final String type;
   final String status;
   final double maxPowerKw;
+  final double unitRate;
   final String chargerId;
 
   const StationConnector({
@@ -10,6 +11,7 @@ class StationConnector {
     required this.type,
     required this.status,
     required this.maxPowerKw,
+    required this.unitRate,
     required this.chargerId,
   });
 }

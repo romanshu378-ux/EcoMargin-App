@@ -77,4 +77,80 @@ public class Station {
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("priceStr")
+    @Transient
+    public String getPriceStr() {
+        if (chargers != null) {
+            BigDecimal minRate = null;
+            for (Charger c : chargers) {
+                if (c.getConnectors() != null) {
+                    for (Connector conn : c.getConnectors()) {
+                        BigDecimal r = conn.getUnitRate();
+                        if (r != null && r.compareTo(BigDecimal.ZERO) > 0) {
+                            if (minRate == null || r.compareTo(minRate) < 0) {
+                                minRate = r;
+                            }
+                        }
+                    }
+                }
+            }
+            if (minRate != null) {
+                if (minRate.stripTrailingZeros().scale() <= 0) {
+                    return "₹" + minRate.longValue() + " / kWh";
+                }
+                return "₹" + minRate.setScale(2, java.math.RoundingMode.HALF_UP).toString() + " / kWh";
+            }
+        }
+        return "₹18.00 / kWh";
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("priceSubtext")
+    @Transient
+    public String getPriceSubtext() {
+        return "Starting from";
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("chargerType")
+    @Transient
+    public String getChargerType() {
+        if (chargers != null) {
+            java.util.Set<String> types = new java.util.LinkedHashSet<>();
+            for (Charger c : chargers) {
+                if (c.getConnectors() != null) {
+                    for (Connector conn : c.getConnectors()) {
+                        if (conn.getType() != null && !conn.getType().isBlank()) {
+                            types.add(conn.getType().toUpperCase());
+                        }
+                    }
+                }
+            }
+            if (!types.isEmpty()) {
+                return String.join(", ", types);
+            }
+        }
+        return "CCS2";
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("chargerCategory")
+    @Transient
+    public String getChargerCategory() {
+        String cType = getChargerType();
+        if (cType.contains("CCS2") || cType.contains("CHADEMO") || cType.contains("GB_T")) {
+            return "Fast Charger";
+        }
+        return "Standard Charger";
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("imageUrl")
+    @Transient
+    public String getImageUrl() {
+        return "https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80";
+    }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("isVerified")
+    @Transient
+    public boolean isVerified() {
+        return true;
+    }
 }

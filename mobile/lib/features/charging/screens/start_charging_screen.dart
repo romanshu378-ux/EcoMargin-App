@@ -890,7 +890,7 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> with 
                                               ),
                                               const SizedBox(height: 2),
                                               Text(
-                                                'Rating: ${conn.maxPowerKw.toInt()} kW • Charger: ${conn.chargerId}',
+                                                'Rating: ${conn.maxPowerKw.toInt()} kW • ₹${conn.unitRate % 1 == 0 ? conn.unitRate.toInt() : conn.unitRate.toStringAsFixed(2)}/kWh',
                                                 style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
