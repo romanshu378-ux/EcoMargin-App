@@ -112,29 +112,27 @@ public class MeterValuesHandler implements OcppRequestHandler {
         }
 
         // Update active session if present for this connector
-        List<ChargingSession> sessions = chargingSessionRepository.findByStatus("ACTIVE");
+        List<ChargingSession> sessions = chargingSessionRepository.findByConnectorAndStatusIn(connector, ACTIVE_STATUSES);
         for (ChargingSession session : sessions) {
-            if (session.getConnector() != null && session.getConnector().getId().equals(connector.getId())) {
-                double rate = 18.0;
-                try {
-                    Setting rateSetting = settingRepository.findById("default_charging_rate_per_kwh").orElse(null);
-                    if (rateSetting != null) {
-                        double r = Double.parseDouble(rateSetting.getValue());
-                        if (r > 0.0) rate = (r == 0.35 ? 18.0 : r);
-                    }
-                } catch (Exception e) {
-                    // fallback
+            double rate = 18.0;
+            try {
+                Setting rateSetting = settingRepository.findById("default_charging_rate_per_kwh").orElse(null);
+                if (rateSetting != null) {
+                    double r = Double.parseDouble(rateSetting.getValue());
+                    if (r > 0.0) rate = (r == 0.35 ? 18.0 : r);
                 }
-
-                BigDecimal energyBd = BigDecimal.valueOf(energyKwh).setScale(3, RoundingMode.HALF_UP);
-                BigDecimal costBd = energyBd.multiply(BigDecimal.valueOf(rate)).setScale(2, RoundingMode.HALF_UP);
-
-                session.setTotalEnergyKwh(energyBd);
-                session.setTotalCost(costBd);
-                session.setUpdatedAt(LocalDateTime.now());
-                chargingSessionRepository.save(session);
-                break;
+            } catch (Exception e) {
+                // fallback
             }
+
+            BigDecimal energyBd = BigDecimal.valueOf(energyKwh).setScale(3, RoundingMode.HALF_UP);
+            BigDecimal costBd = energyBd.multiply(BigDecimal.valueOf(rate)).setScale(2, RoundingMode.HALF_UP);
+
+            session.setTotalEnergyKwh(energyBd);
+            session.setTotalCost(costBd);
+            session.setUpdatedAt(LocalDateTime.now());
+            chargingSessionRepository.save(session);
+            break;
         }
 
         // Publish live telemetry

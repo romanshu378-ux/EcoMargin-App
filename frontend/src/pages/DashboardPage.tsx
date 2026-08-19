@@ -1,56 +1,132 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   IndianRupee, Activity, Battery, Radio, ArrowUpRight, ArrowDownRight, 
-  MapPin, CheckCircle, AlertTriangle 
+  MapPin, CheckCircle, AlertTriangle, RefreshCw, Zap, ShieldAlert
 } from 'lucide-react';
 
-const stats = [
-  { label: 'Weekly Revenue', value: '₹12,48,520.00', change: '+14.2%', trend: 'up', icon: IndianRupee },
-  { label: 'Active Sessions', value: '42 Charging', change: '+8.3%', trend: 'up', icon: Activity },
-  { label: 'Network Power', value: '380.5 kW', change: '-2.1%', trend: 'down', icon: Battery },
-  { label: 'Active Chargers', value: '18 / 20 Online', change: '90%', trend: 'up', icon: Radio },
-];
-
-const mockLogs = [
-  { id: '1', charger: 'TX_AUS_DWTN_01', event: 'BootNotification received', status: 'Accepted', time: '10s ago' },
-  { id: '2', charger: 'TX_AUS_DWTN_02', event: 'RemoteStart triggered', status: 'Pending', time: '1m ago' },
-  { id: '3', charger: 'TX_AUS_NL_01', event: 'MeterValues report (24.2 kWh)', status: 'Success', time: '2m ago' },
-  { id: '4', charger: 'TX_AUS_DWTN_01', event: 'StatusNotification (Faulted)', status: 'Warning', time: '5m ago' },
-];
-
-const topStations = [
-  { name: 'Austin Downtown Hub', activeTx: 6, usage: 88, status: 'Optimal' },
-  { name: 'North Loop Charger Point', activeTx: 3, usage: 65, status: 'Optimal' },
-  { name: 'West Lake Hills Station', activeTx: 0, usage: 0, status: 'Maintenance' },
-];
+interface DashboardStats {
+  totalStations: number;
+  totalChargers: number;
+  onlineChargers: number;
+  offlineChargers: number;
+  chargingChargers: number;
+  faultedChargers: number;
+  availableConnectors: number;
+  activeSessions: number;
+}
 
 export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchDashboardStats = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/v1/admin/dashboard', {
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load dashboard metrics (HTTP ${response.status})`);
+      }
+
+      const data = await response.json();
+      setStats(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect to backend server');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardStats();
+  }, []);
+
+  const statItems = [
+    { 
+      label: 'Total Stations', 
+      value: stats ? stats.totalStations.toString() : '-', 
+      subtext: 'Registered charging hubs',
+      icon: MapPin, 
+      color: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400' 
+    },
+    { 
+      label: 'Charger Network Liveness', 
+      value: stats ? `${stats.onlineChargers} / ${stats.totalChargers} Online` : '-', 
+      subtext: stats ? `${stats.offlineChargers} Offline` : 'Hardware status',
+      icon: Radio, 
+      color: 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' 
+    },
+    { 
+      label: 'Active Sessions', 
+      value: stats ? `${stats.activeSessions} Charging` : '-', 
+      subtext: stats ? `${stats.chargingChargers} chargers in-use` : 'Real-time charging',
+      icon: Activity, 
+      color: 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400' 
+    },
+    { 
+      label: 'Available Connectors', 
+      value: stats ? stats.availableConnectors.toString() : '-', 
+      subtext: stats ? `${stats.faultedChargers} Faulted / Error` : 'Ready for plug-in',
+      icon: Zap, 
+      color: 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400' 
+    },
+  ];
+
   return (
     <div className="space-y-6">
       
+      {/* Header Bar */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight">EcoMargin Admin Control Dashboard</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Live authoritative station, charger, connector, and session telemetry.</p>
+        </div>
+        <button
+          onClick={fetchDashboardStats}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+        >
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          Refresh Stats
+        </button>
+      </div>
+
+      {/* Error Alert */}
+      {error && (
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/80 rounded-2xl flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="text-rose-600 dark:text-rose-400" size={20} />
+            <p className="text-xs text-rose-700 dark:text-rose-300 font-medium">{error}</p>
+          </div>
+          <button
+            onClick={fetchDashboardStats}
+            className="px-3 py-1 bg-rose-600 text-white rounded-lg text-xs font-semibold hover:bg-rose-700"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((s, idx) => {
+        {statItems.map((s, idx) => {
           const Icon = s.icon;
           return (
             <div key={idx} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm flex items-center justify-between">
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{s.label}</span>
-                <p className="text-2xl font-bold">{s.value}</p>
-                <div className="flex items-center gap-1">
-                  {s.trend === 'up' ? (
-                    <span className="text-emerald-500 flex items-center text-xs font-semibold">
-                      <ArrowUpRight size={14} /> {s.change}
-                    </span>
-                  ) : (
-                    <span className="text-rose-500 flex items-center text-xs font-semibold">
-                      <ArrowDownRight size={14} /> {s.change}
-                    </span>
-                  )}
-                  <span className="text-[10px] text-gray-400">vs last week</span>
-                </div>
+                <p className="text-2xl font-bold">{loading ? '...' : s.value}</p>
+                <p className="text-[10px] text-gray-400 font-medium">{s.subtext}</p>
               </div>
-              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl">
+              <div className={`p-4 rounded-xl ${s.color}`}>
                 <Icon size={24} />
               </div>
             </div>
@@ -58,28 +134,25 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* Grid: Charts & Analytics */}
+      {/* Grid: Charts & Network Diagnostics */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Weekly Power Analytics (Custom SVG Chart) */}
+        {/* Network Power Line Chart */}
         <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="font-bold text-sm tracking-wide">Network Utilization (Last 24 Hours)</span>
+            <span className="font-bold text-sm tracking-wide">Network Charging Capacity & Power</span>
             <div className="flex items-center gap-4 text-xs font-semibold">
-              <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Active Power</div>
-              <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-gray-300 dark:bg-gray-700"></span> Baseline Limit</div>
+              <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Active Charging Power</div>
+              <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-gray-300 dark:bg-gray-700"></span> Grid Limit</div>
             </div>
           </div>
           
           <div className="h-64 w-full flex items-end justify-between pt-4 relative">
-            {/* Grid Lines */}
             <div className="absolute inset-x-0 top-1/4 border-b border-gray-100 dark:border-gray-800/80"></div>
             <div className="absolute inset-x-0 top-2/4 border-b border-gray-100 dark:border-gray-800/80"></div>
             <div className="absolute inset-x-0 top-3/4 border-b border-gray-100 dark:border-gray-800/80"></div>
 
-            {/* Custom SVG Line Chart */}
             <svg className="absolute inset-0 h-full w-full" preserveAspectRatio="none" viewBox="0 0 100 100">
-              {/* Fill Gradient Area */}
               <defs>
                 <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#10b981" stopOpacity="0.25"/>
@@ -90,7 +163,6 @@ export default function DashboardPage() {
                 d="M0,100 L0,70 L15,50 L30,80 L45,40 L60,30 L75,55 L90,20 L100,45 L100,100 Z" 
                 fill="url(#chartGrad)"
               />
-              {/* Stroke Line */}
               <path 
                 d="M0,70 L15,50 L30,80 L45,40 L60,30 L75,55 L90,20 L100,45" 
                 fill="none" 
@@ -100,7 +172,6 @@ export default function DashboardPage() {
               />
             </svg>
 
-            {/* Time Labels */}
             <div className="absolute bottom-0 inset-x-0 flex justify-between text-[10px] text-gray-400 pt-1">
               <span>08:00 AM</span>
               <span>12:00 PM</span>
@@ -112,72 +183,44 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Top Stations */}
+        {/* Live Network Summary */}
         <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 space-y-4">
-          <span className="font-bold text-sm tracking-wide">Top Stations</span>
-          <div className="space-y-4">
-            {topStations.map((station, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 rounded-lg">
-                    <MapPin size={18} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold">{station.name}</p>
-                    <p className="text-[10px] text-gray-400">{station.activeTx} Active Transactions</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-bold">{station.usage}% Utilization</p>
-                  <span className={`inline-block w-2 h-2 rounded-full ${station.status === 'Optimal' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-                </div>
+          <span className="font-bold text-sm tracking-wide">Network Health Overview</span>
+          <div className="space-y-4 text-xs">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/40">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="text-emerald-500" size={16} />
+                <span className="font-semibold">Online Chargers</span>
               </div>
-            ))}
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">{stats ? stats.onlineChargers : 0}</span>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/40">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="text-rose-500" size={16} />
+                <span className="font-semibold">Offline Chargers</span>
+              </div>
+              <span className="font-bold text-rose-600 dark:text-rose-400">{stats ? stats.offlineChargers : 0}</span>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/40">
+              <div className="flex items-center gap-2">
+                <Activity className="text-blue-500" size={16} />
+                <span className="font-semibold">Active Charging Sessions</span>
+              </div>
+              <span className="font-bold text-blue-600 dark:text-blue-400">{stats ? stats.activeSessions : 0}</span>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-800/40">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="text-amber-500" size={16} />
+                <span className="font-semibold">Faulted Chargers</span>
+              </div>
+              <span className="font-bold text-amber-600 dark:text-amber-400">{stats ? stats.faultedChargers : 0}</span>
+            </div>
           </div>
         </div>
 
-      </div>
-
-      {/* Grid: OCPP Live Logs & System Diagnostics */}
-      <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="font-bold text-sm tracking-wide">Live OCPP Log Stream</span>
-          <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-400 px-2 py-0.5 rounded-full flex items-center gap-1 font-semibold">
-            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Streaming
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-800 text-gray-400">
-                <th className="py-3 font-semibold">Charger Box ID</th>
-                <th className="py-3 font-semibold">Event Description</th>
-                <th className="py-3 font-semibold">OCPP Status</th>
-                <th className="py-3 font-semibold">Timestamp</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800/80">
-              {mockLogs.map((log) => (
-                <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                  <td className="py-3.5 font-semibold text-gray-700 dark:text-gray-300">{log.charger}</td>
-                  <td className="py-3.5 text-gray-600 dark:text-gray-400">{log.event}</td>
-                  <td className="py-3.5">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                      log.status === 'Accepted' || log.status === 'Success' 
-                        ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-850 dark:text-emerald-400' 
-                        : log.status === 'Warning' 
-                        ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-400'
-                        : 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-400'
-                    }`}>
-                      {log.status}
-                    </span>
-                  </td>
-                  <td className="py-3.5 text-gray-400">{log.time}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
 
     </div>

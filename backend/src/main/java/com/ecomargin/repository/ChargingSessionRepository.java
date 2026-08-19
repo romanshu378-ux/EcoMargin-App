@@ -13,4 +13,6 @@ public interface ChargingSessionRepository extends JpaRepository<ChargingSession
     List<ChargingSession> findByUserOrderByCreatedAtDesc(User user);
     Optional<ChargingSession> findFirstByUserAndStatusInOrderByCreatedAtDesc(User user, List<String> statuses);
     List<ChargingSession> findByStatus(String status);
+    List<ChargingSession> findByStatusIn(List<String> statuses);
+    List<ChargingSession> findByConnectorAndStatusIn(com.ecomargin.model.Connector connector, List<String> statuses);
 }

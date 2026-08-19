@@ -19,6 +19,7 @@ public class AuditLogService {
     public void logAction(Long userId, String performedBy, String action, String entityName, String entityId, String previousValue, String newValue, String ipAddress, String details) {
         try {
             AuditLog logEntry = AuditLog.builder()
+                    .id(System.nanoTime())
                     .createdAt(LocalDateTime.now())
                     .userId(userId)
                     .performedBy(performedBy != null ? performedBy : "SYSTEM")

@@ -103,4 +103,17 @@ class StationControllerIntegrationTest {
                 .andExpect(jsonPath("$.details.name").exists())
                 .andExpect(jsonPath("$.details.latitude").exists());
     }
+
+    @Test
+    @WithMockUser(username = "customer@ecomargin.com", roles = {"CUSTOMER"})
+    void testGetNearbyStations_WithCoordinatesAndDistanceCalculation() throws Exception {
+        mockMvc.perform(get("/api/v1/stations/nearby")
+                        .param("latitude", "30.267153")
+                        .param("longitude", "-97.743062")
+                        .param("radiusKm", "10.0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].name").value("Austin Downtown Hub"))
+                .andExpect(jsonPath("$[0].distanceStr").exists());
+    }
 }

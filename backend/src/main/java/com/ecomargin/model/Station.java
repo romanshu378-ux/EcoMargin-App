@@ -52,6 +52,12 @@ public class Station {
     @OneToMany(mappedBy = "station", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Charger> chargers;
 
+    @Transient
+    private Double distanceKm;
+
+    @Transient
+    private String distanceStr;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

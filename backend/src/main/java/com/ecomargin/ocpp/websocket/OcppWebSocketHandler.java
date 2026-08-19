@@ -172,6 +172,12 @@ public class OcppWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    public boolean isChargerConnected(String chargeBoxId) {
+        if (chargeBoxId == null) return false;
+        WebSocketSession session = sessions.get(chargeBoxId);
+        return session != null && session.isOpen();
+    }
+
     public WebSocketSession getSession(String chargeBoxId) {
         return sessions.get(chargeBoxId);
     }

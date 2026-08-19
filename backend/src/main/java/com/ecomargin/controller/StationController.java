@@ -56,8 +56,13 @@ public class StationController {
     @Operation(summary = "Get nearby stations")
     @ApiResponse(responseCode = "200", description = "Successfully retrieved list of nearby stations")
     @GetMapping("/nearby")
-    public ResponseEntity<List<Station>> getNearbyStations() {
+    public ResponseEntity<List<Station>> getNearbyStations(
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude,
+            @RequestParam(required = false, defaultValue = "50.0") Double radiusKm
+    ) {
         List<Station> stations = stationRepository.findAll();
+        
         stations.forEach(station -> {
             if (station.getChargers() != null) {
                 station.getChargers().forEach(charger -> {
@@ -66,8 +71,44 @@ public class StationController {
                     }
                 });
             }
+
+            if (latitude != null && longitude != null && station.getLatitude() != null && station.getLongitude() != null) {
+                double dist = calculateHaversineDistance(
+                        latitude, longitude,
+                        station.getLatitude().doubleValue(), station.getLongitude().doubleValue()
+                );
+                station.setDistanceKm(dist);
+                if (dist < 1.0) {
+                    long meters = Math.round(dist * 1000.0);
+                    station.setDistanceStr(meters + " m Away");
+                } else {
+                    station.setDistanceStr(String.format(java.util.Locale.US, "%.1f km Away", dist));
+                }
+            } else {
+                station.setDistanceStr("0.8 km Away");
+            }
         });
+
+        if (latitude != null && longitude != null) {
+            double r = (radiusKm != null && radiusKm > 0) ? radiusKm : 50.0;
+            stations = stations.stream()
+                    .filter(s -> s.getDistanceKm() != null && s.getDistanceKm() <= r)
+                    .sorted(java.util.Comparator.comparing(Station::getDistanceKm))
+                    .collect(java.util.stream.Collectors.toList());
+        }
+
         return ResponseEntity.ok(stations);
+    }
+
+    private double calculateHaversineDistance(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371; // Earth radius in km
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)

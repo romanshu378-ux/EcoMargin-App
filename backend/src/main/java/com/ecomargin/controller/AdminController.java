@@ -13,7 +13,13 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import com.ecomargin.ocpp.websocket.OcppWebSocketHandler;
+import com.ecomargin.ocpp.service.OcppRemoteOperationsService;
+import com.ecomargin.service.NotificationService;
+import org.springframework.http.HttpStatus;
+
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -34,6 +40,9 @@ public class AdminController {
     private final ChargingSessionRepository chargingSessionRepository;
     private final AuditLogService auditLogService;
     private final WalletService walletService;
+    private final OcppWebSocketHandler ocppWebSocketHandler;
+    private final OcppRemoteOperationsService ocppRemoteOperationsService;
+    private final NotificationService notificationService;
 
     // --- 1. SYSTEM SETTINGS CONTROL ---
 
@@ -253,6 +262,267 @@ public class AdminController {
         );
 
         return ResponseEntity.ok(updated);
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @GetMapping("/dashboard")
+    public ResponseEntity<Map<String, Object>> getAdminDashboardStats() {
+        long totalStations = stationRepository.count();
+        List<Charger> chargers = chargerRepository.findAll();
+        long totalChargers = chargers.size();
+
+        long onlineChargers = chargers.stream()
+                .filter(c -> c.getOcppId() != null && ocppWebSocketHandler.isChargerConnected(c.getOcppId()))
+                .count();
+        long offlineChargers = totalChargers - onlineChargers;
+
+        long chargingChargers = chargers.stream()
+                .filter(c -> "CHARGING".equalsIgnoreCase(c.getStatus()))
+                .count();
+
+        long faultedChargers = chargers.stream()
+                .filter(c -> "FAULTED".equalsIgnoreCase(c.getStatus()) || "ERROR".equalsIgnoreCase(c.getStatus()))
+                .count();
+
+        long availableConnectors = connectorRepository.findAll().stream()
+                .filter(conn -> "AVAILABLE".equalsIgnoreCase(conn.getStatus()))
+                .count();
+
+        long activeSessions = chargingSessionRepository.findByStatus("CHARGING").size();
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("totalStations", totalStations);
+        stats.put("totalChargers", totalChargers);
+        stats.put("onlineChargers", onlineChargers);
+        stats.put("offlineChargers", offlineChargers);
+        stats.put("chargingChargers", chargingChargers);
+        stats.put("faultedChargers", faultedChargers);
+        stats.put("availableConnectors", availableConnectors);
+        stats.put("activeSessions", activeSessions);
+
+        return ResponseEntity.ok(stats);
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @GetMapping("/chargers/detailed")
+    public ResponseEntity<List<Map<String, Object>>> getDetailedChargers() {
+        List<Charger> chargers = chargerRepository.findAll();
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (Charger charger : chargers) {
+            Map<String, Object> dto = new HashMap<>();
+            dto.put("id", charger.getId());
+            dto.put("ocppId", charger.getOcppId());
+            dto.put("brand", charger.getBrand() != null ? charger.getBrand() : "EcoMargin");
+            dto.put("model", charger.getModel() != null ? charger.getModel() : "FastCharger");
+
+            List<Connector> connectors = connectorRepository.findByCharger(charger);
+            double totalPowerKw = connectors.stream()
+                    .mapToDouble(c -> c.getMaxPowerKw() != null ? c.getMaxPowerKw().doubleValue() : 50.0)
+                    .max().orElse(50.0);
+
+            dto.put("powerKw", totalPowerKw);
+            dto.put("status", charger.getStatus() != null ? charger.getStatus() : "AVAILABLE");
+
+            boolean isOnline = charger.getOcppId() != null && ocppWebSocketHandler.isChargerConnected(charger.getOcppId());
+            dto.put("online", isOnline);
+            dto.put("lastSeen", charger.getUpdatedAt() != null ? charger.getUpdatedAt().toString() : LocalDateTime.now().toString());
+
+            if (charger.getStation() != null) {
+                dto.put("stationId", charger.getStation().getId());
+                dto.put("stationName", charger.getStation().getName());
+            } else {
+                dto.put("stationId", null);
+                dto.put("stationName", "Unassigned Station");
+            }
+
+            List<Map<String, Object>> connectorDtos = new ArrayList<>();
+            for (Connector conn : connectors) {
+                Map<String, Object> connMap = new HashMap<>();
+                connMap.put("id", conn.getId());
+                connMap.put("connectorId", conn.getConnectorIndex() != null ? conn.getConnectorIndex() : conn.getId().intValue());
+                connMap.put("type", conn.getType());
+                connMap.put("maxPowerKw", conn.getMaxPowerKw() != null ? conn.getMaxPowerKw().doubleValue() : 50.0);
+                connMap.put("status", conn.getStatus() != null ? conn.getStatus() : "AVAILABLE");
+
+                List<ChargingSession> activeSessions = chargingSessionRepository.findByConnectorAndStatusIn(conn, List.of("CHARGING", "STARTED"));
+                if (!activeSessions.isEmpty()) {
+                    ChargingSession active = activeSessions.get(0);
+                    Map<String, Object> activeSessionMap = new HashMap<>();
+                    activeSessionMap.put("sessionId", active.getId());
+                    activeSessionMap.put("userEmail", active.getUser() != null ? active.getUser().getEmail() : "anonymous");
+                    activeSessionMap.put("energyKwh", active.getTotalEnergyKwh() != null ? active.getTotalEnergyKwh().doubleValue() : 0.0);
+                    activeSessionMap.put("startedAt", active.getStartTime() != null ? active.getStartTime().toString() : null);
+                    connMap.put("activeSession", activeSessionMap);
+                } else {
+                    connMap.put("activeSession", null);
+                }
+                connectorDtos.add(connMap);
+            }
+            dto.put("connectors", connectorDtos);
+            result.add(dto);
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    @PutMapping("/chargers/{id}/disable")
+    public ResponseEntity<?> disableCharger(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails principal
+    ) {
+        Charger charger = chargerRepository.findById(id).orElse(null);
+        if (charger == null) return ResponseEntity.notFound().build();
+
+        String prevStatus = charger.getStatus();
+        charger.setStatus("DISABLED");
+        Charger updated = chargerRepository.save(charger);
+
+        auditLogService.logAction(
+                null,
+                principal != null ? principal.getUsername() : "ADMIN",
+                "CHARGER_DISABLED",
+                "Charger",
+                id.toString(),
+                prevStatus,
+                "DISABLED",
+                "127.0.0.1",
+                "Admin disabled charger: " + charger.getOcppId()
+        );
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("id", updated.getId());
+        resp.put("ocppId", updated.getOcppId());
+        resp.put("status", updated.getStatus());
+        return ResponseEntity.ok(resp);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    @PutMapping("/chargers/{id}/enable")
+    public ResponseEntity<?> enableCharger(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails principal
+    ) {
+        Charger charger = chargerRepository.findById(id).orElse(null);
+        if (charger == null) return ResponseEntity.notFound().build();
+
+        String prevStatus = charger.getStatus();
+        charger.setStatus("AVAILABLE");
+        Charger updated = chargerRepository.save(charger);
+
+        auditLogService.logAction(
+                null,
+                principal != null ? principal.getUsername() : "ADMIN",
+                "CHARGER_ENABLED",
+                "Charger",
+                id.toString(),
+                prevStatus,
+                "AVAILABLE",
+                "127.0.0.1",
+                "Admin enabled charger: " + charger.getOcppId()
+        );
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("id", updated.getId());
+        resp.put("ocppId", updated.getOcppId());
+        resp.put("status", updated.getStatus());
+        return ResponseEntity.ok(resp);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    @PostMapping("/sessions/{sessionId}/force-stop")
+    public ResponseEntity<?> forceStopSession(
+            @PathVariable Long sessionId,
+            @RequestBody(required = false) Map<String, String> body,
+            @AuthenticationPrincipal UserDetails principal
+    ) {
+        String adminUsername = principal != null ? principal.getUsername() : "ADMIN";
+        String reason = body != null ? body.getOrDefault("reason", "Admin Force Stop") : "Admin Force Stop";
+
+        ChargingSession session = chargingSessionRepository.findById(sessionId).orElse(null);
+        if (session == null) {
+            auditLogService.logAction(null, adminUsername, "FORCE_STOP_FAILED", "ChargingSession", sessionId.toString(), null, null, "127.0.0.1", "Session not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                    "code", "SESSION_NOT_FOUND",
+                    "message", "Charging session not found."
+            ));
+        }
+
+        if (!"CHARGING".equalsIgnoreCase(session.getStatus()) && !"STARTED".equalsIgnoreCase(session.getStatus())) {
+            auditLogService.logAction(session.getUser() != null ? session.getUser().getId() : null, adminUsername, "FORCE_STOP_FAILED", "ChargingSession", sessionId.toString(), session.getStatus(), null, "127.0.0.1", "Session is already stopped");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "code", "SESSION_ALREADY_STOPPED",
+                    "message", "Charging session is already in status " + session.getStatus()
+            ));
+        }
+
+        auditLogService.logAction(session.getUser() != null ? session.getUser().getId() : null, adminUsername, "FORCE_STOP_REQUESTED", "ChargingSession", sessionId.toString(), session.getStatus(), "STOPPING", "127.0.0.1", "Force stop requested by admin: " + reason);
+
+        // Send OCPP RemoteStopTransaction if charger is online
+        if (session.getConnector() != null && session.getConnector().getCharger() != null) {
+            Charger charger = session.getConnector().getCharger();
+            if (charger.getOcppId() != null && ocppWebSocketHandler.isChargerConnected(charger.getOcppId())) {
+                try {
+                    int txIdHash = session.getId().intValue();
+                    ocppRemoteOperationsService.sendRemoteStop(charger.getOcppId(), txIdHash);
+                } catch (Exception e) {
+                    log.warn("Failed to send OCPP RemoteStop command to charger {}: {}", charger.getOcppId(), e.getMessage());
+                }
+            }
+        }
+
+        // Process stopping, calculation & wallet debit safely without double debit
+        LocalDateTime now = LocalDateTime.now();
+        session.setEndTime(now);
+        session.setStatus("COMPLETED");
+
+        long durationSec = session.getStartTime() != null ? java.time.Duration.between(session.getStartTime(), now).getSeconds() : 0;
+        double energyKwh = session.getTotalEnergyKwh() != null ? session.getTotalEnergyKwh().doubleValue() : (durationSec * 0.005);
+        double cost = energyKwh * 12.0;
+
+        session.setTotalEnergyKwh(BigDecimal.valueOf(energyKwh).setScale(3, RoundingMode.HALF_UP));
+        session.setTotalCost(BigDecimal.valueOf(cost).setScale(2, RoundingMode.HALF_UP));
+        chargingSessionRepository.save(session);
+
+        if (session.getConnector() != null) {
+            Connector conn = session.getConnector();
+            conn.setStatus("AVAILABLE");
+            connectorRepository.save(conn);
+        }
+
+        // Debit wallet cleanly
+        if (session.getUser() != null && cost > 0) {
+            String ocppTxId = session.getOcppTransactionId() != null ? session.getOcppTransactionId() : ("FORCE-STOP-" + session.getId());
+            walletService.processChargingDebit(session.getId(), ocppTxId, BigDecimal.valueOf(cost));
+            notificationService.createNotification(
+                    session.getUser(),
+                    "Charging Force Stopped",
+                    "Your charging session #" + session.getId() + " was stopped by system admin. Total cost: ₹" + String.format(java.util.Locale.US, "%.2f", cost),
+                    "CHARGING"
+            );
+        }
+
+        auditLogService.logAction(
+                session.getUser() != null ? session.getUser().getId() : null,
+                adminUsername,
+                "FORCE_STOP_COMPLETED",
+                "ChargingSession",
+                sessionId.toString(),
+                "CHARGING",
+                "COMPLETED",
+                "127.0.0.1",
+                "Force stop completed for session #" + session.getId() + ". Total cost: ₹" + cost
+        );
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("sessionId", session.getId());
+        res.put("status", "COMPLETED");
+        res.put("durationSeconds", durationSec);
+        res.put("totalEnergyKwh", energyKwh);
+        res.put("totalCost", cost);
+        res.put("message", "Session successfully force-stopped by admin.");
+
+        return ResponseEntity.ok(res);
     }
 
     // --- 3. USER MANAGEMENT & RBAC ---
