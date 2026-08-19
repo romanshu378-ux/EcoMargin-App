@@ -54,9 +54,18 @@ interface StationDetailed {
 }
 
 export const getApiBaseUrl = () => {
-  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  let envUrl = import.meta.env.VITE_API_BASE_URL;
   if (envUrl && envUrl.trim() !== '') {
-    return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+    envUrl = envUrl.trim();
+    if (envUrl.endsWith('/')) envUrl = envUrl.slice(0, -1);
+    if (!envUrl.endsWith('/api/v1')) {
+      if (envUrl.endsWith('/api')) {
+        envUrl = `${envUrl}/v1`;
+      } else {
+        envUrl = `${envUrl}/api/v1`;
+      }
+    }
+    return envUrl;
   }
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     return 'http://localhost:8080/api/v1';
@@ -109,6 +118,9 @@ export const StationsPage: React.FC = () => {
   };
 
   const fetchStations = async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout guard
+
     try {
       setLoading(true);
       setError(null);
@@ -118,12 +130,17 @@ export const StationsPage: React.FC = () => {
       if (statusFilter !== 'ALL') params.append('status', statusFilter);
 
       const baseUrl = getApiBaseUrl();
-      const response = await fetch(`${baseUrl}/admin/stations/detailed?${params.toString()}`, {
+      const targetUrl = `${baseUrl}/admin/stations/detailed?${params.toString()}`;
+
+      const response = await fetch(targetUrl, {
+        signal: controller.signal,
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
         }
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -131,7 +148,7 @@ export const StationsPage: React.FC = () => {
         } else if (response.status === 403) {
           throw new Error('403 Forbidden: You do not have permission to access Station Management.');
         } else if (response.status === 404) {
-          throw new Error(`404 Not Found: Station endpoint (${baseUrl}/admin/stations/detailed) unreachable.`);
+          throw new Error(`404 Not Found: Station endpoint (${targetUrl}) unreachable.`);
         }
         throw new Error(`Failed to load stations (HTTP ${response.status})`);
       }
@@ -139,8 +156,14 @@ export const StationsPage: React.FC = () => {
       const data: StationDetailed[] = await response.json();
       setStations(data);
     } catch (err: any) {
-      setError(err.message || 'Unable to load stations');
-      showToast('Error Loading Stations', err.message || 'Unable to fetch station details from backend.', 'error');
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        setError('Unable to load stations. Server is taking too long to respond.');
+        showToast('Request Timeout', 'Unable to load stations. Server is taking too long to respond.', 'warning');
+      } else {
+        setError(err.message || 'Unable to load stations');
+        showToast('Error Loading Stations', err.message || 'Unable to fetch station details from backend.', 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -211,6 +234,9 @@ export const StationsPage: React.FC = () => {
 
   const handleSaveStation = async () => {
     if (!validateForm()) return;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     try {
       setActionLoading(true);
       const token = getAuthToken();
@@ -232,12 +258,15 @@ export const StationsPage: React.FC = () => {
 
       const response = await fetch(url, {
         method,
+        signal: controller.signal,
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -249,7 +278,12 @@ export const StationsPage: React.FC = () => {
       setEditStation(null);
       fetchStations();
     } catch (err: any) {
-      setFormError(err.message || 'Error saving station');
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        setFormError('Server is taking too long to respond. Please try again.');
+      } else {
+        setFormError(err.message || 'Error saving station');
+      }
     } finally {
       setActionLoading(false);
     }
@@ -257,18 +291,24 @@ export const StationsPage: React.FC = () => {
 
   const handleExecuteStatusChange = async () => {
     if (!statusChangeStation) return;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     try {
       setActionLoading(true);
       const token = getAuthToken();
       const baseUrl = getApiBaseUrl();
       const response = await fetch(`${baseUrl}/admin/stations/${statusChangeStation.id}/status`, {
         method: 'PUT',
+        signal: controller.signal,
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status: targetStatus })
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
@@ -279,7 +319,8 @@ export const StationsPage: React.FC = () => {
       setStatusChangeStation(null);
       fetchStations();
     } catch (err: any) {
-      showToast('Status Change Failed', err.message || 'Failed to update station status', 'error');
+      clearTimeout(timeoutId);
+      showToast('Status Change Failed', err.name === 'AbortError' ? 'Server timed out during status update.' : (err.message || 'Failed to update station status'), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -289,17 +330,23 @@ export const StationsPage: React.FC = () => {
     if (!toggleModalStation) return;
     const isDisabling = toggleModalStation.status === 'ACTIVE';
     const actionEndpoint = isDisabling ? 'disable' : 'enable';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     try {
       setActionLoading(true);
       const token = getAuthToken();
       const baseUrl = getApiBaseUrl();
       const response = await fetch(`${baseUrl}/admin/stations/${toggleModalStation.id}/${actionEndpoint}`, {
         method: 'PUT',
+        signal: controller.signal,
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
         }
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
@@ -310,26 +357,32 @@ export const StationsPage: React.FC = () => {
       setToggleModalStation(null);
       fetchStations();
     } catch (err: any) {
-      showToast('Action Failed', err.message || 'Failed to toggle station status', 'error');
-    } finally {
+      clearTimeout(timeoutId);
+      showToast('Action Failed', err.name === 'AbortError' ? 'Server timed out.' : (err.message || 'Failed to toggle station status'), 'error');
+    } fontally {
       setActionLoading(false);
     }
   };
 
   const handleDeleteStation = async () => {
     if (!deleteModalStation) return;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     try {
       setActionLoading(true);
       const token = getAuthToken();
       const baseUrl = getApiBaseUrl();
       const response = await fetch(`${baseUrl}/admin/stations/${deleteModalStation.id}`, {
         method: 'DELETE',
+        signal: controller.signal,
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
         }
       });
 
+      clearTimeout(timeoutId);
       const resData = await response.json().catch(() => ({}));
 
       if (!response.ok) {
@@ -346,7 +399,8 @@ export const StationsPage: React.FC = () => {
       setDeleteModalStation(null);
       fetchStations();
     } catch (err: any) {
-      showToast('Delete Failed', err.message || 'Error deleting station', 'error');
+      clearTimeout(timeoutId);
+      showToast('Delete Failed', err.name === 'AbortError' ? 'Server timed out during delete.' : (err.message || 'Error deleting station'), 'error');
     } finally {
       setActionLoading(false);
     }
