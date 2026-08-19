@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   MapPin, Power, Radio, Server, Plus, Search, Trash2, RefreshCw, 
-  ExternalLink, Edit3, ShieldAlert, CheckCircle, AlertTriangle, X, Info, Zap
+  ExternalLink, Edit3, ShieldAlert, CheckCircle, AlertTriangle, X, Info, Zap, Sliders, Eye
 } from 'lucide-react';
 import { useNotificationStore } from '../store/notificationStore';
 
@@ -69,7 +69,9 @@ export default function StationsPage() {
   const [selectedStation, setSelectedStation] = useState<StationDetailed | null>(null);
   const [addModalOpen, setAddModalOpen] = useState<boolean>(false);
   const [editStation, setEditStation] = useState<StationDetailed | null>(null);
+  const [statusChangeStation, setStatusChangeStation] = useState<StationDetailed | null>(null);
   const [toggleModalStation, setToggleModalStation] = useState<StationDetailed | null>(null);
+  const [deleteModalStation, setDeleteModalStation] = useState<StationDetailed | null>(null);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
   // Form states for Add / Edit
@@ -84,6 +86,9 @@ export default function StationsPage() {
     status: 'ACTIVE'
   });
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Target status for Status Control modal
+  const [targetStatus, setTargetStatus] = useState<string>('ACTIVE');
 
   const fetchStations = async () => {
     try {
@@ -161,6 +166,11 @@ export default function StationsPage() {
     setFormError(null);
   };
 
+  const openStatusChangeModal = (station: StationDetailed) => {
+    setStatusChangeStation(station);
+    setTargetStatus(station.status || 'ACTIVE');
+  };
+
   const validateForm = () => {
     if (!formData.name.trim()) {
       setFormError('Station Name is required');
@@ -230,6 +240,44 @@ export default function StationsPage() {
     }
   };
 
+  const handleExecuteStatusChange = async () => {
+    if (!statusChangeStation) return;
+    try {
+      setActionLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/v1/admin/stations/${statusChangeStation.id}/status`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: targetStatus })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || 'Failed to update station status');
+      }
+
+      addNotification({
+        title: 'Station Status Updated',
+        message: `Station "${statusChangeStation.name}" status changed from ${statusChangeStation.status} to ${targetStatus}.`,
+        type: targetStatus === 'ACTIVE' ? 'success' : 'warning'
+      });
+
+      setStatusChangeStation(null);
+      fetchStations();
+    } catch (err: any) {
+      addNotification({
+        title: 'Status Change Failed',
+        message: err.message || 'Failed to update station status',
+        type: 'error'
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleToggleStatus = async () => {
     if (!toggleModalStation) return;
     const isDisabling = toggleModalStation.status === 'ACTIVE';
@@ -269,8 +317,65 @@ export default function StationsPage() {
     }
   };
 
+  const handleDeleteStation = async () => {
+    if (!deleteModalStation) return;
+    try {
+      setActionLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/v1/admin/stations/${deleteModalStation.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': token ? `Bearer ${token}` : '',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const resData = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        if (response.status === 409) {
+          addNotification({
+            title: 'Station Deactivated',
+            message: resData.message || 'Station has chargers/history and was soft-deactivated instead of deleted.',
+            type: 'info'
+          });
+          setDeleteModalStation(null);
+          fetchStations();
+          return;
+        }
+        throw new Error(resData.message || 'Failed to delete station');
+      }
+
+      addNotification({
+        title: 'Station Deleted',
+        message: `Station "${deleteModalStation.name}" was successfully removed.`,
+        type: 'success'
+      });
+
+      setDeleteModalStation(null);
+      fetchStations();
+    } catch (err: any) {
+      addNotification({
+        title: 'Delete Failed',
+        message: err.message || 'Error deleting station',
+        type: 'error'
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const openGoogleMaps = (lat: number, lng: number) => {
     window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+  };
+
+  const formatDateStr = (dateStr: string | null) => {
+    if (!dateStr) return 'N/A';
+    try {
+      return new Date(dateStr).toLocaleString();
+    } catch {
+      return dateStr;
+    }
   };
 
   return (
@@ -410,7 +515,10 @@ export default function StationsPage() {
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 mt-1">
                       <MapPin size={14} className="text-emerald-500 shrink-0" />
-                      <span className="truncate">{station.address}, {station.city}</span>
+                      <span className="truncate">{station.address}, {station.city}, {station.state}</span>
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Updated: {formatDateStr(station.updatedAt)}
                     </p>
                   </div>
 
@@ -427,34 +535,49 @@ export default function StationsPage() {
                   </div>
                 </div>
 
-                {/* Footer Action Bar */}
+                {/* Footer Action Bar with View, Edit, Status, Enable/Disable, Delete */}
                 <div className="flex items-center justify-between border-t border-gray-100 dark:border-gray-800/80 pt-4 gap-2">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={() => setSelectedStation(station)}
-                      className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-xs font-semibold transition-all"
+                      className="p-1.5 text-gray-400 hover:text-emerald-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      title="View Details"
                     >
-                      Details
+                      <Eye size={15} />
                     </button>
                     <button
                       onClick={() => openEditModal(station)}
-                      className="p-1.5 text-gray-400 hover:text-emerald-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-blue-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                       title="Edit Station"
                     >
                       <Edit3 size={15} />
                     </button>
                     <button
+                      onClick={() => openStatusChangeModal(station)}
+                      className="p-1.5 text-gray-400 hover:text-amber-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      title="Change Status"
+                    >
+                      <Sliders size={15} />
+                    </button>
+                    <button
                       onClick={() => openGoogleMaps(station.latitude, station.longitude)}
-                      className="p-1.5 text-gray-400 hover:text-blue-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-indigo-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                       title="View on Map"
                     >
                       <ExternalLink size={15} />
+                    </button>
+                    <button
+                      onClick={() => setDeleteModalStation(station)}
+                      className="p-1.5 text-gray-400 hover:text-rose-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      title="Delete / Deactivate"
+                    >
+                      <Trash2 size={15} />
                     </button>
                   </div>
 
                   <button
                     onClick={() => setToggleModalStation(station)}
-                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                       isInactive
                         ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100'
                         : 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100'
@@ -481,6 +604,11 @@ export default function StationsPage() {
                 <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                   <MapPin size={13} className="text-emerald-500" /> {selectedStation.address}, {selectedStation.city}, {selectedStation.state}, {selectedStation.country}
                 </p>
+                <div className="flex items-center gap-4 text-[11px] text-gray-400 mt-2">
+                  <span>Coordinates: {selectedStation.latitude}, {selectedStation.longitude}</span>
+                  <span>Created: {formatDateStr(selectedStation.createdAt)}</span>
+                  <span>Updated: {formatDateStr(selectedStation.updatedAt)}</span>
+                </div>
               </div>
               <button
                 onClick={() => setSelectedStation(null)}
@@ -720,6 +848,71 @@ export default function StationsPage() {
         </div>
       )}
 
+      {/* STATUS CONTROL MODAL */}
+      {statusChangeStation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl max-w-md w-full shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Sliders size={18} className="text-emerald-500" />
+                <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Station Status Control</h3>
+              </div>
+              <button onClick={() => setStatusChangeStation(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="bg-gray-50 dark:bg-gray-800/60 p-3 rounded-xl space-y-1.5 text-xs">
+              <div className="flex justify-between"><span className="text-gray-400">Station Name:</span><span className="font-bold text-gray-800 dark:text-gray-200">{statusChangeStation.name}</span></div>
+              <div className="flex justify-between"><span className="text-gray-400">Station ID:</span><span className="font-mono font-bold text-gray-800 dark:text-gray-200">#{statusChangeStation.id}</span></div>
+              <div className="flex justify-between"><span className="text-gray-400">Current Status:</span><span className="font-bold text-emerald-500">{statusChangeStation.status}</span></div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Select New Status</label>
+              <div className="grid grid-cols-3 gap-2">
+                {(['ACTIVE', 'INACTIVE', 'UNDER_MAINTENANCE'] as const).map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setTargetStatus(st)}
+                    className={`py-2 px-2 rounded-xl text-xs font-bold transition-all ${
+                      targetStatus === st
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {st === 'INACTIVE' ? 'DISABLED' : st === 'UNDER_MAINTENANCE' ? 'MAINTENANCE' : st}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 bg-amber-50 dark:bg-amber-950/30 p-2.5 rounded-lg border border-amber-200 dark:border-amber-900/50">
+              {targetStatus === 'ACTIVE'
+                ? 'Activating this station enables customer app visibility and allows new sessions.'
+                : 'Setting to MAINTENANCE or DISABLED prevents new charging sessions from being started by customers. Ongoing active sessions will NOT be interrupted.'}
+            </p>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setStatusChangeStation(null)}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 rounded-xl text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleExecuteStatusChange}
+                disabled={actionLoading}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-md transition-all disabled:opacity-50"
+              >
+                {actionLoading && <RefreshCw size={14} className="animate-spin" />}
+                Confirm Status Update
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ENABLE / DISABLE CONFIRMATION MODAL */}
       {toggleModalStation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -733,7 +926,7 @@ export default function StationsPage() {
                   {toggleModalStation.status === 'ACTIVE' ? 'Disable this station?' : 'Enable this station?'}
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Station: <span className="font-semibold text-gray-800 dark:text-gray-200">{toggleModalStation.name}</span>
+                  Station: <span className="font-semibold text-gray-800 dark:text-gray-200">{toggleModalStation.name}</span> (ID #{toggleModalStation.id})
                 </p>
               </div>
             </div>
@@ -763,6 +956,47 @@ export default function StationsPage() {
               >
                 {actionLoading && <RefreshCw size={14} className="animate-spin" />}
                 Confirm {toggleModalStation.status === 'ACTIVE' ? 'Disable' : 'Enable'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {deleteModalStation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl max-w-md w-full shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-rose-100 dark:bg-rose-950/60 rounded-xl text-rose-600 dark:text-rose-400">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-gray-100">Delete / Deactivate Station</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Station: <span className="font-semibold text-gray-800 dark:text-gray-200">{deleteModalStation.name}</span> (ID #{deleteModalStation.id})
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+              Note: Hard deletion is strictly blocked if this station contains chargers, connectors, or session history. The system will automatically soft-deactivate the station to preserve data integrity.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setDeleteModalStation(null)}
+                disabled={actionLoading}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 rounded-xl text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteStation}
+                disabled={actionLoading}
+                className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-md transition-all disabled:opacity-50"
+              >
+                {actionLoading && <RefreshCw size={14} className="animate-spin" />}
+                Confirm Delete / Deactivate
               </button>
             </div>
           </div>

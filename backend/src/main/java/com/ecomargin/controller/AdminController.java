@@ -319,6 +319,63 @@ public class AdminController {
     }
 
     @org.springframework.transaction.annotation.Transactional
+    @PutMapping("/stations/{id}/status")
+    public ResponseEntity<?> changeStationStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserDetails principal
+    ) {
+        Station station = stationRepository.findById(id).orElse(null);
+        if (station == null) return ResponseEntity.notFound().build();
+
+        String newStatus = body.get("status");
+        if (newStatus == null || newStatus.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("code", "INVALID_STATUS", "message", "Status is required"));
+        }
+
+        String formattedStatus = newStatus.toUpperCase();
+        if ("DISABLED".equals(formattedStatus)) formattedStatus = "INACTIVE";
+        if ("MAINTENANCE".equals(formattedStatus)) formattedStatus = "UNDER_MAINTENANCE";
+
+        String prevStatus = station.getStatus();
+        station.setStatus(formattedStatus);
+        Station updated = stationRepository.save(station);
+
+        String auditAction = "STATION_STATUS_CHANGED";
+        if ("INACTIVE".equals(formattedStatus)) {
+            auditAction = "STATION_DISABLED";
+        } else if ("ACTIVE".equals(formattedStatus)) {
+            auditAction = "STATION_ENABLED";
+        }
+
+        auditLogService.logAction(
+                null,
+                principal != null ? principal.getUsername() : "ADMIN",
+                auditAction,
+                "Station",
+                id.toString(),
+                prevStatus,
+                formattedStatus,
+                "127.0.0.1",
+                "Changed status of station: " + station.getName() + " to " + formattedStatus
+        );
+
+        auditLogService.logAction(
+                null,
+                principal != null ? principal.getUsername() : "ADMIN",
+                "STATION_STATUS_CHANGED",
+                "Station",
+                id.toString(),
+                prevStatus,
+                formattedStatus,
+                "127.0.0.1",
+                "Status changed from " + prevStatus + " to " + formattedStatus
+        );
+
+        return ResponseEntity.ok(buildDetailedStationDto(updated));
+    }
+
+    @org.springframework.transaction.annotation.Transactional
     @DeleteMapping("/stations/{id}")
     public ResponseEntity<?> deleteStation(
             @PathVariable Long id,
