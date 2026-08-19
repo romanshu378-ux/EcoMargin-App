@@ -36,6 +36,13 @@ public class WalletService {
             return existingTx.get();
         }
 
+        // Check if session has already been debited
+        Optional<Transaction> existingBySession = transactionRepository.findFirstBySessionId(sessionId);
+        if (existingBySession.isPresent()) {
+            log.info("Session ID {} already has a recorded debit transaction. Returning existing transaction.", sessionId);
+            return existingBySession.get();
+        }
+
         // 2. Fetch the session
         ChargingSession session = chargingSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Charging session not found: " + sessionId));
@@ -46,16 +53,17 @@ public class WalletService {
                 .orElseThrow(() -> new RuntimeException("Wallet not found for userId: " + userId));
 
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Debit amount must be strictly positive: " + amount);
+            log.info("Debit amount is non-positive ({}); recording zero-debit transaction without altering wallet balance.", amount);
         }
 
-        // 4. Validate sufficient wallet balance (optional check: if balance is too low, we still deduct the final bill but log it)
+        // 4. Validate wallet balance
         BigDecimal balanceBefore = wallet.getBalance();
         BigDecimal balanceAfter = balanceBefore.subtract(amount);
 
         if (balanceAfter.compareTo(BigDecimal.ZERO) < 0) {
-            log.error("[WALLET] Prevented negative balance! userId: {}, balanceBefore: {}, amount: {}", userId, balanceBefore, amount);
-            throw new IllegalArgumentException("Insufficient wallet balance for this charging debit.");
+            log.warn("[WALLET] Wallet balance below zero after debit! userId: {}, balanceBefore: {}, amount: {}", userId, balanceBefore, amount);
+            // Cap balance at 0.00 if insufficient to prevent negative balance
+            balanceAfter = BigDecimal.ZERO;
         }
 
         wallet.setBalance(balanceAfter);

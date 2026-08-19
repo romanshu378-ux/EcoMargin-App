@@ -78,7 +78,7 @@ public class ChargingController {
         if (session == null) return null;
 
         long durationSec = 0;
-        if (ACTIVE_STATUSES.contains(session.getStatus())) {
+        if (ACTIVE_STATUSES.contains(session.getStatus().toUpperCase())) {
             durationSec = Duration.between(session.getStartTime(), LocalDateTime.now()).getSeconds();
             if (durationSec < 0) durationSec = 0;
         } else {
@@ -110,7 +110,7 @@ public class ChargingController {
         double cost = energyKwh * pricePerKwh;
         double batteryPercentage = Math.min(100.0, 42.0 + (durationSec * 0.1));
 
-        if (!ACTIVE_STATUSES.contains(session.getStatus())) {
+        if (!ACTIVE_STATUSES.contains(session.getStatus().toUpperCase())) {
             energyKwh = session.getTotalEnergyKwh() != null ? session.getTotalEnergyKwh().doubleValue() : 0.0;
             cost = session.getTotalCost() != null ? session.getTotalCost().doubleValue() : 0.0;
             batteryPercentage = 100.0;
@@ -119,6 +119,7 @@ public class ChargingController {
         String stationName = "EcoMargin Charging Hub";
         String stationAddress = "Downtown EV Station, City Center";
         String chargerId = "CHG-DC-04";
+        String chargerStatus = "AVAILABLE";
         String connectorType = "CCS2";
         Long connectorId = null;
 
@@ -127,6 +128,7 @@ public class ChargingController {
             connectorType = session.getConnector().getType();
             if (session.getConnector().getCharger() != null) {
                 chargerId = session.getConnector().getCharger().getOcppId();
+                chargerStatus = session.getConnector().getCharger().getStatus();
                 if (session.getConnector().getCharger().getStation() != null) {
                     stationName = session.getConnector().getCharger().getStation().getName();
                     if (session.getConnector().getCharger().getStation().getAddress() != null) {
@@ -142,6 +144,7 @@ public class ChargingController {
         map.put("stationAddress", stationAddress);
         map.put("address", stationAddress);
         map.put("chargerId", chargerId);
+        map.put("chargerStatus", chargerStatus != null ? chargerStatus : "AVAILABLE");
         map.put("connectorType", connectorType);
         map.put("connectorId", connectorId != null ? connectorId.toString() : "CONN-01");
         map.put("status", session.getStatus());
@@ -237,14 +240,17 @@ public class ChargingController {
         }
 
         synchronized (("USER_START_LOCK_" + user.getId()).intern()) {
+            // 1. Duplicate Start Protection: Check if active session already exists
             Optional<ChargingSession> activeOpt = chargingSessionRepository
                     .findFirstByUserAndStatusInOrderByCreatedAtDesc(user, ACTIVE_STATUSES);
             if (activeOpt.isPresent()) {
-                log.warn("Security Alert: Concurrent session start attempt for user {}", user.getEmail());
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
-                        "code", "ACTIVE_SESSION_EXISTS",
-                        "message", "User already has an active charging session."
-                ));
+                log.warn("Security Alert: Duplicate session start attempt for user {}. Returning active session details.", user.getEmail());
+                Map<String, Object> sessionMap = mapSessionToMap(activeOpt.get());
+                Map<String, Object> responseBody = new HashMap<>(sessionMap);
+                responseBody.put("code", "ACTIVE_SESSION_EXISTS");
+                responseBody.put("message", "Charging session already active");
+                responseBody.put("session", sessionMap);
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(responseBody);
             }
 
             Wallet wallet = walletRepository.findByUserId(user.getId())
@@ -270,7 +276,7 @@ public class ChargingController {
                 return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(body);
             }
 
-            // Relational Hierarchy Validation (Prevent trusting client claims)
+            // Relational Hierarchy Validation
             Long clientStationId = parseId(payload, "stationId");
             Long clientChargerId = parseId(payload, "chargerId");
             Long clientConnectorId = parseId(payload, "connectorId");
@@ -286,7 +292,6 @@ public class ChargingController {
                     ));
                 }
 
-                // Validate Connector -> Charger Relationship
                 Charger charger = connector.getCharger();
                 if (charger == null) {
                     return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
@@ -303,7 +308,6 @@ public class ChargingController {
                     ));
                 }
 
-                // Validate Charger -> Station Relationship
                 Station station = charger.getStation();
                 if (station == null) {
                     return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
@@ -464,17 +468,7 @@ public class ChargingController {
             return ResponseEntity.ok(mapSessionToMap(session));
         }
 
-        // Verify session state is active
-        if (!ACTIVE_STATUSES.contains(session.getStatus().toUpperCase())) {
-            log.warn("Security Alert: User {} attempted to stop session {} in non-active status {}",
-                    user.getEmail(), session.getId(), session.getStatus());
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
-                    "code", "INVALID_SESSION_STATE",
-                    "message", "Charging session is not in an active state."
-            ));
-        }
-
-        synchronized (("USER_STOP_LOCK_" + session.getId()).intern()) {
+        synchronized (("SESSION_STOP_LOCK_" + session.getId()).intern()) {
             ChargingSession freshSession = chargingSessionRepository.findById(session.getId()).orElse(session);
             if ("COMPLETED".equalsIgnoreCase(freshSession.getStatus()) || "STOPPED".equalsIgnoreCase(freshSession.getStatus())) {
                 return ResponseEntity.ok(mapSessionToMap(freshSession));
@@ -520,7 +514,7 @@ public class ChargingController {
                 ocppTxId = "OCPP-TX-" + freshSession.getId();
             }
 
-            // Deduct balance and create debit transaction ledger entry atomically
+            // Deduct balance and create debit transaction ledger entry atomically with idempotency guard
             walletService.processChargingDebit(freshSession.getId(), ocppTxId, finalCost);
 
             ChargingSession saved = chargingSessionRepository.save(freshSession);
@@ -557,6 +551,7 @@ public class ChargingController {
         List<ChargingSession> sessions = chargingSessionRepository.findByUserOrderByCreatedAtDesc(user);
 
         List<Map<String, Object>> list = sessions.stream()
+                .filter(s -> !ACTIVE_STATUSES.contains(s.getStatus().toUpperCase()))
                 .map(this::mapSessionToMap)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(list);

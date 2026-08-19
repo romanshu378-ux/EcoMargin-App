@@ -1,6 +1,9 @@
 package com.ecomargin.controller;
 
 import com.ecomargin.model.Station;
+import com.ecomargin.repository.ChargerRepository;
+import com.ecomargin.repository.ChargingSessionRepository;
+import com.ecomargin.repository.ConnectorRepository;
 import com.ecomargin.repository.StationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,10 +34,22 @@ class StationControllerIntegrationTest {
     @Autowired
     private StationRepository stationRepository;
 
+    @Autowired
+    private ChargerRepository chargerRepository;
+
+    @Autowired
+    private ConnectorRepository connectorRepository;
+
+    @Autowired
+    private ChargingSessionRepository chargingSessionRepository;
+
     @BeforeEach
     void setUp() {
+        chargingSessionRepository.deleteAll();
+        connectorRepository.deleteAll();
+        chargerRepository.deleteAll();
         stationRepository.deleteAll();
-        
+
         Station s1 = Station.builder()
                 .name("Austin Downtown Hub")
                 .latitude(new BigDecimal("30.267153"))
@@ -42,7 +57,7 @@ class StationControllerIntegrationTest {
                 .address("120 E 6th St")
                 .status("ACTIVE")
                 .build();
-                
+
         Station s2 = Station.builder()
                 .name("North Loop Charger Point")
                 .latitude(new BigDecimal("30.318858"))

@@ -1,6 +1,12 @@
 package com.ecomargin.ocpp;
 
+import com.ecomargin.model.Charger;
+import com.ecomargin.model.Station;
+import com.ecomargin.repository.ChargerRepository;
+import com.ecomargin.repository.StationRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
@@ -10,6 +16,7 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.math.BigDecimal;
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -24,11 +31,40 @@ class OcppServerIntegrationTest {
     @LocalServerPort
     private int port;
 
+    @Autowired
+    private StationRepository stationRepository;
+
+    @Autowired
+    private ChargerRepository chargerRepository;
+
+    @BeforeEach
+    void setUp() {
+        if (chargerRepository.findByOcppId("TX_TEST_CHARGER").isEmpty()) {
+            Station station = stationRepository.findAll().stream().findFirst().orElseGet(() -> stationRepository.save(
+                    Station.builder()
+                            .name("Test WebSocket Station")
+                            .latitude(new BigDecimal("26.9"))
+                            .longitude(new BigDecimal("75.7"))
+                            .address("Jaipur Test Location")
+                            .status("ACTIVE")
+                            .build()
+            ));
+
+            chargerRepository.save(Charger.builder()
+                    .station(station)
+                    .ocppId("TX_TEST_CHARGER")
+                    .brand("Tritium")
+                    .model("RT50")
+                    .status("AVAILABLE")
+                    .build());
+        }
+    }
+
     @Test
     void testOcppHandshakeAndBootNotification() throws Exception {
         URI uri = new URI("ws://localhost:" + port + "/ocpp/TX_TEST_CHARGER");
         StandardWebSocketClient client = new StandardWebSocketClient();
-        
+
         // OCPP 1.6J demands the ocpp1.6 sub-protocol selection
         WebSocketHttpHeaders headers = new WebSocketHttpHeaders();
         headers.setSecWebSocketProtocol("ocpp1.6");
@@ -55,7 +91,7 @@ class OcppServerIntegrationTest {
 
         String rawResponse = responseFuture.get(5, TimeUnit.SECONDS);
         assertNotNull(rawResponse);
-        
+
         // Assert that the response matches OCPP CallResult format (messageTypeId = 3) with accepted state
         assertTrue(rawResponse.startsWith("[3,\"10001\""));
         assertTrue(rawResponse.contains("\"status\":\"Accepted\""));

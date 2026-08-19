@@ -12,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -39,9 +41,25 @@ public class InternalOcppEventController {
             @RequestHeader(value = "X-Internal-Secret", required = false) String secret,
             @RequestBody Map<String, Object> payload) {
 
-        if (secret == null || !secret.equals(internalApiSecret)) {
-            log.warn("[OCPP-EVENT-REJECT] Invalid X-Internal-Secret");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Unauthorized internal event request"));
+        // 1. Secret & Authentication Verification
+        boolean hasValidSecret = secret != null && secret.equals(internalApiSecret);
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
+        if (!hasValidSecret) {
+            if (auth == null || !auth.isAuthenticated() || "anonymousUser".equalsIgnoreCase(auth.getName())) {
+                log.warn("[OCPP-SECURITY] Unauthenticated attempt to access internal simulator endpoint");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Unauthorized internal event request"));
+            }
+
+            // Customer users cannot control simulator state
+            boolean isCustomerOnly = auth.getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_CUSTOMER".equalsIgnoreCase(a.getAuthority())) &&
+                    auth.getAuthorities().stream().noneMatch(a -> a.getAuthority().contains("ADMIN") || a.getAuthority().contains("OPERATOR"));
+
+            if (isCustomerOnly) {
+                log.warn("[OCPP-SECURITY] CUSTOMER user {} attempted to access simulator endpoint", auth.getName());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "CUSTOMER users cannot access simulator endpoints"));
+            }
         }
 
         String eventType = (String) payload.getOrDefault("eventType", "UNKNOWN");

@@ -281,9 +281,15 @@ class WalletSecurityIntegrationTest {
         walletB.setBalance(new BigDecimal("20.00"));
         walletRepository.save(walletB);
 
-        Station st = stationRepository.findAll().stream().findFirst().orElseThrow();
-        Charger ch = chargerRepository.findAll().stream().findFirst().orElseThrow();
-        Connector conn = connectorRepository.findAll().stream().findFirst().orElseThrow();
+        Station st = stationRepository.findAll().stream().findFirst().orElseGet(() -> stationRepository.save(
+                Station.builder().name("Test Wallet Station").latitude(new BigDecimal("26.9")).longitude(new BigDecimal("75.7")).status("ACTIVE").build()
+        ));
+        Charger ch = chargerRepository.findAll().stream().findFirst().orElseGet(() -> chargerRepository.save(
+                Charger.builder().station(st).ocppId("CHG-WALLET-TEST").status("AVAILABLE").build()
+        ));
+        Connector conn = connectorRepository.findAll().stream().findFirst().orElseGet(() -> connectorRepository.save(
+                Connector.builder().charger(ch).connectorIndex(1).type("CCS2").status("AVAILABLE").maxPowerKw(BigDecimal.valueOf(50.0)).build()
+        ));
 
         String startPayload = String.format("{\"stationId\":%d, \"chargerId\":%d, \"connectorId\":%d}",
                 st.getId(), ch.getId(), conn.getId());
