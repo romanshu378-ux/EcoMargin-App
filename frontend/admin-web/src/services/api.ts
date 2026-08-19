@@ -39,11 +39,33 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response && error.response.status === 401) {
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response && error.response.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      const refreshToken = localStorage.getItem('admin_refresh_token');
+      if (refreshToken) {
+        try {
+          const baseUrl = getApiBaseUrl();
+          const refreshRes = await axios.post(`${baseUrl}/auth/refresh`, { refreshToken });
+          if (refreshRes.data && refreshRes.data.accessToken) {
+            const newAccessToken = refreshRes.data.accessToken;
+            localStorage.setItem('admin_token', newAccessToken);
+            localStorage.setItem('token', newAccessToken);
+            if (refreshRes.data.refreshToken) {
+              localStorage.setItem('admin_refresh_token', refreshRes.data.refreshToken);
+            }
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+            return api(originalRequest);
+          }
+        } catch (refreshErr) {
+          // Token refresh failed or revoked
+        }
+      }
       localStorage.removeItem('admin_token');
       localStorage.removeItem('token');
-      if (window.location.pathname !== '/login') {
+      localStorage.removeItem('admin_refresh_token');
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
     }
