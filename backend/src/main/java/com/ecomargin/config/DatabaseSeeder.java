@@ -338,7 +338,8 @@ public class DatabaseSeeder implements CommandLineRunner {
             Station alwarStation = seedStation(
                     "Alwar Charging Hub",
                     new BigDecimal("27.568400"), new BigDecimal("76.626400"),
-                    "Dholidub, Near Ram Mandir, Alwar, Rajasthan 301001", defaultVendor);
+                    "Dholidub, Near Ram Mandir, Alwar, Rajasthan 301001",
+                    "Alwar", "Rajasthan", "India", defaultVendor);
             Charger alwarCharger = seedCharger(alwarStation, "IN_ALW_01", "Tritium RT50", "Tritium");
             seedConnector(alwarCharger, 1, "CCS2",    BigDecimal.valueOf(50.00));
             seedConnector(alwarCharger, 2, "CHADEMO", BigDecimal.valueOf(50.00));
@@ -346,25 +347,27 @@ public class DatabaseSeeder implements CommandLineRunner {
             Station jaipurStation = seedStation(
                     "Jaipur EV Charging Hub",
                     new BigDecimal("26.915000"), new BigDecimal("75.792000"),
-                    "Tonk Road, Sector 62, Jaipur, Rajasthan 302018", defaultVendor);
+                    "Tonk Road, Sector 62, Jaipur, Rajasthan 302018",
+                    "Jaipur", "Rajasthan", "India", defaultVendor);
             Charger jaipurCharger = seedCharger(jaipurStation, "IN_JAI_01", "ABB Terra 184", "ABB");
             seedConnector(jaipurCharger, 1, "CCS2", BigDecimal.valueOf(180.00));
 
             Station austinStation = seedStation(
                     "Austin Downtown Hub",
                     new BigDecimal("30.267153"), new BigDecimal("-97.743062"),
-                    "120 E 6th St, Austin, TX 78701", defaultVendor);
+                    "120 E 6th St, Austin, TX 78701",
+                    "Austin", "Texas", "USA", defaultVendor);
             Charger austinCharger = seedCharger(austinStation, "TX_AUS_DWTN_01", "ABB Terra 184", "ABB");
             seedConnector(austinCharger, 1, "CCS2", BigDecimal.valueOf(180.00));
             seedConnector(austinCharger, 2, "CCS2", BigDecimal.valueOf(180.00));
         }
     }
 
-    private Station seedStation(String name, BigDecimal lat, BigDecimal lng, String address, Vendor vendor) {
+    private Station seedStation(String name, BigDecimal lat, BigDecimal lng, String address, String city, String state, String country, Vendor vendor) {
         return stationRepository.findByName(name)
                 .orElseGet(() -> stationRepository.save(Station.builder()
                         .name(name).latitude(lat).longitude(lng)
-                        .address(address).status("ACTIVE").vendor(vendor)
+                        .address(address).city(city).state(state).country(country).status("ACTIVE").vendor(vendor)
                         .build()));
     }
 
