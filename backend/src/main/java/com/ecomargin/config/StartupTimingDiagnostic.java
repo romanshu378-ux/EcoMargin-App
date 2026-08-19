@@ -201,6 +201,8 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
     public void onContextRefreshed(ContextRefreshedEvent event) {
         long now = getElapsed();
         log.info("[TIMING] Context refresh COMPLETE elapsed={}ms", now);
+        log.info("[OCPP-STARTUP] JPA initialized");
+        log.info("[OCPP-STARTUP] WebSocket initialized");
         logJvmStats("ContextRefreshed");
         if (firstRepoStartMs > 0 && lastRepoEndMs > 0) {
             log.info("[TIMING] Total Repository Initialization: {} repos processed in {}ms (From {}ms to {}ms)",
@@ -210,14 +212,18 @@ public class StartupTimingDiagnostic implements BeanPostProcessor {
 
     @EventListener
     public void onWebServerInitialized(WebServerInitializedEvent event) {
-        log.info("[TIMING] Tomcat HTTP Connector BOUND on port {} elapsed={}ms",
-                event.getWebServer().getPort(), getElapsed());
+        int boundPort = event.getWebServer().getPort();
+        log.info("[TIMING] Tomcat HTTP Connector BOUND on port {} elapsed={}ms", boundPort, getElapsed());
+        log.info("[OCPP-STARTUP] HTTP server ready");
+        log.info("[OCPP-STARTUP] PORT={}", boundPort);
+        log.info("[OCPP-STARTUP] HOST=0.0.0.0");
         logJvmStats("Tomcat-Bound");
     }
 
     @EventListener
     public void onApplicationReady(ApplicationReadyEvent event) {
         samplingActive = false;
+        log.info("[OCPP-STARTUP] Application READY");
         log.info("[TIMING] ApplicationReadyEvent elapsed={}ms (TOTAL STARTUP TIME)", getElapsed());
         logJvmStats("ApplicationReady");
     }
