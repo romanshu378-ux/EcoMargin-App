@@ -3,6 +3,7 @@ import {
   MapPin, Power, Radio, Server, Plus, Search, Trash2, RefreshCw, 
   ExternalLink, Edit3, ShieldAlert, CheckCircle, AlertTriangle, X, Info, Zap, Sliders, Eye
 } from 'lucide-react';
+import { getApiBaseUrl } from '../services/api';
 
 interface ActiveSessionInfo {
   sessionId: number;
@@ -106,7 +107,8 @@ export const StationsPage: React.FC = () => {
       if (searchQuery.trim()) params.append('search', searchQuery.trim());
       if (statusFilter !== 'ALL') params.append('status', statusFilter);
 
-      const response = await fetch(`/api/v1/admin/stations/detailed?${params.toString()}`, {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}/admin/stations/detailed?${params.toString()}`, {
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
           'Content-Type': 'application/json'
@@ -114,8 +116,12 @@ export const StationsPage: React.FC = () => {
       });
 
       if (!response.ok) {
-        if (response.status === 403) {
+        if (response.status === 401) {
+          throw new Error('401 Unauthorized: Session expired. Please log in again.');
+        } else if (response.status === 403) {
           throw new Error('403 Forbidden: You do not have permission to access Station Management.');
+        } else if (response.status === 404) {
+          throw new Error(`404 Not Found: Station endpoint (${baseUrl}/admin/stations/detailed) unreachable.`);
         }
         throw new Error(`Failed to load stations (HTTP ${response.status})`);
       }
@@ -210,7 +216,8 @@ export const StationsPage: React.FC = () => {
       };
 
       const isEdit = !!editStation;
-      const url = isEdit ? `/api/v1/admin/stations/${editStation.id}` : '/api/v1/admin/stations';
+      const baseUrl = getApiBaseUrl();
+      const url = isEdit ? `${baseUrl}/admin/stations/${editStation.id}` : `${baseUrl}/admin/stations`;
       const method = isEdit ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -243,7 +250,8 @@ export const StationsPage: React.FC = () => {
     try {
       setActionLoading(true);
       const token = getAuthToken();
-      const response = await fetch(`/api/v1/admin/stations/${statusChangeStation.id}/status`, {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}/admin/stations/${statusChangeStation.id}/status`, {
         method: 'PUT',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -274,7 +282,8 @@ export const StationsPage: React.FC = () => {
     try {
       setActionLoading(true);
       const token = getAuthToken();
-      const response = await fetch(`/api/v1/admin/stations/${toggleModalStation.id}/${actionEndpoint}`, {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}/admin/stations/${toggleModalStation.id}/${actionEndpoint}`, {
         method: 'PUT',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',
@@ -302,7 +311,8 @@ export const StationsPage: React.FC = () => {
     try {
       setActionLoading(true);
       const token = getAuthToken();
-      const response = await fetch(`/api/v1/admin/stations/${deleteModalStation.id}`, {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}/admin/stations/${deleteModalStation.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': token ? `Bearer ${token}` : '',

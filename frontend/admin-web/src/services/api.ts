@@ -1,6 +1,17 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+export const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (envUrl && envUrl.trim() !== '') {
+    return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+  }
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return 'http://localhost:8080/api/v1';
+  }
+  return '/api/v1';
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -10,7 +21,7 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('admin_token');
+  const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -22,6 +33,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('admin_token');
+      localStorage.removeItem('token');
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
@@ -41,8 +53,18 @@ export const adminApi = {
 
   // Stations & Chargers
   getStations: () => api.get('/admin/stations'),
+  getDetailedStations: (search?: string, status?: string) => {
+    const params = new URLSearchParams();
+    if (search && search.trim()) params.append('search', search.trim());
+    if (status && status !== 'ALL') params.append('status', status);
+    return api.get(`/admin/stations/detailed?${params.toString()}`);
+  },
+  getStationById: (id: number) => api.get(`/admin/stations/${id}`),
   createStation: (data: any) => api.post('/admin/stations', data),
   updateStation: (id: number, data: any) => api.put(`/admin/stations/${id}`, data),
+  changeStationStatus: (id: number, status: string) => api.put(`/admin/stations/${id}/status`, { status }),
+  disableStation: (id: number) => api.put(`/admin/stations/${id}/disable`),
+  enableStation: (id: number) => api.put(`/admin/stations/${id}/enable`),
   deleteStation: (id: number) => api.delete(`/admin/stations/${id}`),
   createCharger: (data: any) => api.post('/admin/chargers', data),
   updateChargerStatus: (id: number, status: string) =>
