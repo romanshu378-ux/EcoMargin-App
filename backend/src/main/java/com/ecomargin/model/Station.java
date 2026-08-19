@@ -37,6 +37,15 @@ public class Station {
     @Column(columnDefinition = "TEXT")
     private String address;
 
+    @Column
+    private String city;
+
+    @Column
+    private String state;
+
+    @Column
+    private String country;
+
     @Column(nullable = false)
     private String status = "ACTIVE"; // ACTIVE, INACTIVE, UNDER_MAINTENANCE
 

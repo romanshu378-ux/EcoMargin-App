@@ -142,6 +142,9 @@ public class StationController {
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
                 .address(request.getAddress())
+                .city(request.getCity() != null ? request.getCity() : "Jaipur")
+                .state(request.getState() != null ? request.getState() : "Rajasthan")
+                .country(request.getCountry() != null ? request.getCountry() : "India")
                 .status(request.getStatus().toUpperCase())
                 .build();
 

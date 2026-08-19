@@ -1,6 +1,8 @@
 package com.ecomargin.controller;
 
+import com.ecomargin.controller.dto.StationRequest;
 import com.ecomargin.controller.dto.UserSummaryDto;
+import jakarta.validation.Valid;
 import com.ecomargin.model.*;
 import com.ecomargin.model.enums.RoleType;
 import com.ecomargin.repository.*;
@@ -124,81 +126,234 @@ public class AdminController {
 
     // --- 2. STATIONS, CHARGERS & CONNECTORS ---
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @GetMapping("/stations")
     public ResponseEntity<List<Station>> getStations() {
         return ResponseEntity.ok(stationRepository.findAll());
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @GetMapping("/stations/detailed")
+    public ResponseEntity<List<Map<String, Object>>> getDetailedStations(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status
+    ) {
+        List<Station> stations = stationRepository.findAll();
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (Station station : stations) {
+            if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
+                String st = station.getStatus() != null ? station.getStatus().toUpperCase() : "ACTIVE";
+                if ("DISABLED".equalsIgnoreCase(status) || "INACTIVE".equalsIgnoreCase(status)) {
+                    if (!"INACTIVE".equals(st) && !"DISABLED".equals(st)) continue;
+                } else if ("MAINTENANCE".equalsIgnoreCase(status) || "UNDER_MAINTENANCE".equalsIgnoreCase(status)) {
+                    if (!"UNDER_MAINTENANCE".equals(st) && !"MAINTENANCE".equals(st)) continue;
+                } else if (!st.equalsIgnoreCase(status)) {
+                    continue;
+                }
+            }
+
+            if (search != null && !search.isBlank()) {
+                String q = search.toLowerCase();
+                boolean match = (station.getName() != null && station.getName().toLowerCase().contains(q)) ||
+                                (station.getId() != null && station.getId().toString().contains(q)) ||
+                                (station.getCity() != null && station.getCity().toLowerCase().contains(q)) ||
+                                (station.getAddress() != null && station.getAddress().toLowerCase().contains(q));
+                if (!match) continue;
+            }
+
+            result.add(buildDetailedStationDto(station));
+        }
+
+        return ResponseEntity.ok(result);
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @GetMapping("/stations/{id}")
+    public ResponseEntity<?> getDetailedStationById(@PathVariable Long id) {
+        Station station = stationRepository.findById(id).orElse(null);
+        if (station == null) return ResponseEntity.notFound().build();
+
+        return ResponseEntity.ok(buildDetailedStationDto(station));
+    }
+
+    @org.springframework.transaction.annotation.Transactional
     @PostMapping("/stations")
-    public ResponseEntity<Station> createStation(
-            @RequestBody Station station,
+    public ResponseEntity<?> createStation(
+            @Valid @RequestBody StationRequest request,
             @AuthenticationPrincipal UserDetails principal
     ) {
-        if (station.getStatus() == null) station.setStatus("ACTIVE");
+        if (request.getLatitude() == null || request.getLatitude().compareTo(new BigDecimal("-90.0")) < 0 || request.getLatitude().compareTo(new BigDecimal("90.0")) > 0) {
+            return ResponseEntity.badRequest().body(Map.of("code", "INVALID_COORDINATES", "message", "Latitude must be between -90 and 90"));
+        }
+        if (request.getLongitude() == null || request.getLongitude().compareTo(new BigDecimal("-180.0")) < 0 || request.getLongitude().compareTo(new BigDecimal("180.0")) > 0) {
+            return ResponseEntity.badRequest().body(Map.of("code", "INVALID_COORDINATES", "message", "Longitude must be between -180 and 180"));
+        }
+
+        Station station = Station.builder()
+                .name(request.getName())
+                .address(request.getAddress())
+                .city(request.getCity() != null ? request.getCity() : "Jaipur")
+                .state(request.getState() != null ? request.getState() : "Rajasthan")
+                .country(request.getCountry() != null ? request.getCountry() : "India")
+                .latitude(request.getLatitude())
+                .longitude(request.getLongitude())
+                .status(request.getStatus() != null ? request.getStatus().toUpperCase() : "ACTIVE")
+                .build();
+
         Station saved = stationRepository.save(station);
 
         auditLogService.logAction(
                 null,
                 principal != null ? principal.getUsername() : "ADMIN",
-                "CREATE_STATION",
+                "STATION_CREATED",
                 "Station",
-                saved.getId() != null ? saved.getId().toString() : saved.getName(),
+                saved.getId().toString(),
                 null,
                 saved.getName(),
                 "127.0.0.1",
-                "Created new station: " + saved.getName()
+                "Created station: " + saved.getName()
         );
 
-        return ResponseEntity.ok(saved);
+        return ResponseEntity.ok(buildDetailedStationDto(saved));
     }
 
+    @org.springframework.transaction.annotation.Transactional
     @PutMapping("/stations/{id}")
-    public ResponseEntity<Station> updateStation(
+    public ResponseEntity<?> updateStation(
             @PathVariable Long id,
-            @RequestBody Station stationDetails,
+            @Valid @RequestBody StationRequest request,
             @AuthenticationPrincipal UserDetails principal
     ) {
         Station station = stationRepository.findById(id).orElse(null);
         if (station == null) return ResponseEntity.notFound().build();
 
+        if (request.getLatitude() == null || request.getLatitude().compareTo(new BigDecimal("-90.0")) < 0 || request.getLatitude().compareTo(new BigDecimal("90.0")) > 0) {
+            return ResponseEntity.badRequest().body(Map.of("code", "INVALID_COORDINATES", "message", "Latitude must be between -90 and 90"));
+        }
+        if (request.getLongitude() == null || request.getLongitude().compareTo(new BigDecimal("-180.0")) < 0 || request.getLongitude().compareTo(new BigDecimal("180.0")) > 0) {
+            return ResponseEntity.badRequest().body(Map.of("code", "INVALID_COORDINATES", "message", "Longitude must be between -180 and 180"));
+        }
+
         String prevName = station.getName();
-        station.setName(stationDetails.getName());
-        station.setAddress(stationDetails.getAddress());
-        station.setLatitude(stationDetails.getLatitude());
-        station.setLongitude(stationDetails.getLongitude());
-        if (stationDetails.getStatus() != null) station.setStatus(stationDetails.getStatus());
+        station.setName(request.getName());
+        station.setAddress(request.getAddress());
+        if (request.getCity() != null) station.setCity(request.getCity());
+        if (request.getState() != null) station.setState(request.getState());
+        if (request.getCountry() != null) station.setCountry(request.getCountry());
+        station.setLatitude(request.getLatitude());
+        station.setLongitude(request.getLongitude());
+        if (request.getStatus() != null) station.setStatus(request.getStatus().toUpperCase());
 
         Station updated = stationRepository.save(station);
 
         auditLogService.logAction(
                 null,
                 principal != null ? principal.getUsername() : "ADMIN",
-                "UPDATE_STATION",
+                "STATION_UPDATED",
                 "Station",
                 id.toString(),
                 prevName,
                 updated.getName(),
                 "127.0.0.1",
-                "Updated station id: " + id
+                "Updated station: " + updated.getName()
         );
 
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(buildDetailedStationDto(updated));
     }
 
-    @DeleteMapping("/stations/{id}")
-    public ResponseEntity<Void> deleteStation(
+    @org.springframework.transaction.annotation.Transactional
+    @PutMapping("/stations/{id}/disable")
+    public ResponseEntity<?> disableStation(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails principal
     ) {
         Station station = stationRepository.findById(id).orElse(null);
         if (station == null) return ResponseEntity.notFound().build();
 
+        String prevStatus = station.getStatus();
+        station.setStatus("INACTIVE");
+        Station updated = stationRepository.save(station);
+
+        auditLogService.logAction(
+                null,
+                principal != null ? principal.getUsername() : "ADMIN",
+                "STATION_DISABLED",
+                "Station",
+                id.toString(),
+                prevStatus,
+                "INACTIVE",
+                "127.0.0.1",
+                "Disabled station: " + station.getName()
+        );
+
+        return ResponseEntity.ok(buildDetailedStationDto(updated));
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    @PutMapping("/stations/{id}/enable")
+    public ResponseEntity<?> enableStation(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails principal
+    ) {
+        Station station = stationRepository.findById(id).orElse(null);
+        if (station == null) return ResponseEntity.notFound().build();
+
+        String prevStatus = station.getStatus();
+        station.setStatus("ACTIVE");
+        Station updated = stationRepository.save(station);
+
+        auditLogService.logAction(
+                null,
+                principal != null ? principal.getUsername() : "ADMIN",
+                "STATION_ENABLED",
+                "Station",
+                id.toString(),
+                prevStatus,
+                "ACTIVE",
+                "127.0.0.1",
+                "Enabled station: " + station.getName()
+        );
+
+        return ResponseEntity.ok(buildDetailedStationDto(updated));
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    @DeleteMapping("/stations/{id}")
+    public ResponseEntity<?> deleteStation(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails principal
+    ) {
+        Station station = stationRepository.findById(id).orElse(null);
+        if (station == null) return ResponseEntity.notFound().build();
+
+        List<Charger> chargers = chargerRepository.findByStation(station);
+        if (chargers != null && !chargers.isEmpty()) {
+            station.setStatus("INACTIVE");
+            stationRepository.save(station);
+            auditLogService.logAction(
+                    null,
+                    principal != null ? principal.getUsername() : "ADMIN",
+                    "STATION_DISABLE_FAILED",
+                    "Station",
+                    id.toString(),
+                    station.getName(),
+                    "INACTIVE",
+                    "127.0.0.1",
+                    "Station has chargers; soft-disabled instead of hard delete"
+            );
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "code", "STATION_HAS_CHARGERS",
+                    "message", "Cannot hard delete station with associated chargers/history. Station has been deactivated."
+            ));
+        }
+
         stationRepository.delete(station);
 
         auditLogService.logAction(
                 null,
                 principal != null ? principal.getUsername() : "ADMIN",
-                "DELETE_STATION",
+                "STATION_DELETED",
                 "Station",
                 id.toString(),
                 station.getName(),
@@ -207,7 +362,90 @@ public class AdminController {
                 "Deleted station id: " + id
         );
 
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(Map.of("message", "Station deleted successfully"));
+    }
+
+    private Map<String, Object> buildDetailedStationDto(Station station) {
+        Map<String, Object> dto = new HashMap<>();
+        dto.put("id", station.getId());
+        dto.put("name", station.getName());
+        dto.put("address", station.getAddress() != null ? station.getAddress() : "");
+        dto.put("city", station.getCity() != null ? station.getCity() : "Jaipur");
+        dto.put("state", station.getState() != null ? station.getState() : "Rajasthan");
+        dto.put("country", station.getCountry() != null ? station.getCountry() : "India");
+        dto.put("latitude", station.getLatitude());
+        dto.put("longitude", station.getLongitude());
+        dto.put("status", station.getStatus() != null ? station.getStatus() : "ACTIVE");
+        dto.put("createdAt", station.getCreatedAt() != null ? station.getCreatedAt().toString() : LocalDateTime.now().toString());
+        dto.put("updatedAt", station.getUpdatedAt() != null ? station.getUpdatedAt().toString() : LocalDateTime.now().toString());
+
+        List<Charger> chargers = chargerRepository.findByStation(station);
+        int totalChargers = chargers.size();
+        int onlineChargers = 0;
+        int offlineChargers = 0;
+        int totalConnectors = 0;
+        int availableConnectors = 0;
+        int chargingConnectors = 0;
+        int faultedConnectors = 0;
+
+        List<Map<String, Object>> chargerDtos = new ArrayList<>();
+        for (Charger charger : chargers) {
+            Map<String, Object> cDto = new HashMap<>();
+            cDto.put("id", charger.getId());
+            cDto.put("ocppId", charger.getOcppId());
+            cDto.put("brand", charger.getBrand() != null ? charger.getBrand() : "EcoMargin");
+            cDto.put("model", charger.getModel() != null ? charger.getModel() : "EV-Fast-100");
+            cDto.put("status", charger.getStatus() != null ? charger.getStatus() : "AVAILABLE");
+            boolean online = ocppWebSocketHandler.isChargerConnected(charger.getOcppId());
+            cDto.put("online", online);
+            if (online) onlineChargers++; else offlineChargers++;
+
+            List<Connector> connectors = connectorRepository.findByCharger(charger);
+            cDto.put("connectorCount", connectors.size());
+            totalConnectors += connectors.size();
+
+            List<Map<String, Object>> connDtos = new ArrayList<>();
+            for (Connector conn : connectors) {
+                Map<String, Object> connMap = new HashMap<>();
+                connMap.put("id", conn.getId());
+                connMap.put("connectorId", conn.getConnectorIndex() != null ? conn.getConnectorIndex() : conn.getId());
+                connMap.put("type", conn.getType() != null ? conn.getType() : "CCS2");
+                connMap.put("maxPowerKw", conn.getMaxPowerKw() != null ? conn.getMaxPowerKw() : new BigDecimal("60.0"));
+                String cStat = conn.getStatus() != null ? conn.getStatus() : "AVAILABLE";
+                connMap.put("status", cStat);
+
+                if ("AVAILABLE".equalsIgnoreCase(cStat)) availableConnectors++;
+                else if ("CHARGING".equalsIgnoreCase(cStat) || "OCCUPIED".equalsIgnoreCase(cStat)) chargingConnectors++;
+                else if ("FAULTED".equalsIgnoreCase(cStat)) faultedConnectors++;
+
+                List<ChargingSession> activeSessions = chargingSessionRepository.findByConnectorAndStatusIn(conn, List.of("CHARGING", "STARTING", "PREPARING"));
+                if (!activeSessions.isEmpty()) {
+                    ChargingSession active = activeSessions.get(0);
+                    Map<String, Object> sessMap = new HashMap<>();
+                    sessMap.put("sessionId", active.getId());
+                    sessMap.put("userEmail", active.getUser() != null ? active.getUser().getEmail() : "customer@ecomargin.com");
+                    sessMap.put("energyKwh", active.getTotalEnergyKwh());
+                    sessMap.put("startedAt", active.getStartTime() != null ? active.getStartTime().toString() : null);
+                    connMap.put("activeSession", sessMap);
+                } else {
+                    connMap.put("activeSession", null);
+                }
+                connDtos.add(connMap);
+            }
+            cDto.put("connectors", connDtos);
+            chargerDtos.add(cDto);
+        }
+
+        dto.put("totalChargers", totalChargers);
+        dto.put("onlineChargers", onlineChargers);
+        dto.put("offlineChargers", offlineChargers);
+        dto.put("totalConnectors", totalConnectors);
+        dto.put("availableConnectors", availableConnectors);
+        dto.put("chargingConnectors", chargingConnectors);
+        dto.put("faultedConnectors", faultedConnectors);
+        dto.put("chargers", chargerDtos);
+
+        return dto;
     }
 
     @PostMapping("/chargers")

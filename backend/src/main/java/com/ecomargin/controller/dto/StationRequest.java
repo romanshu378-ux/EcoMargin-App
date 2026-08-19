@@ -25,6 +25,12 @@ public class StationRequest {
 
     private String address;
 
+    private String city;
+
+    private String state;
+
+    private String country;
+
     @NotBlank(message = "Station status is required")
     private String status;
 }
