@@ -125,9 +125,13 @@ export const StationsPage: React.FC = () => {
 
       if (!response.ok) {
         if (response.status === 401) {
+          localStorage.removeItem('admin_token');
+          localStorage.removeItem('token');
+          localStorage.removeItem('admin_refresh_token');
+          window.location.href = '/login';
           throw new Error('401 Unauthorized: Session expired. Please log in again.');
         } else if (response.status === 403) {
-          throw new Error('403 Forbidden: You do not have permission to access Station Management.');
+          throw new Error('403 Forbidden: Authenticated user does not have Admin permission.');
         } else if (response.status === 404) {
           throw new Error(`404 Not Found: Station endpoint (${targetUrl}) unreachable.`);
         }
