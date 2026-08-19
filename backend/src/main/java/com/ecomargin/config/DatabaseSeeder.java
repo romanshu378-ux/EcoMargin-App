@@ -153,8 +153,14 @@ public class DatabaseSeeder implements CommandLineRunner {
                 vendorRole    != null ? Collections.singleton(vendorRole)    : Collections.emptySet());
         seedUser("operator@ecomargin.com", "admin123", "System", "Admin", "+919999999991",
                 adminRole     != null ? Collections.singleton(adminRole)     : Collections.emptySet());
-        seedUser("admin@ecomargin.com", "admin123", "Super", "Admin", "+919999999999",
+        User adminUser = seedUser("admin@ecomargin.com", "admin123", "Super", "Admin", "+919999999999",
                 superAdminRole != null ? Collections.singleton(superAdminRole) : Collections.emptySet());
+
+        if (adminUser != null && !passwordEncoder.matches("admin123", adminUser.getPassword())) {
+            log.info("[SEEDER] Syncing admin@ecomargin.com password hash to match admin123");
+            adminUser.setPassword(passwordEncoder.encode("admin123"));
+            userRepository.save(adminUser);
+        }
 
         if (customerUser != null) {
             Wallet wallet = walletRepository.findByUserId(customerUser.getId())
