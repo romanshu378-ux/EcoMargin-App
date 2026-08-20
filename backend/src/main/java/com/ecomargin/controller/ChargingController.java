@@ -276,103 +276,103 @@ public class ChargingController {
                 return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(body);
             }
 
-            // Relational Hierarchy Validation
+            // Relational Hierarchy Validation & Lookup
             Long clientStationId = parseId(payload, "stationId");
-            Long clientChargerId = parseId(payload, "chargerId");
             Long clientConnectorId = parseId(payload, "connectorId");
+            Long clientChargerId = parseId(payload, "chargerId");
+            String clientChargerOcppId = payload != null && payload.get("chargerId") instanceof String ? (String) payload.get("chargerId") : null;
 
             Connector connector = null;
 
             if (clientConnectorId != null) {
                 connector = connectorRepository.findById(clientConnectorId).orElse(null);
-                if (connector == null) {
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
-                            "code", "CONNECTOR_NOT_FOUND",
-                            "message", "The specified connector was not found."
-                    ));
+                if (connector == null && clientChargerId != null) {
+                    Charger chg = chargerRepository.findById(clientChargerId).orElse(null);
+                    if (chg != null) {
+                        connector = connectorRepository.findByChargerAndConnectorIndex(chg, clientConnectorId.intValue()).orElse(null);
+                    }
                 }
-
-                Charger charger = connector.getCharger();
-                if (charger == null) {
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
-                            "code", "CHARGER_NOT_FOUND",
-                            "message", "Charger associated with connector not found."
-                    ));
+            } else if (clientChargerId != null || (clientChargerOcppId != null && !clientChargerOcppId.isBlank())) {
+                Charger charger = clientChargerId != null ? chargerRepository.findById(clientChargerId).orElse(null) : null;
+                if (charger == null && clientChargerOcppId != null) {
+                    charger = chargerRepository.findByOcppId(clientChargerOcppId.trim()).orElse(null);
                 }
-                if (clientChargerId != null && !charger.getId().equals(clientChargerId)) {
-                    log.warn("Security Alert: Relational Mismatch! Client specified chargerId {} but connector {} belongs to chargerId {}",
-                            clientChargerId, clientConnectorId, charger.getId());
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                            "code", "INVALID_RELATIONSHIP",
-                            "message", "Connector does not belong to the specified charger."
-                    ));
+                if (charger != null) {
+                    List<Connector> connectors = connectorRepository.findByCharger(charger);
+                    if (!connectors.isEmpty()) {
+                        connector = connectors.get(0);
+                    }
                 }
-
-                Station station = charger.getStation();
-                if (station == null) {
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
-                            "code", "STATION_NOT_FOUND",
-                            "message", "Station associated with charger not found."
-                    ));
-                }
-                if (clientStationId != null && !station.getId().equals(clientStationId)) {
-                    log.warn("Security Alert: Relational Mismatch! Client specified stationId {} but charger {} belongs to stationId {}",
-                            clientStationId, charger.getId(), station.getId());
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                            "code", "INVALID_RELATIONSHIP",
-                            "message", "Charger does not belong to the specified station."
-                    ));
-                }
-            } else if (clientChargerId != null) {
-                Charger charger = chargerRepository.findById(clientChargerId).orElse(null);
-                if (charger == null) {
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
-                            "code", "CHARGER_NOT_FOUND",
-                            "message", "The specified charger was not found."
-                    ));
-                }
-
-                Station station = charger.getStation();
-                if (station == null) {
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
-                            "code", "STATION_NOT_FOUND",
-                            "message", "Station associated with charger not found."
-                    ));
-                }
-                if (clientStationId != null && !station.getId().equals(clientStationId)) {
-                    log.warn("Security Alert: Relational Mismatch! Client specified stationId {} but charger {} belongs to stationId {}",
-                            clientStationId, clientChargerId, station.getId());
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                            "code", "INVALID_RELATIONSHIP",
-                            "message", "Charger does not belong to the specified station."
-                    ));
-                }
-
-                List<Connector> connectors = connectorRepository.findByCharger(charger);
-                if (!connectors.isEmpty()) {
-                    connector = connectors.get(0);
-                }
-            } else {
-                List<Connector> connectors = connectorRepository.findAll();
-                if (!connectors.isEmpty()) {
-                    connector = connectors.get(0);
+            } else if (clientStationId != null) {
+                Station station = stationRepository.findById(clientStationId).orElse(null);
+                if (station != null && station.getChargers() != null) {
+                    for (Charger chg : station.getChargers()) {
+                        List<Connector> connectors = connectorRepository.findByCharger(chg);
+                        if (!connectors.isEmpty()) {
+                            connector = connectors.get(0);
+                            break;
+                        }
+                    }
                 }
             }
 
             if (connector == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
                         "code", "CONNECTOR_NOT_FOUND",
-                        "message", "No valid connectors available."
+                        "message", "The specified connector was not found."
                 ));
             }
 
-            // Connector Status Validation
+            // Relational Hierarchy Security Validation
+            Charger chgRel = connector.getCharger();
+            if (chgRel == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                        "code", "CHARGER_NOT_FOUND",
+                        "message", "Charger associated with connector not found."
+                ));
+            }
+            if (clientChargerId != null && !chgRel.getId().equals(clientChargerId)) {
+                log.warn("Security Alert: Relational Mismatch! Client specified chargerId {} but connector {} belongs to chargerId {}",
+                        clientChargerId, connector.getId(), chgRel.getId());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                        "code", "INVALID_RELATIONSHIP",
+                        "message", "Connector does not belong to the specified charger."
+                ));
+            }
+
+            Station stRel = chgRel.getStation();
+            if (stRel == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                        "code", "STATION_NOT_FOUND",
+                        "message", "Station associated with charger not found."
+                ));
+            }
+            if (clientStationId != null && !stRel.getId().equals(clientStationId)) {
+                log.warn("Security Alert: Relational Mismatch! Client specified stationId {} but charger {} belongs to stationId {}",
+                        clientStationId, chgRel.getId(), stRel.getId());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                        "code", "INVALID_RELATIONSHIP",
+                        "message", "Charger does not belong to the specified station."
+                ));
+            }
+
+            // Connector Status & Busy Validation
             String connStatus = connector.getStatus() != null ? connector.getStatus().toUpperCase() : "UNAVAILABLE";
             if (connector.getDeletedAt() != null || Set.of("UNAVAILABLE", "DELETED", "INACTIVE", "DISABLED").contains(connStatus) || !List.of("AVAILABLE", "PREPARING", "PLUGGED").contains(connStatus)) {
                 log.warn("Security Alert: Attempted to start session on connector {} in status {} / deletedAt {}", connector.getId(), connStatus, connector.getDeletedAt());
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
                         "code", "CONNECTOR_UNAVAILABLE",
                         "message", "Connector is currently unavailable."
+                ));
+            }
+
+            List<ChargingSession> activeConnSessions = chargingSessionRepository.findByConnectorAndStatusIn(connector, ACTIVE_STATUSES);
+            if (!activeConnSessions.isEmpty()) {
+                log.warn("Security Alert: Attempted to start session on connector {} which already has active session {}", connector.getId(), activeConnSessions.get(0).getId());
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                        "code", "CONNECTOR_BUSY",
+                        "message", "Connector is currently in use by another charging session.",
+                        "connectorId", connector.getId()
                 ));
             }
 
@@ -396,6 +396,10 @@ public class ChargingController {
                         "message", "Station is currently unavailable."
                 ));
             }
+
+            // Update connector status to CHARGING to reflect reservation
+            connector.setStatus("CHARGING");
+            connectorRepository.save(connector);
 
             ChargingSession session = ChargingSession.builder()
                     .user(user)
@@ -519,6 +523,12 @@ public class ChargingController {
 
             // Deduct balance and create debit transaction ledger entry atomically with idempotency guard
             walletService.processChargingDebit(freshSession.getId(), ocppTxId, finalCost);
+
+            if (freshSession.getConnector() != null) {
+                Connector conn = freshSession.getConnector();
+                conn.setStatus("AVAILABLE");
+                connectorRepository.save(conn);
+            }
 
             ChargingSession saved = chargingSessionRepository.save(freshSession);
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -241,19 +242,60 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> with 
       }
     } catch (e) {
       if (mounted) {
-        String errorMsg = e.toString();
-        if (e.toString().contains('message:')) {
+        // Auto-refresh station availability and session status immediately on error/conflict
+        ref.read(stationsProvider.notifier).fetchStations();
+        ref.read(chargingSessionProvider.notifier).checkActiveSession();
+
+        String errorMsg = "Unable to start charging session. Please refresh and try again.";
+        String? errorCode;
+
+        if (e is DioException) {
+          debugPrint("START CHARGING HTTP STATUS: ${e.response?.statusCode}");
+          debugPrint("START CHARGING RESPONSE DATA: ${e.response?.data}");
+          debugPrint("START CHARGING URL: ${e.requestOptions.uri}");
+
+          if (e.response?.data is Map) {
+            final Map errMap = e.response!.data as Map;
+            errorCode = errMap['code']?.toString();
+            if (errMap['message'] != null) {
+              errorMsg = errMap['message'].toString();
+            }
+          }
+        } else {
           errorMsg = e.toString();
         }
-        try {
-          final dynamic errData = (e as dynamic).response?.data;
-          if (errData != null && errData is Map && errData.containsKey('message')) {
-            errorMsg = errData['message'].toString();
-          }
-        } catch (_) {}
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMsg), backgroundColor: Colors.red),
-        );
+
+        if (errorCode == 'ACTIVE_SESSION_EXISTS') {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Active Session Running'),
+              content: const Text('You already have an active charging session in progress.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    context.go('/live-charging');
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A), foregroundColor: Colors.white),
+                  child: const Text('View Charging'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMsg),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isStartingSession = false);

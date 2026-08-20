@@ -313,6 +313,36 @@ class ChargingSessionNotifier extends StateNotifier<ChargingSessionState> with W
       } else {
         state = state.copyWith(hasConnectionError: true);
       }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409 && e.response?.data != null) {
+        final data = e.response!.data is Map ? (e.response!.data as Map) : {};
+        final sessionData = data['session'] != null && data['session'] is Map ? (data['session'] as Map) : data;
+        final status = (sessionData['status'] ?? 'CHARGING').toString().toUpperCase();
+        final sessId = sessionData['sessionId']?.toString();
+        if (sessId != null) {
+          final storage = ref.read(storageServiceProvider);
+          await storage.saveData('active_session_id', sessId);
+        }
+        state = ChargingSessionState(
+          isCharging: true,
+          sessionId: sessId,
+          status: status,
+          stationName: sessionData['stationName'] ?? stationName ?? 'EcoMargin Charging Hub',
+          chargerId: sessionData['chargerId'] ?? chargerId ?? '',
+          connectorType: sessionData['connectorType'] ?? connectorType ?? '',
+          percentage: double.tryParse(sessionData['percentage']?.toString() ?? '0') ?? 0.0,
+          kwhDelivered: double.tryParse(sessionData['kwhDelivered']?.toString() ?? '0') ?? 0.0,
+          currentPowerKw: double.tryParse(sessionData['currentPowerKw']?.toString() ?? '0') ?? 0.0,
+          durationSeconds: int.tryParse(sessionData['durationSeconds']?.toString() ?? '0') ?? 0,
+          totalCost: double.tryParse(sessionData['totalCost']?.toString() ?? '0') ?? 0.0,
+          hasConnectionError: false,
+        );
+        await fetchWalletBalance();
+        _startPolling();
+        return;
+      }
+      state = state.copyWith(isCharging: false, hasConnectionError: true);
+      rethrow;
     } catch (e) {
       state = state.copyWith(isCharging: false, hasConnectionError: true);
       rethrow;
