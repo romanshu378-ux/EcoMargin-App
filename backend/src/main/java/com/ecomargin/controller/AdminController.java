@@ -898,6 +898,48 @@ public class AdminController {
     }
 
     @org.springframework.transaction.annotation.Transactional
+    @DeleteMapping("/chargers/{id}")
+    public ResponseEntity<?> deleteCharger(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails principal
+    ) {
+        Charger charger = chargerRepository.findById(id).orElse(null);
+        if (charger == null) return ResponseEntity.notFound().build();
+
+        List<Connector> connectors = connectorRepository.findByCharger(charger);
+        LocalDateTime now = LocalDateTime.now();
+
+        charger.setStatus("DELETED");
+        charger.setDeletedAt(now);
+
+        for (Connector conn : connectors) {
+            conn.setStatus("DELETED");
+            conn.setDeletedAt(now);
+            connectorRepository.save(conn);
+        }
+
+        Charger saved = chargerRepository.save(charger);
+
+        log.info("[ADMIN-DELETE-CHARGER] stationId={}, chargerId={}, ocppId={}, status=DELETED, deletedAt={}",
+                charger.getStation() != null ? charger.getStation().getId() : null,
+                charger.getId(), charger.getOcppId(), now);
+
+        auditLogService.logAction(
+                null,
+                principal != null ? principal.getUsername() : "ADMIN",
+                "CHARGER_DELETED",
+                "Charger",
+                id.toString(),
+                saved.getOcppId(),
+                "DELETED",
+                "127.0.0.1",
+                "Deleted charger " + saved.getOcppId()
+        );
+
+        return ResponseEntity.ok(Map.of("message", "Charger deleted successfully", "id", id));
+    }
+
+    @org.springframework.transaction.annotation.Transactional
     @PostMapping("/sessions/{sessionId}/force-stop")
     public ResponseEntity<?> forceStopSession(
             @PathVariable Long sessionId,

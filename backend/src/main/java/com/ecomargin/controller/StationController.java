@@ -3,6 +3,8 @@ package com.ecomargin.controller;
 import com.ecomargin.controller.dto.StationRequest;
 import com.ecomargin.model.Station;
 import com.ecomargin.repository.StationRepository;
+import com.ecomargin.repository.ChargerRepository;
+import com.ecomargin.repository.ConnectorRepository;
 import com.ecomargin.repository.StationSpecification;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -24,6 +26,8 @@ import java.util.List;
 public class StationController {
 
     private final StationRepository stationRepository;
+    private final ChargerRepository chargerRepository;
+    private final ConnectorRepository connectorRepository;
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @Operation(summary = "Search stations with pagination and filtering", description = "Allows multi-criteria filters including vendor ID, name search, and operational status")
@@ -53,11 +57,12 @@ public class StationController {
             @RequestParam(required = false) Double longitude,
             @RequestParam(required = false, defaultValue = "50.0") Double radiusKm
     ) {
-        List<Station> stations = stationRepository.findAll();
-        
-        stations.forEach(station -> {
-            filterCustomerVisibleHardware(station);
+        List<Station> stations = stationRepository.findAll().stream()
+                .filter(s -> s.getDeletedAt() == null && !"INACTIVE".equalsIgnoreCase(s.getStatus()) && !"DELETED".equalsIgnoreCase(s.getStatus()))
+                .peek(this::filterCustomerVisibleHardware)
+                .collect(java.util.stream.Collectors.toList());
 
+        stations.forEach(station -> {
             if (latitude != null && longitude != null && station.getLatitude() != null && station.getLongitude() != null) {
                 double dist = calculateHaversineDistance(
                         latitude, longitude,
@@ -100,6 +105,7 @@ public class StationController {
     @GetMapping("/{id:\\d+}")
     public ResponseEntity<Station> getStationById(@PathVariable Long id) {
         return stationRepository.findById(id)
+                .filter(s -> s.getDeletedAt() == null && !"INACTIVE".equalsIgnoreCase(s.getStatus()) && !"DELETED".equalsIgnoreCase(s.getStatus()))
                 .map(station -> {
                     filterCustomerVisibleHardware(station);
                     return ResponseEntity.ok(station);
@@ -108,12 +114,22 @@ public class StationController {
     }
 
     private void filterCustomerVisibleHardware(Station station) {
-        if (station == null || station.getChargers() == null) return;
-        List<com.ecomargin.model.Charger> visibleChargers = station.getChargers().stream()
+        if (station == null) return;
+        List<com.ecomargin.model.Charger> chargers = station.getChargers();
+        if (chargers == null) {
+            chargers = chargerRepository.findByStation(station);
+        }
+        if (chargers == null) return;
+
+        List<com.ecomargin.model.Charger> visibleChargers = chargers.stream()
                 .filter(this::isChargerCustomerVisible)
                 .peek(charger -> {
-                    if (charger.getConnectors() != null) {
-                        List<com.ecomargin.model.Connector> visibleConnectors = charger.getConnectors().stream()
+                    List<com.ecomargin.model.Connector> connectors = charger.getConnectors();
+                    if (connectors == null) {
+                        connectors = connectorRepository.findByCharger(charger);
+                    }
+                    if (connectors != null) {
+                        List<com.ecomargin.model.Connector> visibleConnectors = connectors.stream()
                                 .filter(this::isConnectorCustomerVisible)
                                 .collect(java.util.stream.Collectors.toList());
                         charger.setConnectors(visibleConnectors);
@@ -126,13 +142,13 @@ public class StationController {
     private boolean isChargerCustomerVisible(com.ecomargin.model.Charger charger) {
         if (charger == null || charger.getDeletedAt() != null) return false;
         String st = charger.getStatus() != null ? charger.getStatus().toUpperCase() : "";
-        return !java.util.Set.of("DELETED", "DISABLED").contains(st);
+        return !java.util.Set.of("DELETED", "DISABLED", "INACTIVE").contains(st);
     }
 
     private boolean isConnectorCustomerVisible(com.ecomargin.model.Connector connector) {
         if (connector == null || connector.getDeletedAt() != null) return false;
         String st = connector.getStatus() != null ? connector.getStatus().toUpperCase() : "";
-        return !java.util.Set.of("DELETED", "DISABLED").contains(st);
+        return !java.util.Set.of("DELETED", "DISABLED", "INACTIVE").contains(st);
     }
 
     @Operation(summary = "Create a new CPO Station")

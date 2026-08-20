@@ -373,11 +373,14 @@ public class DatabaseSeeder implements CommandLineRunner {
     }
 
     private Station seedStation(String name, BigDecimal lat, BigDecimal lng, String address, String city, String state, String country, Vendor vendor) {
-        return stationRepository.findByName(name)
-                .orElseGet(() -> stationRepository.save(Station.builder()
-                        .name(name).latitude(lat).longitude(lng)
-                        .address(address).city(city).state(state).country(country).status("ACTIVE").vendor(vendor)
-                        .build()));
+        Station station = stationRepository.findByName(name).orElse(null);
+        if (station == null) {
+            return stationRepository.save(Station.builder()
+                    .name(name).latitude(lat).longitude(lng)
+                    .address(address).city(city).state(state).country(country).status("ACTIVE").vendor(vendor)
+                    .build());
+        }
+        return station;
     }
 
     private Charger seedCharger(Station station, String ocppId, String model, String brand) {
@@ -388,7 +391,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                     .brand(brand).status("AVAILABLE")
                     .updatedAt(LocalDateTime.now())
                     .build());
-        } else if (charger.getDeletedAt() == null && "UNAVAILABLE".equalsIgnoreCase(charger.getStatus())) {
+        } else if (charger.getDeletedAt() == null && !"DELETED".equalsIgnoreCase(charger.getStatus()) && !"DISABLED".equalsIgnoreCase(charger.getStatus()) && "UNAVAILABLE".equalsIgnoreCase(charger.getStatus())) {
             charger.setStatus("AVAILABLE");
             charger.setUpdatedAt(LocalDateTime.now());
             charger = chargerRepository.save(charger);
@@ -397,6 +400,9 @@ public class DatabaseSeeder implements CommandLineRunner {
     }
 
     private void seedConnector(Charger charger, int index, String type, BigDecimal maxPower) {
+        if (charger == null || charger.getDeletedAt() != null || "DELETED".equalsIgnoreCase(charger.getStatus())) {
+            return;
+        }
         Connector conn = connectorRepository.findByChargerAndConnectorIndex(charger, index).orElse(null);
         if (conn == null) {
             connectorRepository.save(Connector.builder()
@@ -404,7 +410,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                     .status("AVAILABLE").maxPowerKw(maxPower)
                     .updatedAt(LocalDateTime.now())
                     .build());
-        } else if (conn.getDeletedAt() == null && "UNAVAILABLE".equalsIgnoreCase(conn.getStatus())) {
+        } else if (conn.getDeletedAt() == null && !"DELETED".equalsIgnoreCase(conn.getStatus()) && "UNAVAILABLE".equalsIgnoreCase(conn.getStatus())) {
             conn.setStatus("AVAILABLE");
             conn.setUpdatedAt(LocalDateTime.now());
             connectorRepository.save(conn);
@@ -416,7 +422,9 @@ public class DatabaseSeeder implements CommandLineRunner {
             List<Charger> allChargers = chargerRepository.findAll();
             List<String> activeStatuses = List.of("STARTING", "ACTIVE", "STOPPING", "PREPARING", "CHARGING", "FINISHING");
             for (Charger charger : allChargers) {
-                if (charger.getDeletedAt() != null) continue;
+                if (charger.getDeletedAt() != null || "DELETED".equalsIgnoreCase(charger.getStatus()) || "DISABLED".equalsIgnoreCase(charger.getStatus())) {
+                    continue;
+                }
 
                 List<Connector> connectors = connectorRepository.findByCharger(charger);
                 boolean hasActiveSession = connectors.stream().anyMatch(c ->
@@ -430,7 +438,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                     chargerRepository.save(charger);
 
                     for (Connector conn : connectors) {
-                        if (conn.getDeletedAt() == null && "UNAVAILABLE".equalsIgnoreCase(conn.getStatus())) {
+                        if (conn.getDeletedAt() == null && !"DELETED".equalsIgnoreCase(conn.getStatus()) && "UNAVAILABLE".equalsIgnoreCase(conn.getStatus())) {
                             log.info("[SEEDER-REPAIR] Repairing stale connector status for ocppId={}, connectorIndex={} from UNAVAILABLE to AVAILABLE", charger.getOcppId(), conn.getConnectorIndex());
                             conn.setStatus("AVAILABLE");
                             conn.setUpdatedAt(LocalDateTime.now());
