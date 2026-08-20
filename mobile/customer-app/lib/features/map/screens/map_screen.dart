@@ -352,15 +352,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               s.latitude,
               s.longitude,
             ) / 1000.0;
-            return s.copyWith(distanceStr: '${dist.toStringAsFixed(1)} km Away');
+            return s.copyWith(
+              distanceKm: dist,
+              distanceStr: '${dist.toStringAsFixed(1)} km Away',
+            );
           }).toList();
 
           // 2. Sort Nearest -> Farthest
-          mappedStations.sort((a, b) {
-            final distA = Geolocator.distanceBetween(_userPosition.latitude, _userPosition.longitude, a.latitude, a.longitude);
-            final distB = Geolocator.distanceBetween(_userPosition.latitude, _userPosition.longitude, b.latitude, b.longitude);
-            return distA.compareTo(distB);
-          });
+          mappedStations.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
 
           // 3. Live search filter
           final searchQuery = _searchController.text.toLowerCase();

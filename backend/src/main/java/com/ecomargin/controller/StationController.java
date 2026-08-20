@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@lombok.extern.slf4j.Slf4j
 @RestController
 @RequestMapping("/api/v1/stations")
 @RequiredArgsConstructor
@@ -55,7 +56,7 @@ public class StationController {
     public ResponseEntity<List<Station>> getNearbyStations(
             @RequestParam(required = false) Double latitude,
             @RequestParam(required = false) Double longitude,
-            @RequestParam(required = false, defaultValue = "50.0") Double radiusKm
+            @RequestParam(required = false, defaultValue = "500.0") Double radiusKm
     ) {
         List<Station> stations = stationRepository.findAll().stream()
                 .filter(s -> s.getDeletedAt() == null && !"INACTIVE".equalsIgnoreCase(s.getStatus()) && !"DELETED".equalsIgnoreCase(s.getStatus()))
@@ -77,11 +78,33 @@ public class StationController {
         });
 
         if (latitude != null && longitude != null) {
-            double r = (radiusKm != null && radiusKm > 0) ? radiusKm : 50.0;
+            double r = (radiusKm != null && radiusKm > 0) ? radiusKm : 500.0;
             stations = stations.stream()
                     .filter(s -> s.getDistanceKm() != null && s.getDistanceKm() <= r)
                     .sorted(java.util.Comparator.comparing(Station::getDistanceKm))
                     .collect(java.util.stream.Collectors.toList());
+        }
+
+        log.info("[NEARBY-STATIONS] total API stations: {}, lat: {}, lng: {}, radiusKm: {}", stations.size(), latitude, longitude, radiusKm);
+        for (Station s : stations) {
+            int chgCount = s.getChargers() != null ? s.getChargers().size() : 0;
+            int connCount = 0;
+            int availConnCount = 0;
+            if (s.getChargers() != null) {
+                for (com.ecomargin.model.Charger chg : s.getChargers()) {
+                    boolean isChgAvail = "AVAILABLE".equalsIgnoreCase(chg.getStatus());
+                    if (chg.getConnectors() != null) {
+                        connCount += chg.getConnectors().size();
+                        for (com.ecomargin.model.Connector conn : chg.getConnectors()) {
+                            if (isChgAvail && "AVAILABLE".equalsIgnoreCase(conn.getStatus())) {
+                                availConnCount++;
+                            }
+                        }
+                    }
+                }
+            }
+            log.info("[NEARBY-STATIONS] station ID: {} | station name: '{}' | distance: {} | charger count: {} | connector count: {} | available connector count: {}",
+                    s.getId(), s.getName(), s.getDistanceStr(), chgCount, connCount, availConnCount);
         }
 
         return ResponseEntity.ok(stations);
