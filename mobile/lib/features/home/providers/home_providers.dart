@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/station.dart';
 import '../../../core/providers/core_providers.dart';
 
@@ -9,166 +10,155 @@ class StationNotifier extends StateNotifier<AsyncValue<List<ChargingStation>>> {
     fetchStations();
   }
 
-  Future<void> fetchStations() async {
+  Future<void> fetchStations({double? latitude, double? longitude, double? radiusKm}) async {
     try {
       state = const AsyncValue.loading();
       final apiClient = ref.read(apiClientProvider);
-      
-      try {
-        final response = await apiClient.dio.get('/stations/nearby');
-        if (response.statusCode == 200 && response.data is List) {
-          final List<ChargingStation> stations = (response.data as List).map((json) {
-            final chargersList = json['chargers'] as List?;
-            final List<StationConnector> connectors = [];
-            int total = 0;
-            int available = 0;
-            
-            if (chargersList != null) {
-              for (final chg in chargersList) {
-                final String chargerId = chg['ocppId'] ?? chg['id']?.toString() ?? '';
-                final connList = chg['connectors'] as List?;
-                if (connList != null) {
-                  for (final conn in connList) {
-                    total++;
-                    final String status = conn['status'] ?? 'AVAILABLE';
-                    if (status.toUpperCase() == 'AVAILABLE') {
-                      available++;
-                    }
-                    final double rate = (conn['unitRate'] as num?)?.toDouble() ?? 18.0;
-                    connectors.add(StationConnector(
-                      id: conn['id']?.toString() ?? '',
-                      type: conn['type'] ?? 'CCS2',
-                      status: status,
-                      maxPowerKw: (conn['maxPowerKw'] as num?)?.toDouble() ?? 60.0,
-                      unitRate: rate,
-                      chargerId: chargerId,
-                    ));
+
+      double? userLat = latitude;
+      double? userLng = longitude;
+
+      if (userLat == null || userLng == null) {
+        try {
+          bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+          if (serviceEnabled) {
+            LocationPermission permission = await Geolocator.checkPermission();
+            if (permission == LocationPermission.denied) {
+              permission = await Geolocator.requestPermission();
+            }
+            if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+              Position position = await Geolocator.getCurrentPosition(
+                desiredAccuracy: LocationAccuracy.medium,
+                timeLimit: const Duration(seconds: 6),
+              );
+              userLat = position.latitude;
+              userLng = position.longitude;
+            }
+          }
+        } catch (_) {
+          // Continue if location fetch times out or fails
+        }
+      }
+
+      final Map<String, dynamic> queryParams = {};
+      if (userLat != null && userLng != null) {
+        queryParams['latitude'] = userLat;
+        queryParams['longitude'] = userLng;
+        queryParams['radiusKm'] = radiusKm ?? 50.0;
+      }
+
+      final response = await apiClient.dio.get('/stations/nearby', queryParameters: queryParams);
+
+      if (response.statusCode == 200 && response.data is List) {
+        final List<ChargingStation> stations = (response.data as List).map((json) {
+          final chargersList = json['chargers'] as List?;
+          final List<StationConnector> connectors = [];
+          int total = 0;
+          int available = 0;
+
+          if (chargersList != null) {
+            for (final chg in chargersList) {
+              final String chargerId = chg['ocppId'] ?? chg['id']?.toString() ?? '';
+              final connList = chg['connectors'] as List?;
+              if (connList != null) {
+                for (final conn in connList) {
+                  total++;
+                  final String status = (conn['status'] ?? 'AVAILABLE').toString();
+                  if (status.toUpperCase() == 'AVAILABLE') {
+                    available++;
                   }
+                  final double rate = (conn['unitRate'] as num?)?.toDouble() ?? 0.0;
+                  connectors.add(StationConnector(
+                    id: conn['id']?.toString() ?? '',
+                    type: (conn['type'] ?? 'CCS2').toString(),
+                    status: status,
+                    maxPowerKw: (conn['maxPowerKw'] as num?)?.toDouble() ?? 60.0,
+                    unitRate: rate,
+                    chargerId: chargerId,
+                  ));
                 }
               }
             }
+          }
 
-            final chargerType = json['chargerType'] ?? (connectors.isNotEmpty ? connectors.first.type : 'CCS2');
+          final double stationLat = (json['latitude'] as num?)?.toDouble() ?? 0.0;
+          final double stationLng = (json['longitude'] as num?)?.toDouble() ?? 0.0;
 
-            String computedPriceStr = json['priceStr'] ?? '';
-            if (computedPriceStr.isEmpty && connectors.isNotEmpty) {
-              final double minRate = connectors.map((c) => c.unitRate).reduce((a, b) => a < b ? a : b);
-              computedPriceStr = '₹${minRate % 1 == 0 ? minRate.toInt() : minRate.toStringAsFixed(2)} / kWh';
-            } else if (computedPriceStr.isEmpty) {
-              computedPriceStr = '₹18.00 / kWh';
+          double distKm = 0.0;
+          String distStr = '';
+
+          if (userLat != null && userLng != null && stationLat != 0.0 && stationLng != 0.0) {
+            distKm = Geolocator.distanceBetween(userLat, userLng, stationLat, stationLng) / 1000.0;
+            distStr = '${distKm.toStringAsFixed(1)} km Away';
+          } else if (json['distanceKm'] != null) {
+            distKm = (json['distanceKm'] as num).toDouble();
+            distStr = json['distanceStr'] ?? '${distKm.toStringAsFixed(1)} km Away';
+          } else {
+            distStr = json['distanceStr'] ?? '';
+          }
+
+          final String chargerType = json['chargerType'] ??
+              (connectors.isNotEmpty ? connectors.map((c) => c.type).toSet().join(', ') : 'CCS2');
+
+          String computedPriceStr = json['priceStr'] ?? '';
+          String computedPriceSubtext = json['priceSubtext'] ?? 'Per kWh';
+
+          if (computedPriceStr.isEmpty || computedPriceStr == 'N/A') {
+            if (connectors.isNotEmpty) {
+              final List<double> validRates = connectors
+                  .map((c) => c.unitRate)
+                  .where((r) => r > 0.0)
+                  .toList();
+              if (validRates.isNotEmpty) {
+                final double minRate = validRates.reduce((double a, double b) => a < b ? a : b);
+                final double maxRate = validRates.reduce((double a, double b) => a > b ? a : b);
+                computedPriceStr = '₹${minRate % 1 == 0 ? minRate.toInt() : minRate.toStringAsFixed(2)} / kWh';
+                computedPriceSubtext = minRate < maxRate ? 'Starting from' : 'Per kWh';
+              }
             }
+          }
 
-            return ChargingStation(
-              id: json['id']?.toString() ?? '',
-              name: json['name'] ?? 'EcoMargin Charging Station',
-              address: json['address'] ?? 'Jaipur, Rajasthan',
-              distanceStr: json['distanceStr'] ?? '0.8 km Away',
-              totalChargers: total,
-              availableChargers: available,
-              chargerType: chargerType,
-              chargerCategory: json['chargerCategory'] ?? (chargerType.contains('CCS2') ? 'Fast Charger' : 'Standard Charger'),
-              priceStr: computedPriceStr,
-              priceSubtext: json['priceSubtext'] ?? 'Starting from',
-              imageUrl: json['imageUrl'] ?? 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
-              isVerified: json['isVerified'] ?? true,
-              latitude: (json['latitude'] as num?)?.toDouble() ?? 26.9150,
-              longitude: (json['longitude'] as num?)?.toDouble() ?? 75.7920,
-              connectors: connectors,
-            );
-          }).toList();
-          state = AsyncValue.data(stations);
-          return;
-        }
-      } catch (_) {
-        // Fallback to sample data for offline demo
+          final String rawAddress = json['address'] ?? '';
+          final String city = json['city'] ?? '';
+          final String stateStr = json['state'] ?? '';
+          String fullAddress = rawAddress;
+          if (city.isNotEmpty && !fullAddress.contains(city)) {
+            fullAddress = fullAddress.isNotEmpty ? '$fullAddress, $city' : city;
+          }
+          if (stateStr.isNotEmpty && !fullAddress.contains(stateStr)) {
+            fullAddress = fullAddress.isNotEmpty ? '$fullAddress, $stateStr' : stateStr;
+          }
+
+          return ChargingStation(
+            id: json['id']?.toString() ?? '',
+            name: json['name'] ?? 'EcoMargin Station',
+            address: fullAddress.isNotEmpty ? fullAddress : 'Location N/A',
+            distanceKm: distKm,
+            distanceStr: distStr.isNotEmpty ? distStr : 'N/A',
+            totalChargers: total,
+            availableChargers: available,
+            chargerType: chargerType,
+            chargerCategory: json['chargerCategory'] ??
+                (chargerType.contains('CCS2') || chargerType.contains('CHADEMO') || chargerType.contains('GB')
+                    ? 'Fast Charger'
+                    : 'Standard Charger'),
+            priceStr: computedPriceStr.isNotEmpty ? computedPriceStr : 'N/A',
+            priceSubtext: computedPriceSubtext,
+            imageUrl: json['imageUrl'] ?? 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
+            isVerified: json['isVerified'] ?? true,
+            latitude: stationLat,
+            longitude: stationLng,
+            connectors: connectors,
+          );
+        }).toList();
+
+        // Strictly sort by distance ascending (nearest station at index 0)
+        stations.sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
+
+        state = AsyncValue.data(stations);
+        return;
       }
-
-      final mockStations = [
-        const ChargingStation(
-          id: 'st-01',
-          name: 'EcoMargin Fast Charging Hub',
-          address: 'Tonk Road, Sector 62, Jaipur, Rajasthan 302018',
-          distanceStr: '0.8 km Away',
-          totalChargers: 2,
-          availableChargers: 2,
-          chargerType: 'CCS2, Type 2',
-          chargerCategory: 'Fast Charger',
-          priceStr: '₹18 / kWh',
-          priceSubtext: 'Starting from',
-          imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
-          isVerified: true,
-          isFavorite: false,
-          latitude: 26.9150,
-          longitude: 75.7920,
-          connectors: [
-            StationConnector(id: '1', type: 'CCS2', status: 'AVAILABLE', maxPowerKw: 60.0, unitRate: 18.0, chargerId: 'TX_AUS_DWTN_01'),
-            StationConnector(id: '2', type: 'Type 2', status: 'AVAILABLE', maxPowerKw: 22.0, unitRate: 18.0, chargerId: 'TX_AUS_DWTN_01'),
-          ],
-        ),
-        const ChargingStation(
-          id: 'st-02',
-          name: 'EcoMargin Supercharge Hub',
-          address: 'Apex Circle, Malviya Nagar, Jaipur 302017',
-          distanceStr: '2.4 km Away',
-          totalChargers: 2,
-          availableChargers: 2,
-          chargerType: 'CCS2, GB/T',
-          chargerCategory: 'Super Charger',
-          priceStr: '₹18 / kWh',
-          priceSubtext: 'Starting from',
-          imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
-          isVerified: true,
-          isFavorite: true,
-          latitude: 26.8540,
-          longitude: 75.8140,
-          connectors: [
-            StationConnector(id: '3', type: 'CCS2', status: 'AVAILABLE', maxPowerKw: 120.0, unitRate: 18.0, chargerId: 'TX_AUS_DWTN_02'),
-            StationConnector(id: '4', type: 'GB/T', status: 'AVAILABLE', maxPowerKw: 60.0, unitRate: 18.0, chargerId: 'TX_AUS_DWTN_02'),
-          ],
-        ),
-        const ChargingStation(
-          id: 'st-03',
-          name: 'PowerGrid Hub C-Scheme',
-          address: 'MI Road, C-Scheme, Jaipur 302001',
-          distanceStr: '3.1 km Away',
-          totalChargers: 1,
-          availableChargers: 1,
-          chargerType: 'Type 2',
-          chargerCategory: 'Standard Charger',
-          priceStr: '₹18 / kWh',
-          priceSubtext: 'Starting from',
-          imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
-          isVerified: true,
-          isFavorite: false,
-          latitude: 26.9180,
-          longitude: 75.8010,
-          connectors: [
-            StationConnector(id: '5', type: 'Type 2', status: 'AVAILABLE', maxPowerKw: 22.0, unitRate: 18.0, chargerId: 'TX_AUS_NL_01'),
-          ],
-        ),
-        const ChargingStation(
-          id: 'st-04',
-          name: 'ChargeZone Express Vaishali',
-          address: 'Queens Road, Vaishali Nagar, Jaipur 302021',
-          distanceStr: '4.5 km Away',
-          totalChargers: 1,
-          availableChargers: 1,
-          chargerType: 'CCS2',
-          chargerCategory: 'Super Charger',
-          priceStr: '₹18 / kWh',
-          priceSubtext: 'Starting from',
-          imageUrl: 'https://images.unsplash.com/photo-1563720223185-11003d516935?w=500&q=80',
-          isVerified: true,
-          isFavorite: false,
-          latitude: 26.9080,
-          longitude: 75.7480,
-          connectors: [
-            StationConnector(id: '6', type: 'CCS2', status: 'AVAILABLE', maxPowerKw: 240.0, unitRate: 18.0, chargerId: 'TX_AUS_NL_02'),
-          ],
-        ),
-      ];
-
-      state = AsyncValue.data(mockStations);
+      state = AsyncValue.error('Invalid response format', StackTrace.current);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }

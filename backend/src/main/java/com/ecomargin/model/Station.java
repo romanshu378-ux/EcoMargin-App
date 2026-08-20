@@ -102,13 +102,31 @@ public class Station {
                 return "₹" + minRate.setScale(2, java.math.RoundingMode.HALF_UP).toString() + " / kWh";
             }
         }
-        return "₹18.00 / kWh";
+        return "N/A";
     }
 
     @com.fasterxml.jackson.annotation.JsonProperty("priceSubtext")
     @Transient
     public String getPriceSubtext() {
-        return "Starting from";
+        if (chargers != null) {
+            BigDecimal minRate = null;
+            BigDecimal maxRate = null;
+            for (Charger c : chargers) {
+                if (c.getConnectors() != null) {
+                    for (Connector conn : c.getConnectors()) {
+                        BigDecimal r = conn.getUnitRate();
+                        if (r != null && r.compareTo(BigDecimal.ZERO) > 0) {
+                            if (minRate == null || r.compareTo(minRate) < 0) minRate = r;
+                            if (maxRate == null || r.compareTo(maxRate) > 0) maxRate = r;
+                        }
+                    }
+                }
+            }
+            if (minRate != null && maxRate != null && minRate.compareTo(maxRate) < 0) {
+                return "Starting from";
+            }
+        }
+        return "Per kWh";
     }
 
     @com.fasterxml.jackson.annotation.JsonProperty("chargerType")
@@ -129,15 +147,26 @@ public class Station {
                 return String.join(", ", types);
             }
         }
-        return "CCS2";
+        return "N/A";
     }
 
     @com.fasterxml.jackson.annotation.JsonProperty("chargerCategory")
     @Transient
     public String getChargerCategory() {
         String cType = getChargerType();
-        if (cType.contains("CCS2") || cType.contains("CHADEMO") || cType.contains("GB_T")) {
+        if (cType.contains("CCS2") || cType.contains("CHADEMO") || cType.contains("GB_T") || cType.contains("GB/T")) {
             return "Fast Charger";
+        }
+        if (chargers != null) {
+            for (Charger c : chargers) {
+                if (c.getConnectors() != null) {
+                    for (Connector conn : c.getConnectors()) {
+                        if (conn.getMaxPowerKw() != null && conn.getMaxPowerKw().doubleValue() >= 50.0) {
+                            return "Fast Charger";
+                        }
+                    }
+                }
+            }
         }
         return "Standard Charger";
     }

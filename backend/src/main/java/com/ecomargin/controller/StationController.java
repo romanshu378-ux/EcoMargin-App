@@ -78,14 +78,10 @@ public class StationController {
                         station.getLatitude().doubleValue(), station.getLongitude().doubleValue()
                 );
                 station.setDistanceKm(dist);
-                if (dist < 1.0) {
-                    long meters = Math.round(dist * 1000.0);
-                    station.setDistanceStr(meters + " m Away");
-                } else {
-                    station.setDistanceStr(String.format(java.util.Locale.US, "%.1f km Away", dist));
-                }
+                station.setDistanceStr(String.format(java.util.Locale.US, "%.1f km Away", dist));
             } else {
-                station.setDistanceStr("0.8 km Away");
+                station.setDistanceKm(null);
+                station.setDistanceStr(null);
             }
         });
 

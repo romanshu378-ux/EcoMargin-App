@@ -3,6 +3,7 @@ class StationConnector {
   final String type;
   final String status;
   final double maxPowerKw;
+  final double unitRate;
   final String chargerId;
 
   const StationConnector({
@@ -10,6 +11,7 @@ class StationConnector {
     required this.type,
     required this.status,
     required this.maxPowerKw,
+    this.unitRate = 18.0,
     required this.chargerId,
   });
 }
@@ -18,6 +20,7 @@ class ChargingStation {
   final String id;
   final String name;
   final String address;
+  final double distanceKm;
   final String distanceStr;
   final int totalChargers;
   final int availableChargers;
@@ -36,6 +39,7 @@ class ChargingStation {
     required this.id,
     required this.name,
     required this.address,
+    this.distanceKm = 0.0,
     required this.distanceStr,
     required this.totalChargers,
     required this.availableChargers,
@@ -54,6 +58,7 @@ class ChargingStation {
   ChargingStation copyWith({
     bool? isFavorite,
     int? availableChargers,
+    double? distanceKm,
     String? distanceStr,
     List<StationConnector>? connectors,
   }) {
@@ -61,6 +66,7 @@ class ChargingStation {
       id: id,
       name: name,
       address: address,
+      distanceKm: distanceKm ?? this.distanceKm,
       distanceStr: distanceStr ?? this.distanceStr,
       totalChargers: totalChargers,
       availableChargers: availableChargers ?? this.availableChargers,

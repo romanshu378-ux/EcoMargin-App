@@ -503,7 +503,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                                 const Icon(Icons.ev_station_outlined, size: 44, color: Colors.grey),
                                 const SizedBox(height: 12),
                                 Text(
-                                  _searchQuery.isEmpty ? 'No chargers available nearby.' : 'No stations found matching "$_searchQuery"',
+                                  _searchQuery.isEmpty ? 'No charging stations found nearby.' : 'No stations found matching "$_searchQuery"',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 14,
@@ -563,41 +563,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       ),
                     ),
                   ),
-                  error: (err, stack) => SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.error_outline_rounded, size: 36, color: Colors.red),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Unable to load nearby chargers',
-                              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Please check your network connection and try again.',
-                              style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                            ),
-                            const SizedBox(height: 12),
-                            OutlinedButton.icon(
-                              onPressed: () {
-                                ref.read(stationsProvider.notifier).fetchStations();
-                              },
-                              icon: const Icon(Icons.refresh_rounded),
-                              label: const Text('Retry'),
-                            ),
-                          ],
+                  error: (err, stack) {
+                    final errStr = err.toString().toLowerCase();
+                    final isLocationErr = errStr.contains('location') || errStr.contains('permission') || errStr.contains('gps');
+                    final titleText = isLocationErr
+                        ? 'Unable to determine your location'
+                        : 'Unable to load nearby chargers';
+                    final bodyText = isLocationErr
+                        ? 'Please enable location permission to discover charging stations near you.'
+                        : 'Please check your network connection and try again.';
+
+                    return SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(isLocationErr ? Icons.location_off_rounded : Icons.error_outline_rounded, size: 36, color: Colors.red),
+                              const SizedBox(height: 8),
+                              Text(
+                                titleText,
+                                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 14),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                bodyText,
+                                style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  ref.read(stationsProvider.notifier).fetchStations();
+                                },
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: const Text('Retry'),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
 
                 const SliverToBoxAdapter(child: SizedBox(height: 12)),
