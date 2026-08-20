@@ -104,9 +104,15 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> with 
             _selectedStation = matched;
             if (matched.connectors.isNotEmpty) {
               _selectedConnector = matched.connectors.firstWhere(
-                (c) => c.id == widget.connectorId,
-                orElse: () => matched.connectors.first,
+                (c) => c.id == widget.connectorId && ConnectorStatusInfo.fromRaw(c.status).isStartable,
+                orElse: () => matched.connectors.firstWhere(
+                  (c) => ConnectorStatusInfo.fromRaw(c.status).isStartable,
+                  orElse: () => matched.connectors.first,
+                ),
               );
+              if (!ConnectorStatusInfo.fromRaw(_selectedConnector?.status).isStartable) {
+                _selectedConnector = null;
+              }
             } else {
               _selectedConnector = null;
             }
@@ -898,7 +904,17 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> with 
                             margin: const EdgeInsets.only(bottom: 12),
                             child: InkWell(
                               onTap: () {
-                                setState(() => _selectedConnector = conn);
+                                if (cInfo.isStartable) {
+                                  setState(() => _selectedConnector = conn);
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Connector #$index is currently ${cInfo.label}. Please select an AVAILABLE connector.'),
+                                      backgroundColor: Colors.orange.shade800,
+                                      duration: const Duration(seconds: 3),
+                                    ),
+                                  );
+                                }
                               },
                               borderRadius: BorderRadius.circular(18),
                               child: Container(

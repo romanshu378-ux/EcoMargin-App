@@ -378,18 +378,33 @@ public class DatabaseSeeder implements CommandLineRunner {
     }
 
     private Charger seedCharger(Station station, String ocppId, String model, String brand) {
-        return chargerRepository.findByOcppId(ocppId)
-                .orElseGet(() -> chargerRepository.save(Charger.builder()
-                        .station(station).ocppId(ocppId).model(model)
-                        .brand(brand).status("AVAILABLE")
-                        .build()));
+        Charger charger = chargerRepository.findByOcppId(ocppId).orElse(null);
+        if (charger == null) {
+            charger = chargerRepository.save(Charger.builder()
+                    .station(station).ocppId(ocppId).model(model)
+                    .brand(brand).status("AVAILABLE")
+                    .updatedAt(LocalDateTime.now())
+                    .build());
+        } else if (charger.getDeletedAt() == null && "UNAVAILABLE".equalsIgnoreCase(charger.getStatus())) {
+            charger.setStatus("AVAILABLE");
+            charger.setUpdatedAt(LocalDateTime.now());
+            charger = chargerRepository.save(charger);
+        }
+        return charger;
     }
 
     private void seedConnector(Charger charger, int index, String type, BigDecimal maxPower) {
-        connectorRepository.findByChargerAndConnectorIndex(charger, index)
-                .orElseGet(() -> connectorRepository.save(Connector.builder()
-                        .charger(charger).connectorIndex(index).type(type)
-                        .status("AVAILABLE").maxPowerKw(maxPower)
-                        .build()));
+        Connector conn = connectorRepository.findByChargerAndConnectorIndex(charger, index).orElse(null);
+        if (conn == null) {
+            connectorRepository.save(Connector.builder()
+                    .charger(charger).connectorIndex(index).type(type)
+                    .status("AVAILABLE").maxPowerKw(maxPower)
+                    .updatedAt(LocalDateTime.now())
+                    .build());
+        } else if (conn.getDeletedAt() == null && "UNAVAILABLE".equalsIgnoreCase(conn.getStatus())) {
+            conn.setStatus("AVAILABLE");
+            conn.setUpdatedAt(LocalDateTime.now());
+            connectorRepository.save(conn);
+        }
     }
 }

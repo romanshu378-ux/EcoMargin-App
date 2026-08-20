@@ -30,8 +30,10 @@ public class HeartbeatTimeoutChecker {
         LocalDateTime threshold = LocalDateTime.now().minusSeconds(120);
 
         List<Charger> activeChargers = chargerRepository.findAll().stream()
+                .filter(c -> c.getDeletedAt() == null)
                 .filter(c -> !"UNAVAILABLE".equalsIgnoreCase(c.getStatus()) && !"OFFLINE".equalsIgnoreCase(c.getStatus()))
                 .filter(c -> c.getUpdatedAt() != null && c.getUpdatedAt().isBefore(threshold))
+                .filter(c -> c.getOcppId() != null && c.getOcppId().startsWith("SIM-"))
                 .toList();
 
         for (Charger charger : activeChargers) {

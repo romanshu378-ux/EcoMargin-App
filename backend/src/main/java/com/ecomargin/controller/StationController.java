@@ -126,13 +126,13 @@ public class StationController {
     private boolean isChargerCustomerVisible(com.ecomargin.model.Charger charger) {
         if (charger == null || charger.getDeletedAt() != null) return false;
         String st = charger.getStatus() != null ? charger.getStatus().toUpperCase() : "";
-        return !java.util.Set.of("UNAVAILABLE", "DELETED", "INACTIVE", "DISABLED").contains(st);
+        return !java.util.Set.of("DELETED", "DISABLED").contains(st);
     }
 
     private boolean isConnectorCustomerVisible(com.ecomargin.model.Connector connector) {
         if (connector == null || connector.getDeletedAt() != null) return false;
         String st = connector.getStatus() != null ? connector.getStatus().toUpperCase() : "";
-        return !java.util.Set.of("UNAVAILABLE", "DELETED", "INACTIVE", "DISABLED").contains(st);
+        return !java.util.Set.of("DELETED", "DISABLED").contains(st);
     }
 
     @Operation(summary = "Create a new CPO Station")
