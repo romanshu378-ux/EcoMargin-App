@@ -27,6 +27,7 @@ public class OcppStartupTimingDiagnostic {
 
     @EventListener
     public void onContextRefreshed(ContextRefreshedEvent event) {
+        log.info("[OCPP-STARTUP] Database initialization complete");
         log.info("[OCPP-STARTUP] Database connection established");
         log.info("[OCPP-STARTUP] JPA initialized");
         log.info("[OCPP-STARTUP] WebSocket initialized");
