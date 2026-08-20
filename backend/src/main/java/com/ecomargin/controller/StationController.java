@@ -40,15 +40,7 @@ public class StationController {
                 .and(StationSpecification.hasNameLike(search));
 
         Page<Station> stations = stationRepository.findAll(spec, pageable);
-        stations.getContent().forEach(station -> {
-            if (station.getChargers() != null) {
-                station.getChargers().forEach(charger -> {
-                    if (charger.getConnectors() != null) {
-                        charger.getConnectors().size();
-                    }
-                });
-            }
-        });
+        stations.getContent().forEach(this::filterCustomerVisibleHardware);
         return ResponseEntity.ok(stations);
     }
 
@@ -64,13 +56,7 @@ public class StationController {
         List<Station> stations = stationRepository.findAll();
         
         stations.forEach(station -> {
-            if (station.getChargers() != null) {
-                station.getChargers().forEach(charger -> {
-                    if (charger.getConnectors() != null) {
-                        charger.getConnectors().size();
-                    }
-                });
-            }
+            filterCustomerVisibleHardware(station);
 
             if (latitude != null && longitude != null && station.getLatitude() != null && station.getLongitude() != null) {
                 double dist = calculateHaversineDistance(
@@ -115,16 +101,38 @@ public class StationController {
     public ResponseEntity<Station> getStationById(@PathVariable Long id) {
         return stationRepository.findById(id)
                 .map(station -> {
-                    if (station.getChargers() != null) {
-                        station.getChargers().forEach(charger -> {
-                            if (charger.getConnectors() != null) {
-                                charger.getConnectors().size();
-                            }
-                        });
-                    }
+                    filterCustomerVisibleHardware(station);
                     return ResponseEntity.ok(station);
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private void filterCustomerVisibleHardware(Station station) {
+        if (station == null || station.getChargers() == null) return;
+        List<com.ecomargin.model.Charger> visibleChargers = station.getChargers().stream()
+                .filter(this::isChargerCustomerVisible)
+                .peek(charger -> {
+                    if (charger.getConnectors() != null) {
+                        List<com.ecomargin.model.Connector> visibleConnectors = charger.getConnectors().stream()
+                                .filter(this::isConnectorCustomerVisible)
+                                .collect(java.util.stream.Collectors.toList());
+                        charger.setConnectors(visibleConnectors);
+                    }
+                })
+                .collect(java.util.stream.Collectors.toList());
+        station.setChargers(visibleChargers);
+    }
+
+    private boolean isChargerCustomerVisible(com.ecomargin.model.Charger charger) {
+        if (charger == null || charger.getDeletedAt() != null) return false;
+        String st = charger.getStatus() != null ? charger.getStatus().toUpperCase() : "";
+        return !java.util.Set.of("UNAVAILABLE", "DELETED", "INACTIVE", "DISABLED").contains(st);
+    }
+
+    private boolean isConnectorCustomerVisible(com.ecomargin.model.Connector connector) {
+        if (connector == null || connector.getDeletedAt() != null) return false;
+        String st = connector.getStatus() != null ? connector.getStatus().toUpperCase() : "";
+        return !java.util.Set.of("UNAVAILABLE", "DELETED", "INACTIVE", "DISABLED").contains(st);
     }
 
     @Operation(summary = "Create a new CPO Station")

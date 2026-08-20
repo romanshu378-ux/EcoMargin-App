@@ -116,4 +116,72 @@ class StationControllerIntegrationTest {
                 .andExpect(jsonPath("$[0].name").value("Austin Downtown Hub"))
                 .andExpect(jsonPath("$[0].distanceStr").exists());
     }
+
+    @Test
+    @WithMockUser(username = "customer@ecomargin.com", roles = {"CUSTOMER"})
+    void testDeletedChargerExclusionFromCustomerApi() throws Exception {
+        Station st = Station.builder()
+                .name("Filter Test Station")
+                .latitude(new BigDecimal("30.267153"))
+                .longitude(new BigDecimal("-97.743062"))
+                .address("100 Test St")
+                .status("ACTIVE")
+                .build();
+        Station savedStation = stationRepository.save(st);
+
+        com.ecomargin.model.Charger activeCharger = com.ecomargin.model.Charger.builder()
+                .station(savedStation)
+                .ocppId("ACTIVE-CHG-1")
+                .brand("EcoMargin")
+                .model("EV-Fast-60")
+                .status("AVAILABLE")
+                .build();
+        com.ecomargin.model.Charger savedActiveChg = chargerRepository.save(activeCharger);
+
+        com.ecomargin.model.Connector c1 = com.ecomargin.model.Connector.builder()
+                .charger(savedActiveChg)
+                .connectorIndex(1)
+                .type("CCS2")
+                .maxPowerKw(new BigDecimal("60.00"))
+                .unitRate(new BigDecimal("18.00"))
+                .status("AVAILABLE")
+                .build();
+        connectorRepository.save(c1);
+
+        com.ecomargin.model.Charger deletedCharger = com.ecomargin.model.Charger.builder()
+                .station(savedStation)
+                .ocppId("DELETED-CHG-2")
+                .brand("EcoMargin")
+                .model("EV-Fast-60")
+                .status("UNAVAILABLE")
+                .deletedAt(java.time.LocalDateTime.now())
+                .build();
+        com.ecomargin.model.Charger savedDeletedChg = chargerRepository.save(deletedCharger);
+
+        com.ecomargin.model.Connector c2 = com.ecomargin.model.Connector.builder()
+                .charger(savedDeletedChg)
+                .connectorIndex(1)
+                .type("CCS2")
+                .maxPowerKw(new BigDecimal("60.00"))
+                .unitRate(new BigDecimal("18.00"))
+                .status("UNAVAILABLE")
+                .deletedAt(java.time.LocalDateTime.now())
+                .build();
+        connectorRepository.save(c2);
+
+        // Customer API GET /nearby: should return ONLY activeCharger
+        mockMvc.perform(get("/api/v1/stations/nearby")
+                        .param("latitude", "30.267153")
+                        .param("longitude", "-97.743062")
+                        .param("radiusKm", "10.0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.name == 'Filter Test Station')].chargers[0].ocppId").value("ACTIVE-CHG-1"))
+                .andExpect(jsonPath("$[?(@.name == 'Filter Test Station')].chargers", hasSize(1)));
+
+        // Customer API GET /{id}: should return ONLY activeCharger
+        mockMvc.perform(get("/api/v1/stations/" + savedStation.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.chargers", hasSize(1)))
+                .andExpect(jsonPath("$.chargers[0].ocppId").value("ACTIVE-CHG-1"));
+    }
 }

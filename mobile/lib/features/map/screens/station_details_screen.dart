@@ -259,17 +259,18 @@ class StationDetailsScreen extends ConsumerWidget {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
+                        if (station.connectors.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('No active chargers available at this station.'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                          return;
+                        }
                         final availableConn = station.connectors.firstWhere(
                           (c) => c.status.toUpperCase() == 'AVAILABLE',
-                          orElse: () => station.connectors.isNotEmpty
-                              ? station.connectors.first
-                              : const StationConnector(
-                                  id: '1',
-                                  type: 'CCS2',
-                                  status: 'AVAILABLE',
-                                  maxPowerKw: 60.0,
-                                  chargerId: 'CHG-DC-04',
-                                ),
+                          orElse: () => station.connectors.first,
                         );
                         context.push(
                           '/start-charging',

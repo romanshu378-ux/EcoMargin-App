@@ -198,7 +198,11 @@ class _StartChargingScreenState extends ConsumerState<StartChargingScreen> with 
       if (latestStations != null && _selectedStation != null) {
         latestStation = latestStations.firstWhere((s) => s.id == _selectedStation!.id, orElse: () => _selectedStation!);
         if (_selectedConnector != null) {
-          latestConn = latestStation.connectors.firstWhere((c) => c.id == _selectedConnector!.id, orElse: () => _selectedConnector!);
+          try {
+            latestConn = latestStation.connectors.firstWhere((c) => c.id == _selectedConnector!.id);
+          } catch (_) {
+            latestConn = null;
+          }
         }
       }
 

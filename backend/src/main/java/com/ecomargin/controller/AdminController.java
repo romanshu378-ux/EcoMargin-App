@@ -350,6 +350,7 @@ public class AdminController {
                             if (!sessions.isEmpty()) {
                                 log.warn("[ADMIN-SAFETY] Cannot hard delete connector {} with active session. Soft-deactivating.", conn.getId());
                                 conn.setStatus("UNAVAILABLE");
+                                conn.setDeletedAt(LocalDateTime.now());
                                 connectorRepository.save(conn);
                             } else {
                                 try {
@@ -357,6 +358,7 @@ public class AdminController {
                                 } catch (Exception e) {
                                     log.warn("[ADMIN-SAFETY] Soft-deactivating connector {} due to historical data constraint: {}", conn.getId(), e.getMessage());
                                     conn.setStatus("UNAVAILABLE");
+                                    conn.setDeletedAt(LocalDateTime.now());
                                     connectorRepository.save(conn);
                                 }
                             }
@@ -372,6 +374,12 @@ public class AdminController {
                     if (hasActive) {
                         log.warn("[ADMIN-SAFETY] Cannot hard delete charger {} with active sessions. Soft-deactivating.", chg.getOcppId());
                         chg.setStatus("UNAVAILABLE");
+                        chg.setDeletedAt(LocalDateTime.now());
+                        for (Connector c : chgConns) {
+                            c.setStatus("UNAVAILABLE");
+                            c.setDeletedAt(LocalDateTime.now());
+                            connectorRepository.save(c);
+                        }
                         chargerRepository.save(chg);
                     } else {
                         try {
@@ -379,6 +387,12 @@ public class AdminController {
                         } catch (Exception e) {
                             log.warn("[ADMIN-SAFETY] Soft-deactivating charger {} due to historical constraint: {}", chg.getOcppId(), e.getMessage());
                             chg.setStatus("UNAVAILABLE");
+                            chg.setDeletedAt(LocalDateTime.now());
+                            for (Connector c : chgConns) {
+                                c.setStatus("UNAVAILABLE");
+                                c.setDeletedAt(LocalDateTime.now());
+                                connectorRepository.save(c);
+                            }
                             chargerRepository.save(chg);
                         }
                     }

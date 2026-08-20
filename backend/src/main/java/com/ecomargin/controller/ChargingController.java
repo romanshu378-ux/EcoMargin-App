@@ -368,17 +368,19 @@ public class ChargingController {
 
             // Connector Status Validation
             String connStatus = connector.getStatus() != null ? connector.getStatus().toUpperCase() : "UNAVAILABLE";
-            if (!List.of("AVAILABLE", "PREPARING", "PLUGGED").contains(connStatus)) {
-                log.warn("Security Alert: Attempted to start session on connector {} in status {}", connector.getId(), connStatus);
+            if (connector.getDeletedAt() != null || Set.of("UNAVAILABLE", "DELETED", "INACTIVE", "DISABLED").contains(connStatus) || !List.of("AVAILABLE", "PREPARING", "PLUGGED").contains(connStatus)) {
+                log.warn("Security Alert: Attempted to start session on connector {} in status {} / deletedAt {}", connector.getId(), connStatus, connector.getDeletedAt());
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
                         "code", "CONNECTOR_UNAVAILABLE",
-                        "message", "Connector is currently unavailable (" + connStatus + ")."
+                        "message", "Connector is currently unavailable."
                 ));
             }
 
             // Charger Status Validation
             Charger charger = connector.getCharger();
-            if (charger == null || !"AVAILABLE".equalsIgnoreCase(charger.getStatus())) {
+            String chgStatus = charger != null && charger.getStatus() != null ? charger.getStatus().toUpperCase() : "UNAVAILABLE";
+            if (charger == null || charger.getDeletedAt() != null || Set.of("UNAVAILABLE", "DELETED", "INACTIVE", "DISABLED").contains(chgStatus)) {
+                log.warn("Security Alert: Attempted to start session on charger in status {} / deletedAt {}", chgStatus, charger != null ? charger.getDeletedAt() : null);
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
                         "code", "CHARGER_UNAVAILABLE",
                         "message", "Charger is currently unavailable."
@@ -387,7 +389,8 @@ public class ChargingController {
 
             // Station Status Validation
             Station station = charger.getStation();
-            if (station == null || !"ACTIVE".equalsIgnoreCase(station.getStatus())) {
+            String stStatus = station != null && station.getStatus() != null ? station.getStatus().toUpperCase() : "INACTIVE";
+            if (station == null || station.getDeletedAt() != null || !"ACTIVE".equalsIgnoreCase(stStatus)) {
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
                         "code", "STATION_UNAVAILABLE",
                         "message", "Station is currently unavailable."
