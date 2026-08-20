@@ -70,6 +70,8 @@ public class BootNotificationHandler implements OcppRequestHandler {
         charger.setUpdatedAt(LocalDateTime.now());
         chargerRepository.save(charger);
 
+        log.info("[OCPP-BOOT-TRANSITION] ocppId={}, chargerStatus=AVAILABLE", chargeBoxId);
+
         responsePayload.put("status", "Accepted");
         responsePayload.put("currentTime", Instant.now().toString());
         responsePayload.put("interval", 300);

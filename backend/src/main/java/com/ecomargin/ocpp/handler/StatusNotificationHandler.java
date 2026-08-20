@@ -75,10 +75,13 @@ public class StatusNotificationHandler implements OcppRequestHandler {
         connectorRepository.save(connector);
 
         charger.setUpdatedAt(LocalDateTime.now());
-        if ("CHARGING".equalsIgnoreCase(dbStatus) || "FAULTED".equalsIgnoreCase(dbStatus) || "AVAILABLE".equalsIgnoreCase(dbStatus)) {
+        if ("CHARGING".equalsIgnoreCase(dbStatus) || "FAULTED".equalsIgnoreCase(dbStatus) || "AVAILABLE".equalsIgnoreCase(dbStatus) || "PREPARING".equalsIgnoreCase(dbStatus)) {
             charger.setStatus(dbStatus);
         }
         chargerRepository.save(charger);
+
+        log.info("[OCPP-STATUS-TRANSITION] ocppId={}, connectorIndex={}, ocppStatus={}, dbStatus={}, newChargerStatus={}",
+                chargeBoxId, connectorIndex, ocppStatus, dbStatus, charger.getStatus());
 
         return OcppMessage.builder()
                 .messageTypeId(3)

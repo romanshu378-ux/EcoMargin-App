@@ -59,19 +59,24 @@ class StationNotifier extends StateNotifier<AsyncValue<List<ChargingStation>>> {
           if (chargersList != null) {
             for (final chg in chargersList) {
               final String chargerId = chg['ocppId'] ?? chg['id']?.toString() ?? '';
+              final String chgStatus = (chg['status'] ?? 'AVAILABLE').toString().toUpperCase();
+              final bool isChargerAvailable = chgStatus == 'AVAILABLE';
               final connList = chg['connectors'] as List?;
+
               if (connList != null) {
                 for (final conn in connList) {
                   total++;
-                  final String status = (conn['status'] ?? 'AVAILABLE').toString();
-                  if (status.toUpperCase() == 'AVAILABLE') {
+                  final String rawConnStatus = (conn['status'] ?? 'AVAILABLE').toString().toUpperCase();
+                  final String effectiveStatus = isChargerAvailable ? rawConnStatus : 'UNAVAILABLE';
+
+                  if (effectiveStatus == 'AVAILABLE') {
                     available++;
                   }
                   final double rate = (conn['unitRate'] as num?)?.toDouble() ?? 0.0;
                   connectors.add(StationConnector(
                     id: conn['id']?.toString() ?? '',
                     type: (conn['type'] ?? 'CCS2').toString(),
-                    status: status,
+                    status: effectiveStatus,
                     maxPowerKw: (conn['maxPowerKw'] as num?)?.toDouble() ?? 60.0,
                     unitRate: rate,
                     chargerId: chargerId,

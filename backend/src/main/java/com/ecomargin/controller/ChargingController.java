@@ -379,6 +379,17 @@ public class ChargingController {
             // Charger Status Validation
             Charger charger = connector.getCharger();
             String chgStatus = charger != null && charger.getStatus() != null ? charger.getStatus().toUpperCase() : "UNAVAILABLE";
+            Station station = charger != null ? charger.getStation() : null;
+
+            log.info("[DIAGNOSTIC-START-CHARGING] stationId={}, chargerId={}, ocppId={}, chargerStatus={}, connectorId={}, connectorIndex={}, connectorStatus={}",
+                    station != null ? station.getId() : null,
+                    charger != null ? charger.getId() : null,
+                    charger != null ? charger.getOcppId() : null,
+                    chgStatus,
+                    connector.getId(),
+                    connector.getConnectorIndex(),
+                    connStatus);
+
             if (charger == null || charger.getDeletedAt() != null || Set.of("UNAVAILABLE", "DELETED", "INACTIVE", "DISABLED").contains(chgStatus)) {
                 log.warn("Security Alert: Attempted to start session on charger in status {} / deletedAt {}", chgStatus, charger != null ? charger.getDeletedAt() : null);
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
@@ -388,7 +399,6 @@ public class ChargingController {
             }
 
             // Station Status Validation
-            Station station = charger.getStation();
             String stStatus = station != null && station.getStatus() != null ? station.getStatus().toUpperCase() : "INACTIVE";
             if (station == null || station.getDeletedAt() != null || !"ACTIVE".equalsIgnoreCase(stStatus)) {
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(

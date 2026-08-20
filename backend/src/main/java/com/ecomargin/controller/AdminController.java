@@ -269,7 +269,7 @@ public class AdminController {
                             .ocppId(ocppId)
                             .brand(cReq.getBrand() != null ? cReq.getBrand() : "EcoMargin")
                             .model(cReq.getModel() != null ? cReq.getModel() : "EV-Fast-60")
-                            .status(cReq.getStatus() != null ? cReq.getStatus().toUpperCase() : "AVAILABLE")
+                            .status(cReq.getStatus() != null && !cReq.getStatus().isBlank() ? cReq.getStatus().toUpperCase() : "AVAILABLE")
                             .build();
                 } else {
                     if (cReq.getOcppId() != null && !cReq.getOcppId().isBlank()) {
@@ -277,7 +277,9 @@ public class AdminController {
                     }
                     if (cReq.getBrand() != null) charger.setBrand(cReq.getBrand());
                     if (cReq.getModel() != null) charger.setModel(cReq.getModel());
-                    if (cReq.getStatus() != null) charger.setStatus(cReq.getStatus().toUpperCase());
+                    if (cReq.getStatus() != null && !cReq.getStatus().isBlank()) {
+                        charger.setStatus(cReq.getStatus().toUpperCase());
+                    }
                 }
 
                 Charger savedCharger = chargerRepository.save(charger);
@@ -319,13 +321,15 @@ public class AdminController {
                                     .type(connReq.getType() != null ? connReq.getType().toUpperCase() : "CCS2")
                                     .maxPowerKw(kw)
                                     .unitRate(rate)
-                                    .status(connReq.getStatus() != null ? connReq.getStatus().toUpperCase() : "AVAILABLE")
+                                    .status(connReq.getStatus() != null && !connReq.getStatus().isBlank() ? connReq.getStatus().toUpperCase() : "AVAILABLE")
                                     .build();
                         } else {
                             if (connReq.getType() != null) connector.setType(connReq.getType().toUpperCase());
                             connector.setMaxPowerKw(kw);
                             connector.setUnitRate(rate);
-                            if (connReq.getStatus() != null) connector.setStatus(connReq.getStatus().toUpperCase());
+                            if (connReq.getStatus() != null && !connReq.getStatus().isBlank()) {
+                                connector.setStatus(connReq.getStatus().toUpperCase());
+                            }
                         }
 
                         Connector savedConn = connectorRepository.save(connector);

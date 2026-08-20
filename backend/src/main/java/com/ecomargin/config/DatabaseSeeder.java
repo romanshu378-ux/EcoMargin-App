@@ -17,6 +17,7 @@ import com.ecomargin.repository.TransactionRepository;
 import com.ecomargin.repository.StationRepository;
 import com.ecomargin.repository.ChargerRepository;
 import com.ecomargin.repository.ConnectorRepository;
+import com.ecomargin.repository.ChargingSessionRepository;
 import com.ecomargin.repository.VendorRepository;
 import com.ecomargin.repository.SettingRepository;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +53,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final StationRepository stationRepository;
     private final ChargerRepository chargerRepository;
     private final ConnectorRepository connectorRepository;
+    private final ChargingSessionRepository chargingSessionRepository;
     private final VendorRepository vendorRepository;
     private final SettingRepository settingRepository;
 
@@ -106,6 +108,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         // 4. Seed Stations
         try {
             seedDefaultStations();
+            auditAndRepairStaleChargers();
         } catch (Exception e) {
             log.error("[SEEDER] Non-fatal error during station seeding: {}", e.getMessage(), e);
         }
@@ -405,6 +408,39 @@ public class DatabaseSeeder implements CommandLineRunner {
             conn.setStatus("AVAILABLE");
             conn.setUpdatedAt(LocalDateTime.now());
             connectorRepository.save(conn);
+        }
+    }
+
+    private void auditAndRepairStaleChargers() {
+        try {
+            List<Charger> allChargers = chargerRepository.findAll();
+            List<String> activeStatuses = List.of("STARTING", "ACTIVE", "STOPPING", "PREPARING", "CHARGING", "FINISHING");
+            for (Charger charger : allChargers) {
+                if (charger.getDeletedAt() != null) continue;
+
+                List<Connector> connectors = connectorRepository.findByCharger(charger);
+                boolean hasActiveSession = connectors.stream().anyMatch(c ->
+                        !chargingSessionRepository.findByConnectorAndStatusIn(c, activeStatuses).isEmpty()
+                );
+
+                if (!hasActiveSession && "UNAVAILABLE".equalsIgnoreCase(charger.getStatus())) {
+                    log.info("[SEEDER-REPAIR] Repairing stale charger status for ocppId={} from UNAVAILABLE to AVAILABLE", charger.getOcppId());
+                    charger.setStatus("AVAILABLE");
+                    charger.setUpdatedAt(LocalDateTime.now());
+                    chargerRepository.save(charger);
+
+                    for (Connector conn : connectors) {
+                        if (conn.getDeletedAt() == null && "UNAVAILABLE".equalsIgnoreCase(conn.getStatus())) {
+                            log.info("[SEEDER-REPAIR] Repairing stale connector status for ocppId={}, connectorIndex={} from UNAVAILABLE to AVAILABLE", charger.getOcppId(), conn.getConnectorIndex());
+                            conn.setStatus("AVAILABLE");
+                            conn.setUpdatedAt(LocalDateTime.now());
+                            connectorRepository.save(conn);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[SEEDER-REPAIR] Audit and repair skipped: {}", e.getMessage());
         }
     }
 }
